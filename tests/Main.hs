@@ -63,7 +63,7 @@ testRounding
     , CmpNat 0 (Money.Scale currency) ~ 'LT )
   => Proxy currency
   -> Tasty.TestTree
-testRounding pc = Tasty.testGroup "Rounding laws"
+testRounding pc = Tasty.testGroup "Rounding"
   [ QC.testProperty ("floor - " ++ symbolVal pc) $
       QC.forAll QC.arbitrary $ \(x :: Money.Continuous currency) ->
          x === case Money.floor x of

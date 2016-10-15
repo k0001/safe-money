@@ -1,10 +1,10 @@
-{ mkDerivation, base, tasty, tasty-hunit, tasty-quickcheck, stdenv
+{ mkDerivation, base, tasty, tasty-hunit, tasty-quickcheck, scientific, stdenv
 }:
 mkDerivation {
   pname = "money";
   version = "0.1";
   src = ./.;
-  isExcecutable = false;
+  isExecutable = false;
   libraryHaskellDepends = [ base scientific ];
   testDepends = [ base tasty tasty-hunit tasty-quickcheck ];
   homepage = "https://github.com/k0001/haskell-money";
