@@ -3,9 +3,10 @@
 {-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
 {-# LANGUAGE KindSignatures #-}
+{-# LANGUAGE LambdaCase #-}
+{-# LANGUAGE ScopedTypeVariables #-}
 {-# LANGUAGE TypeFamilies #-}
 {-# LANGUAGE TypeOperators #-}
-{-# LANGUAGE ScopedTypeVariables #-}
 {-# LANGUAGE UndecidableInstances #-}
 {-# OPTIONS_GHC -Wno-redundant-constraints #-}
 
@@ -29,13 +30,17 @@ module Data.Money
  , scale
  ) where
 
-import GHC.TypeLits (Symbol, Nat, CmpNat, KnownNat)
-import qualified GHC.TypeLits as GHC
+import Control.Applicative (empty)
 import Data.Proxy (Proxy(..))
-import Data.Ratio ((%))
+import Data.Ratio ((%), numerator, denominator)
 import GHC.Real (infinity, notANumber)
+import GHC.TypeLits (Symbol, Nat, CmpNat, KnownNat, KnownSymbol, symbolVal)
+import qualified GHC.TypeLits as GHC
 import Prelude hiding (round, ceiling, floor, truncate)
 import qualified Prelude
+import qualified Text.ParserCombinators.ReadPrec as ReadPrec
+import qualified Text.ParserCombinators.ReadP as ReadP
+import Text.Read (readPrec)
 
 --------------------------------------------------------------------------------
 -- | 'Continuous' represents a continuous monetary value for @currency@.
@@ -72,7 +77,39 @@ import qualified Prelude
 -- `x` to be a number of USD dollars, the second expression expects @x@ to be a
 -- number of USD cents.
 newtype Continuous (currency :: Symbol) = Continuous Rational
-  deriving (Eq, Ord, Show, Num, Real)
+  deriving (Eq, Ord, Num, Real)
+
+instance
+  forall (currency :: Symbol).
+  ( CmpNat 0 (Scale currency) ~ 'LT
+  , KnownNat (Scale currency)
+  , KnownSymbol currency
+  ) => Show (Continuous currency) where
+  show = \(Continuous r0) -> mconcat
+    [ "Continuous "
+    , if r0 < 0 then "-" else "+"
+    , show (abs (numerator r0))
+    , "/"
+    , show (abs (denominator r0))
+    , ":"
+    , symbolVal (Proxy :: Proxy currency)
+    ]
+
+instance
+  forall (currency :: Symbol).
+  ( CmpNat 0 (Scale currency) ~ 'LT
+  , KnownNat (Scale currency)
+  , KnownSymbol currency
+  ) => Read (Continuous currency) where
+  readPrec = do
+    _ <- ReadPrec.lift $ ReadP.string "Continuous "
+    f <- ReadPrec.get >>= \case { '+' -> pure id; '-' -> pure negate; _ -> empty }
+    n <- readPrec
+    _ <- ReadPrec.lift $ ReadP.satisfy (== '/')
+    d <- readPrec
+    _ <- ReadPrec.lift $ ReadP.satisfy (== ':')
+    _ <- ReadPrec.lift $ ReadP.string (symbolVal (Proxy :: Proxy currency))
+    maybe empty pure (continuous (f n % d))
 
 -- | Build a 'Continuous' monetary value from a 'Rational' value.
 --
@@ -109,7 +146,35 @@ continuous = \r0 ->
 --
 -- Because @2015 / 100 == 20.15@.
 newtype Discrete (currency :: Symbol) = Discrete Integer
-  deriving (Eq, Ord, Show, Enum, Num, Real, Integral)
+  deriving (Eq, Ord, Enum, Num, Real, Integral)
+
+instance
+  forall (currency :: Symbol).
+  ( CmpNat 0 (Scale currency) ~ 'LT
+  , KnownNat (Scale currency)
+  , KnownSymbol currency
+  ) => Show (Discrete currency) where
+  show = \(Discrete i0) -> mconcat
+    [ "Discrete "
+    , if i0 < 0 then "-" else "+"
+    , show (abs i0)
+    , ":"
+    , symbolVal (Proxy :: Proxy currency)
+    ]
+
+instance
+  forall (currency :: Symbol).
+  ( CmpNat 0 (Scale currency) ~ 'LT
+  , KnownNat (Scale currency)
+  , KnownSymbol currency
+  ) => Read (Discrete currency) where
+  readPrec = do
+    _ <- ReadPrec.lift $ ReadP.string "Discrete "
+    f <- ReadPrec.get >>= \case { '+' -> pure id; '-' -> pure negate; _ -> empty }
+    i <- readPrec
+    _ <- ReadPrec.lift $ ReadP.satisfy (== ':')
+    _ <- ReadPrec.lift $ ReadP.string (symbolVal (Proxy :: Proxy currency))
+    pure (Discrete (f i))
 
 instance
   ( GHC.TypeError

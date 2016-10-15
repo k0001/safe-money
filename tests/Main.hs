@@ -43,17 +43,45 @@ main =  Tasty.defaultMainWithIngredients
 
 tests :: Tasty.TestTree
 tests = Tasty.testGroup "root"
-  [ testRounding (Proxy :: Proxy "USD")
-  , testRounding (Proxy :: Proxy "USD/cent")
-  , testRounding (Proxy :: Proxy "USD/dollar")
-  , testRounding (Proxy :: Proxy "BTC")
-  , testRounding (Proxy :: Proxy "BTC/satoshi")
-  , testRounding (Proxy :: Proxy "BTC/bitcoin")
-  , testRounding (Proxy :: Proxy "BTC/bitcoin")
-  , testRounding (Proxy :: Proxy "XAU")
-  , testRounding (Proxy :: Proxy "XAU/micrograin")
-  , testRounding (Proxy :: Proxy "XAU/milligrain")
-  , testRounding (Proxy :: Proxy "XAU/grain")
+  [ testCurrency (Proxy :: Proxy "USD")
+  , testCurrency (Proxy :: Proxy "USD/cent")
+  , testCurrency (Proxy :: Proxy "USD/dollar")
+  , testCurrency (Proxy :: Proxy "BTC")
+  , testCurrency (Proxy :: Proxy "BTC/satoshi")
+  , testCurrency (Proxy :: Proxy "BTC/bitcoin")
+  , testCurrency (Proxy :: Proxy "BTC/bitcoin")
+  , testCurrency (Proxy :: Proxy "XAU")
+  , testCurrency (Proxy :: Proxy "XAU/micrograin")
+  , testCurrency (Proxy :: Proxy "XAU/milligrain")
+  , testCurrency (Proxy :: Proxy "XAU/grain")
+  ]
+
+testCurrency
+  :: forall (currency :: Symbol)
+  . ( KnownSymbol currency
+    , KnownNat (Money.Scale currency)
+    , CmpNat 0 (Money.Scale currency) ~ 'LT )
+  => Proxy currency
+  -> Tasty.TestTree
+testCurrency pc = Tasty.testGroup ("Currency " ++ symbolVal pc)
+  [ testShowRead pc
+  , testRounding pc
+  ]
+
+testShowRead
+  :: forall (currency :: Symbol)
+  . ( KnownSymbol currency
+    , KnownNat (Money.Scale currency)
+    , CmpNat 0 (Money.Scale currency) ~ 'LT )
+  => Proxy currency
+  -> Tasty.TestTree
+testShowRead _ = Tasty.testGroup "read . show == id"
+  [ QC.testProperty "Continuous" $
+      QC.forAll QC.arbitrary $ \(x :: Money.Continuous currency) ->
+         x == read (show x)
+  , QC.testProperty "Discrete" $
+      QC.forAll QC.arbitrary $ \(x :: Money.Discrete currency) ->
+         x == read (show x)
   ]
 
 testRounding
@@ -63,23 +91,23 @@ testRounding
     , CmpNat 0 (Money.Scale currency) ~ 'LT )
   => Proxy currency
   -> Tasty.TestTree
-testRounding pc = Tasty.testGroup "Rounding"
-  [ QC.testProperty ("floor - " ++ symbolVal pc) $
+testRounding _ = Tasty.testGroup "Rounding"
+  [ QC.testProperty "floor" $
       QC.forAll QC.arbitrary $ \(x :: Money.Continuous currency) ->
          x === case Money.floor x of
                   (y, Nothing) -> Money.fromDiscrete y
                   (y, Just z)  -> Money.fromDiscrete y + z
-  , QC.testProperty ("ceiling - " ++ symbolVal pc) $
+  , QC.testProperty "ceiling" $
       QC.forAll QC.arbitrary $ \(x :: Money.Continuous currency) ->
          x === case Money.ceiling x of
                   (y, Nothing) -> Money.fromDiscrete y
                   (y, Just z)  -> Money.fromDiscrete y + z
-  , QC.testProperty ("round - " ++ symbolVal pc) $
+  , QC.testProperty "round" $
       QC.forAll QC.arbitrary $ \(x :: Money.Continuous currency) ->
          x === case Money.round x of
                   (y, Nothing) -> Money.fromDiscrete y
                   (y, Just z)  -> Money.fromDiscrete y + z
-  , QC.testProperty ("truncate - " ++ symbolVal pc) $
+  , QC.testProperty "truncate" $
       QC.forAll QC.arbitrary $ \(x :: Money.Continuous currency) ->
          x === case Money.truncate x of
                   (y, Nothing) -> Money.fromDiscrete y
