@@ -31,6 +31,7 @@ module Data.Money
  ) where
 
 import Control.Applicative (empty)
+import qualified Data.Char as Char
 import Data.Proxy (Proxy(..))
 import Data.Ratio ((%), numerator, denominator)
 import GHC.Real (infinity, notANumber)
@@ -77,7 +78,7 @@ import Text.Read (readPrec)
 -- `x` to be a number of USD dollars, the second expression expects @x@ to be a
 -- number of USD cents.
 newtype Continuous (currency :: Symbol) = Continuous Rational
-  deriving (Eq, Ord, Num, Real)
+  deriving (Eq, Ord, Num, Real, Fractional)
 
 instance
   forall (currency :: Symbol).
@@ -104,9 +105,9 @@ instance
   readPrec = do
     _ <- ReadPrec.lift $ ReadP.string "Continuous "
     f <- ReadPrec.get >>= \case { '+' -> pure id; '-' -> pure negate; _ -> empty }
-    n <- readPrec
+    n :: Integer <- readPrec
     _ <- ReadPrec.lift $ ReadP.satisfy (== '/')
-    d <- readPrec
+    d :: Integer <- readPrec
     _ <- ReadPrec.lift $ ReadP.satisfy (== ':')
     _ <- ReadPrec.lift $ ReadP.string (symbolVal (Proxy :: Proxy currency))
     maybe empty pure (continuous (f n % d))
@@ -154,13 +155,15 @@ instance
   , KnownNat (Scale currency)
   , KnownSymbol currency
   ) => Show (Discrete currency) where
-  show = \(Discrete i0) -> mconcat
-    [ "Discrete "
-    , if i0 < 0 then "-" else "+"
-    , show (abs i0)
-    , ":"
-    , symbolVal (Proxy :: Proxy currency)
-    ]
+  show = \d0@(Discrete i0) ->
+    let (i1,i2) = quotRem (abs i0) (scale d0)
+    in mconcat
+       [ "Discrete "
+       , if i0 < 0 then "-" else "+"
+       , show i1, ".", show i2
+       , ":"
+       , symbolVal (Proxy :: Proxy currency)
+       ]
 
 instance
   forall (currency :: Symbol).
@@ -171,10 +174,12 @@ instance
   readPrec = do
     _ <- ReadPrec.lift $ ReadP.string "Discrete "
     f <- ReadPrec.get >>= \case { '+' -> pure id; '-' -> pure negate; _ -> empty }
-    i <- readPrec
+    i :: Integer <- fmap read $ ReadPrec.lift $ ReadP.munch1 Char.isDigit
+    _ <- ReadPrec.lift $ ReadP.satisfy (== '.')
+    d :: Integer <- fmap read $ ReadPrec.lift $ ReadP.munch1 Char.isDigit
     _ <- ReadPrec.lift $ ReadP.satisfy (== ':')
     _ <- ReadPrec.lift $ ReadP.string (symbolVal (Proxy :: Proxy currency))
-    pure (Discrete (f i))
+    pure (Discrete (f (d + (i * scale (Proxy :: Proxy currency)))))
 
 instance
   ( GHC.TypeError
