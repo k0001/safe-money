@@ -9,15 +9,21 @@
 {-# LANGUAGE UndecidableInstances #-}
 {-# OPTIONS_GHC -Wno-redundant-constraints #-}
 
+-- | Import this module qualified:
+--
+-- @
+-- import qualified Data.Money as Money
+-- @
 module Data.Money
- ( Discrete(..)
+ ( Discrete
  , fromDiscrete
 
- , Continuous(..)
- , fromContinuous
+ , Continuous
+ , continuous
  , round
  , ceiling
  , floor
+ , truncate
 
  , Scale
  , scale
@@ -26,11 +32,9 @@ module Data.Money
 import GHC.TypeLits (Symbol, Nat, CmpNat, KnownNat)
 import qualified GHC.TypeLits as GHC
 import Data.Proxy (Proxy(..))
-import Data.Scientific (Scientific)
-import qualified Data.Scientific as Scientific
-import Prelude
-  (Eq(..), Ord(..), Num(..), Show(..), Ordering(..), Fractional(..),
-   Maybe(..), Integer, undefined)
+import Data.Ratio ((%))
+import GHC.Real (infinity, notANumber)
+import Prelude hiding (round, ceiling, floor, truncate)
 import qualified Prelude
 
 --------------------------------------------------------------------------------
@@ -45,41 +49,67 @@ import qualified Prelude
 -- cents. In other words, 'Continuous' monetary values allow us to perform
 -- precise calculations deferring the conversion to a 'Discrete' monetary values
 -- as much as posible. Once you are ready to aproximate a 'Continuous' value to
--- a 'Discrete' value you can use one of 'round', 'floor' or 'ceiling'.
-newtype Continuous (currency :: Symbol)
-  = Continuous Scientific
-    -- ^ If you want to represent @USD 12.5231@, then you can use:
-    --
-    -- @
-    -- 'Continuous' ('fromInteger' 12531 * 10 '^^' (-3))
-    -- @
-    --
-    -- In practice, it is more likely that you will be constructing 'Continuous'
-    -- values from 'Discrete' values using 'fromDiscrete'.
-  deriving (Eq, Ord, Show, Num)
+-- a 'Discrete' value you can use one of 'round', 'floor', 'ceiling' or
+-- 'truncate'.
+-- Otherwise, using 'toRational' you can obtain a precise 'Rational'
+-- representation.
+--
+-- Construct 'Continuous' monetary values using 'continuous', or
+-- 'fromInteger'/'fromIntegral' if that suffices.  Note, however, that the
+-- following two expressions lead to different results:
+--
+-- @
+-- 'fromInteger' x :: 'Continuous' "USD"
+-- @
+--
+-- is not equal to
+--
+-- @
+-- 'fromDiscrete' ('fromInteger' x :: Discrete "USD") :: 'Continuous' "USD"
+-- @
+--
+-- The reason for this difference is that while the first expression expects
+-- `x` to be a number of USD dollars, the second expression expects @x@ to be a
+-- number of USD cents.
+newtype Continuous (currency :: Symbol) = Continuous Rational
+  deriving (Eq, Ord, Show, Num, Real)
 
--- | Obtain the underlying 'Scientific' representation for a 'Continuous'
--- monetary value, which is not guaranteed to be discrete and representable
--- within @currency@'s 'Scale'.
-fromContinuous :: Continuous currency -> Scientific
-fromContinuous = \(Continuous currency) -> currency
-{-# INLINE fromContinuous #-}
+-- | Build a 'Continuous' monetary value from a 'Rational' value.
+--
+-- For example, if you want to represent @USD 12.52316@, then you can use:
+--
+-- @
+-- 'continuous' (125316 % 10000)
+-- @
+--
+-- This function returns 'Nothing' in case the given 'Rational' is 'infinity' or
+-- 'notANumber'.
+--
+-- In practice, it is more likely that you will be constructing 'Continuous'
+-- values from 'Discrete' values using 'fromDiscrete'.
+continuous :: Rational -> Maybe (Continuous currency)
+continuous = \r0 ->
+  if (infinity == r0 || notANumber == r0)
+  then Nothing else Just (Continuous r0)
+{-# INLINE continuous #-}
 
 -- | 'Discrete' represents a discrete monetary value for @currency@. That is, an
 -- amount of money that is fully representable by the smallest unit of
 -- @currency@.
-newtype Discrete (currency :: Symbol)
-  = Discrete Integer
-    -- ^ If you want to represent @GBP 21.05@, where the smallest represetable
-    -- unit for a GBP (United Kingdom Pound) is the /penny/, and 100 /pennies/
-    -- equal 1 GBP (i.e., @'Scale' \"GBP\" ~ 100@), then you can use:
-    --
-    -- @
-    -- 'Discrete' 2105
-    -- @
-    --
-    -- Since @2015 / 100 == 20.15@.
-  deriving (Eq, Ord, Show, Num)
+--
+-- Construct 'Discrete' values using 'fromInteger'.
+--
+-- For example, if you want to represent @GBP 21.05@, where the smallest
+-- represetable unit for a GBP (United Kingdom Pound) is the /penny/, and 100
+-- /pennies/ equal 1 GBP (i.e., @'Scale' \"GBP\" ~ 100@), then you can use:
+--
+-- @
+-- 'fromInteger' 2105
+-- @
+--
+-- Because @2015 / 100 == 20.15@.
+newtype Discrete (currency :: Symbol) = Discrete Integer
+  deriving (Eq, Ord, Show, Enum, Num, Real, Integral)
 
 instance
   ( GHC.TypeError
@@ -103,25 +133,23 @@ instance
 fromDiscrete
   :: (CmpNat 0 (Scale currency) ~ 'LT, KnownNat (Scale currency))
   => Discrete currency -> Continuous currency
-fromDiscrete = \c@(Discrete i) ->
-  Continuous (fromInteger i / fromInteger (scale c))
+fromDiscrete = \c@(Discrete i) -> Continuous (i % scale c)
 {-# INLINE fromDiscrete #-}
 
--- | Internal. Used to implement 'round', 'ceiling' and 'floor'.
+-- | Internal. Used to implement 'round', 'ceiling', 'floor' and 'truncate'.
 roundf
   :: (CmpNat 0 (Scale currency) ~ 'LT, KnownNat (Scale currency))
-  => (Scientific -> Integer)
-  -- ^ 'Prelude.round', 'Prelude.ceiling' or similar.
+  => (Rational -> Integer) -- ^ 'Prelude.round', 'Prelude.ceiling' or similar.
   -> Continuous currency
   -> (Discrete currency, Maybe (Continuous currency))
-roundf f = \m ->
-  let ss = fromInteger (scale m)
-      sx = fromContinuous m * ss
-      iy = f sx
-      sc = fromContinuous m - (fromInteger iy / ss)
-      yc = if Scientific.isInteger sx
-              then Nothing else Just (Continuous sc)
-  in (Discrete iy, yc)
+roundf f = \c0 ->
+  let r0 = toRational c0 :: Rational
+      r1 = r0 * fromInteger (scale c0) :: Rational
+      i2 = f r1 :: Integer
+      r2 = fromInteger i2 % scale c0 :: Rational
+      ycrest | r0 == r2  = Nothing
+             | otherwise = Just (Continuous (r0 - r2))
+  in (Discrete i2, ycrest)
 {-# INLINE roundf #-}
 
 -- | Round a 'Continuous' value @x@ to the nearest value fully representable in
@@ -239,6 +267,41 @@ floor
 floor = roundf Prelude.floor
 {-# INLINE floor #-}
 
+-- | Round a 'Continuous' value @x@ to the nearest value between zero and
+-- @x@ (inclusive) which is fully representable in its @currency@'s 'Scale'.
+--
+-- If @x@ is already fully representable in its @currency@'s 'Scale', then the
+-- following holds:
+--
+-- @
+-- 'truncate' x == (x, 'Nothing')
+-- @
+--
+-- Otherwise, if @x@ is positive, then the following holds:
+--
+-- @
+-- 'truncate' == 'floor'
+-- @
+--
+-- Otherwise, if @x@ is negative, the following holds:
+--
+-- @
+-- 'truncate' == 'ceiling'
+-- @
+--
+-- Proof that 'round' doesn't lose money:
+--
+-- @
+-- x == case 'truncate' x of
+--        (y, 'Nothing') -> y
+--        (y, 'Just' z)  -> y + z
+-- @
+truncate
+  :: (CmpNat 0 (Scale currency) ~ 'LT, KnownNat (Scale currency))
+  => Continuous currency -> (Discrete currency, Maybe (Continuous currency))
+truncate = roundf Prelude.truncate
+{-# INLINE truncate #-}
+
 --------------------------------------------------------------------------------
 -- | Monetary values in a particular currency are rational and discrete values,
 -- and as such they can have an integral representation as the amount of
@@ -300,7 +363,7 @@ type instance Scale "GBP/pound" = 1
 type instance Scale "JPY" = Scale "JPY/yen"
 type instance Scale "JPY/yen" = 1
 
-type instance Scale "USD" = Scale "USD/Cent"
+type instance Scale "USD" = Scale "USD/cent"
 type instance Scale "USD/cent" = 100
 type instance Scale "USD/dollar" = 1
 
