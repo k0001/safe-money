@@ -77,7 +77,7 @@ import Text.Read (readPrec)
 -- `x` to be a number of USD dollars, the second expression expects @x@ to be a
 -- number of USD cents.
 newtype Continuous (currency :: Symbol) = Continuous Rational
-  deriving (Eq, Ord, Num, Real)
+  deriving (Eq, Ord, Num, Real, Fractional)
 
 instance
   forall (currency :: Symbol).
