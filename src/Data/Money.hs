@@ -470,11 +470,11 @@ type instance Scale' "ARS" "ARS" = Scale' "ARS" "centavo"
 type instance Scale' "ARS" "peso" = 1
 type instance Scale' "ARS" "centavo" = 100
 
-type instance Scale' "BTC" "BTC" = Scale' "ARS" "satoshi"
+type instance Scale' "BTC" "BTC" = Scale' "BTC" "satoshi"
 type instance Scale' "BTC" "bitcoin" = 1
 type instance Scale' "BTC" "satoshi" = 100000000
 
-type instance Scale' "GBP" "GBP" = Scale' "ARS" "penny"
+type instance Scale' "GBP" "GBP" = Scale' "GBP" "penny"
 type instance Scale' "GBP" "pound" = 1
 type instance Scale' "GBP" "penny" = 100
 

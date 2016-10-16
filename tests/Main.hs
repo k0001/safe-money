@@ -21,14 +21,11 @@ import qualified Data.Money as Money
 
 --------------------------------------------------------------------------------
 
-instance QC.Arbitrary (Money.Discrete currency) where
+instance QC.Arbitrary (Money.Discrete currency unit) where
   arbitrary = fmap fromInteger QC.arbitrary
   shrink = fmap fromInteger . QC.shrink . toInteger
 
-instance
-  ( KnownNat (Money.Scale currency)
-  , CmpNat 0 (Money.Scale currency) ~ 'LT
-  ) => QC.Arbitrary (Money.Continuous currency) where
+instance QC.Arbitrary (Money.Continuous currency) where
   arbitrary = maybe QC.arbitrary pure . Money.continuous =<< QC.arbitrary
   shrink = catMaybes . fmap Money.continuous . QC.shrink . toRational
 
@@ -40,76 +37,90 @@ main =  Tasty.defaultMainWithIngredients
   , Tasty.listingTests
   ] tests
 
-
 tests :: Tasty.TestTree
-tests = Tasty.testGroup "root"
-  [ testCurrency (Proxy :: Proxy "USD")
-  , testCurrency (Proxy :: Proxy "USD/cent")
-  , testCurrency (Proxy :: Proxy "USD/dollar")
-  , testCurrency (Proxy :: Proxy "BTC")
-  , testCurrency (Proxy :: Proxy "BTC/satoshi")
-  , testCurrency (Proxy :: Proxy "BTC/bitcoin")
-  , testCurrency (Proxy :: Proxy "BTC/bitcoin")
-  , testCurrency (Proxy :: Proxy "XAU")
-  , testCurrency (Proxy :: Proxy "XAU/micrograin")
-  , testCurrency (Proxy :: Proxy "XAU/milligrain")
-  , testCurrency (Proxy :: Proxy "XAU/grain")
+tests =
+  Tasty.testGroup "root"
+  [ testCurrency     (Proxy :: Proxy "USD")
+  , testCurrencyUnit (Proxy :: Proxy "USD") (Proxy :: Proxy "USD")
+  , testCurrencyUnit (Proxy :: Proxy "USD") (Proxy :: Proxy "cent")
+  , testCurrencyUnit (Proxy :: Proxy "USD") (Proxy :: Proxy "dollar")
+  , testCurrency     (Proxy :: Proxy "BTC")
+  , testCurrencyUnit (Proxy :: Proxy "BTC") (Proxy :: Proxy "BTC")
+  , testCurrencyUnit (Proxy :: Proxy "BTC") (Proxy :: Proxy "satoshi")
+  , testCurrencyUnit (Proxy :: Proxy "BTC") (Proxy :: Proxy "bitcoin")
+  , testCurrency     (Proxy :: Proxy "XAU")
+  , testCurrencyUnit (Proxy :: Proxy "XAU") (Proxy :: Proxy "micrograin")
+  , testCurrencyUnit (Proxy :: Proxy "XAU") (Proxy :: Proxy "milligrain")
+  , testCurrencyUnit (Proxy :: Proxy "XAU") (Proxy :: Proxy "grain")
   ]
 
 testCurrency
-  :: forall (currency :: Symbol)
-  . ( KnownSymbol currency
-    , KnownNat (Money.Scale currency)
-    , CmpNat 0 (Money.Scale currency) ~ 'LT )
+  :: KnownSymbol currency
   => Proxy currency
   -> Tasty.TestTree
-testCurrency pc = Tasty.testGroup ("Currency " ++ symbolVal pc)
-  [ testShowRead pc
-  , testRounding pc
+testCurrency pc =
+  Tasty.testGroup ("Currency " ++ symbolVal pc)
+  [ testShowReadContinuous pc
   ]
 
-testShowRead
-  :: forall (currency :: Symbol)
+testCurrencyUnit
+  :: forall (currency :: Symbol) (unit :: Symbol)
   . ( KnownSymbol currency
-    , KnownNat (Money.Scale currency)
-    , CmpNat 0 (Money.Scale currency) ~ 'LT )
+    , KnownSymbol unit
+    , KnownNat (Money.Scale' currency unit)
+    , CmpNat 0 (Money.Scale' currency unit) ~ 'LT )
+  => Proxy currency
+  -> Proxy unit
+  -> Tasty.TestTree
+testCurrencyUnit pc pu =
+  Tasty.testGroup ("Currency unit " ++ symbolVal pc ++ " " ++ symbolVal pu)
+  [ testShowReadDiscrete pc pu
+  , testRounding pc pu
+  ]
+
+testShowReadContinuous
+  :: forall (currency :: Symbol)
+  .  KnownSymbol currency
   => Proxy currency
   -> Tasty.TestTree
-testShowRead _ = Tasty.testGroup "read . show == id"
+testShowReadContinuous _ =
+  Tasty.testGroup "read . show == id"
   [ QC.testProperty "Continuous" $
       QC.forAll QC.arbitrary $ \(x :: Money.Continuous currency) ->
          x == read (show x)
-  , QC.testProperty "Discrete" $
-      QC.forAll QC.arbitrary $ \(x :: Money.Discrete currency) ->
+  ]
+
+testShowReadDiscrete
+  :: forall (currency :: Symbol) (unit :: Symbol)
+  . ( KnownSymbol currency
+    , KnownNat (Money.Scale' currency unit)
+    , CmpNat 0 (Money.Scale' currency unit) ~ 'LT )
+  => Proxy currency
+  -> Proxy unit
+  -> Tasty.TestTree
+testShowReadDiscrete _ _ =
+  Tasty.testGroup "read . show == id"
+  [ QC.testProperty "Discrete" $
+      QC.forAll QC.arbitrary $ \(x :: Money.Discrete currency unit) ->
          x == read (show x)
   ]
 
 testRounding
-  :: forall (currency :: Symbol)
+  :: forall (currency :: Symbol) (unit :: Symbol)
   . ( KnownSymbol currency
-    , KnownNat (Money.Scale currency)
-    , CmpNat 0 (Money.Scale currency) ~ 'LT )
+    , KnownNat (Money.Scale' currency unit)
+    , CmpNat 0 (Money.Scale' currency unit) ~ 'LT )
   => Proxy currency
+  -> Proxy unit
   -> Tasty.TestTree
-testRounding _ = Tasty.testGroup "Rounding"
-  [ QC.testProperty "floor" $
-      QC.forAll QC.arbitrary $ \(x :: Money.Continuous currency) ->
-         x === case Money.floor x of
-                  (y, Nothing) -> Money.fromDiscrete y
-                  (y, Just z)  -> Money.fromDiscrete y + z
-  , QC.testProperty "ceiling" $
-      QC.forAll QC.arbitrary $ \(x :: Money.Continuous currency) ->
-         x === case Money.ceiling x of
-                  (y, Nothing) -> Money.fromDiscrete y
-                  (y, Just z)  -> Money.fromDiscrete y + z
-  , QC.testProperty "round" $
-      QC.forAll QC.arbitrary $ \(x :: Money.Continuous currency) ->
-         x === case Money.round x of
-                  (y, Nothing) -> Money.fromDiscrete y
-                  (y, Just z)  -> Money.fromDiscrete y + z
-  , QC.testProperty "truncate" $
-      QC.forAll QC.arbitrary $ \(x :: Money.Continuous currency) ->
-         x === case Money.truncate x of
-                  (y, Nothing) -> Money.fromDiscrete y
-                  (y, Just z)  -> Money.fromDiscrete y + z
-  ]
+testRounding _ _ =
+    Tasty.testGroup "Rounding"
+    [ QC.testProperty "floor"    $ QC.forAll QC.arbitrary (g Money.floor)
+    , QC.testProperty "ceiling"  $ QC.forAll QC.arbitrary (g Money.ceiling)
+    , QC.testProperty "round"    $ QC.forAll QC.arbitrary (g Money.round)
+    , QC.testProperty "truncate" $ QC.forAll QC.arbitrary (g Money.truncate)
+    ]
+  where
+    g f = \(x :: Money.Continuous currency) -> x === case f x of
+      (y, Nothing) -> Money.fromDiscrete (y :: Money.Discrete currency unit)
+      (y, Just z)  -> Money.fromDiscrete y + z
