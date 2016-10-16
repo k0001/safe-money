@@ -366,7 +366,7 @@ truncate = roundf Prelude.truncate
 -- cents are the smallest unit that can represent United States Dollars, so:
 --
 -- @
--- 'Scale' \"USD\" ~ 'Scale'' \"USD\" \"USD\" ~ 'Scale'' \"USD\" \"cent\"
+-- 'Scale' \"USD\"  ~  'Scale'' \"USD\" \"USD\"  ~  'Scale'' \"USD\" \"cent\"
 -- @
 --
 -- If you try to obtain the 'Scale' of a @currency@ without an obvious smallest
