@@ -12,7 +12,7 @@ import qualified Test.Tasty.Runners as Tasty
 import Test.Tasty.QuickCheck ((===))
 import qualified Test.Tasty.QuickCheck as QC
 
-import GHC.TypeLits (CmpNat, KnownNat, Symbol, KnownSymbol, symbolVal)
+import GHC.TypeLits (Nat, Symbol, KnownSymbol, symbolVal)
 import Data.Maybe (catMaybes)
 import Data.Proxy (Proxy(Proxy))
 import Data.Scientific (Scientific, scientific)
@@ -64,11 +64,8 @@ testCurrency pc =
   ]
 
 testCurrencyUnit
-  :: forall (currency :: Symbol) (unit :: Symbol)
-  . ( KnownSymbol currency
-    , KnownSymbol unit
-    , KnownNat (Money.Scale' currency unit)
-    , CmpNat 0 (Money.Scale' currency unit) ~ 'LT )
+  :: forall (currency :: Symbol) (unit :: Symbol) (num :: Nat) (den :: Nat)
+  .  Money.GoodScale currency unit num den
   => Proxy currency
   -> Proxy unit
   -> Tasty.TestTree
@@ -91,10 +88,8 @@ testShowReadContinuous _ =
   ]
 
 testShowReadDiscrete
-  :: forall (currency :: Symbol) (unit :: Symbol)
-  . ( KnownSymbol currency
-    , KnownNat (Money.Scale' currency unit)
-    , CmpNat 0 (Money.Scale' currency unit) ~ 'LT )
+  :: forall (currency :: Symbol) (unit :: Symbol) (num :: Nat) (den :: Nat)
+  .  Money.GoodScale currency unit num den
   => Proxy currency
   -> Proxy unit
   -> Tasty.TestTree
@@ -106,10 +101,8 @@ testShowReadDiscrete _ _ =
   ]
 
 testRounding
-  :: forall (currency :: Symbol) (unit :: Symbol)
-  . ( KnownSymbol currency
-    , KnownNat (Money.Scale' currency unit)
-    , CmpNat 0 (Money.Scale' currency unit) ~ 'LT )
+  :: forall (currency :: Symbol) (unit :: Symbol) (num :: Nat) (den :: Nat)
+  .  Money.GoodScale currency unit num den
   => Proxy currency
   -> Proxy unit
   -> Tasty.TestTree
