@@ -28,6 +28,12 @@ module Data.Money
  , floor
  , truncate
 
+ , ExchangeRate
+ , exchangeRate
+ , fromExchangeRate
+ , flipExchangeRate
+ , exchange
+
  , Scale
  , Scale'
  , GoodScale
@@ -479,6 +485,67 @@ scaleFromProxy
 scaleFromProxy = \_ _ ->
    natVal (Proxy :: Proxy num) % natVal (Proxy :: Proxy den)
 {-# INLINE scaleFromProxy #-}
+
+--------------------------------------------------------------------------------
+
+-- | Exchange rate for converting monetary values of currency @src@ into
+-- monetary values of currency @dst@ by multiplying for it.
+--
+-- For example, if in order to convert USD to GBP we have to multiply by 1.2345,
+-- then we can represent this situaion using:
+--
+-- @
+-- 'exchangeRate' (12345 % 10000) :: 'Maybe' ('ExchangeRate' \"USD\" \"GBP\")
+-- @
+newtype ExchangeRate (src :: Symbol) (dst :: Symbol) = ExchangeRate Rational
+  deriving (Eq, Ord, Show)
+
+instance Read (ExchangeRate (src :: Symbol) (dst :: Symbol)) where
+  readPrec = maybe empty pure =<< fmap exchangeRate readPrec
+
+-- | Obtain a 'Rational' representation of the 'ExchangeRate'.
+--
+-- This 'Rational' is statically guaranteed to be greater than 0, different
+-- from 'infinity' and different from 'notANumber'.
+fromExchangeRate :: ExchangeRate src dst -> Rational
+fromExchangeRate = \(ExchangeRate r0) -> r0
+{-# INLINE fromExchangeRate #-}
+
+-- | Safely construct an 'ExchangeRate' from a 'Rational' number.
+--
+-- For construction to succeed, this 'Rational' must be greater than 0,
+-- different from 'infinity' and different from 'notANumber'.
+exchangeRate :: Rational -> Maybe (ExchangeRate (src :: Symbol) (dst :: Symbol))
+exchangeRate = \r0 ->
+  if (r0 <= 0 || infinity == r0 || notANumber == r0)
+  then Nothing else Just (ExchangeRate r0)
+{-# INLINE exchangeRate #-}
+
+-- | Flip the direction of an 'ExchangeRate'.
+--
+-- Identity law:
+--
+-- @
+-- 'flipExchangeRate' . 'flipExchangeRate'   ==  'id'
+-- @
+flipExchangeRate :: ExchangeRate a b -> ExchangeRate b a
+flipExchangeRate = \(ExchangeRate x) -> ExchangeRate (1 / x)
+{-# INLINE flipExchangeRate #-}
+
+-- | Apply the 'ExchangeRate' to the given @'Continuous' src@ monetary value.
+--
+-- Identity law:
+--
+-- @
+-- 'exchange' ('flipExchangeRate 'x') . 'exchange' x  ==  'id'
+-- @
+--
+-- Use the /Identity law/ for reasoning about going back and forth between @src@
+-- and @dst@ in order to manage any leftovers that might not be representable as
+-- a 'Discrete' monetary value of @src@.
+exchange :: ExchangeRate src dst -> Continuous src -> Continuous dst
+exchange = \(ExchangeRate r) -> \(Continuous s) -> Continuous (r * s)
+{-# INLINE exchange #-}
 
 --------------------------------------------------------------------------------
 

@@ -29,6 +29,10 @@ instance QC.Arbitrary (Money.Continuous currency) where
   arbitrary = maybe QC.arbitrary pure . Money.continuous =<< QC.arbitrary
   shrink = catMaybes . fmap Money.continuous . QC.shrink . toRational
 
+instance QC.Arbitrary (Money.ExchangeRate src dst) where
+  arbitrary = maybe QC.arbitrary pure . Money.exchangeRate =<< QC.arbitrary
+  shrink = catMaybes . fmap Money.exchangeRate . QC.shrink . Money.fromExchangeRate
+
 --------------------------------------------------------------------------------
 
 main :: IO ()
@@ -61,6 +65,7 @@ testCurrency
 testCurrency pc =
   Tasty.testGroup ("Currency " ++ symbolVal pc)
   [ testShowReadContinuous pc
+  , testExchangeRate pc pc
   ]
 
 testCurrencyUnit
@@ -84,7 +89,7 @@ testShowReadContinuous _ =
   Tasty.testGroup "read . show == id"
   [ QC.testProperty "Continuous" $
       QC.forAll QC.arbitrary $ \(x :: Money.Continuous currency) ->
-         x == read (show x)
+         x === read (show x)
   ]
 
 testShowReadDiscrete
@@ -97,7 +102,27 @@ testShowReadDiscrete _ _ =
   Tasty.testGroup "read . show == id"
   [ QC.testProperty "Discrete" $
       QC.forAll QC.arbitrary $ \(x :: Money.Discrete currency unit) ->
-         x == read (show x)
+         x === read (show x)
+  ]
+
+testExchangeRate
+  :: forall (src :: Symbol) (dst :: Symbol)
+  .  KnownSymbol src
+  => Proxy src
+  -> Proxy dst
+  -> Tasty.TestTree
+testExchangeRate _ _ =
+  Tasty.testGroup "ExchangeRate"
+  -- TODO: these diverge.
+  [ QC.testProperty "flipExchangeRate . flipExchangeRate == id" $
+      QC.forAll QC.arbitrary $ \(xr :: Money.ExchangeRate src dst) ->
+         xr === Money.flipExchangeRate (Money.flipExchangeRate xr)
+  , QC.testProperty "exchange (flipExchangeRate x) . exchange x == id" $
+      QC.forAll QC.arbitrary $
+         \( c0 :: Money.Continuous src
+          , xr :: Money.ExchangeRate src dst
+          ) -> c0 === Money.exchange (Money.flipExchangeRate xr)
+                                     (Money.exchange xr c0)
   ]
 
 testRounding
