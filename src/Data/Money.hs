@@ -306,7 +306,7 @@ floor = roundf Prelude.floor
 -- 'truncate' == 'ceiling'
 -- @
 --
--- Proof that 'round' doesn't lose money:
+-- Proof that 'truncate' doesn't lose money:
 --
 -- @
 -- x == case 'truncate' x of
