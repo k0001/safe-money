@@ -25,11 +25,11 @@ instance QC.Arbitrary (Money.Discrete currency unit) where
   arbitrary = fmap fromInteger QC.arbitrary
   shrink = fmap fromInteger . QC.shrink . toInteger
 
-instance QC.Arbitrary (Money.Continuous currency) where
+instance QC.Arbitrary (Money.Dense currency) where
   arbitrary = do
-    Just x <- QC.suchThat (fmap Money.continuous QC.arbitrary) isJust
+    Just x <- QC.suchThat (fmap Money.dense QC.arbitrary) isJust
     pure x
-  shrink = catMaybes . fmap Money.continuous . QC.shrink . toRational
+  shrink = catMaybes . fmap Money.dense . QC.shrink . toRational
 
 instance QC.Arbitrary (Money.ExchangeRate src dst) where
   arbitrary = do
@@ -69,7 +69,7 @@ testCurrency
   -> Tasty.TestTree
 testCurrency pc =
   Tasty.testGroup ("Currency " ++ symbolVal pc)
-  [ testShowReadContinuous pc
+  [ testShowReadDense pc
   , testExchangeRate pc pc
   ]
 
@@ -86,15 +86,15 @@ testCurrencyUnit pc pu =
   , testRounding pc pu
   ]
 
-testShowReadContinuous
+testShowReadDense
   :: forall (currency :: Symbol)
   .  KnownSymbol currency
   => Proxy currency
   -> Tasty.TestTree
-testShowReadContinuous _ =
+testShowReadDense _ =
   Tasty.testGroup "read . show == id"
-  [ QC.testProperty "Continuous" $
-      QC.forAll QC.arbitrary $ \(x :: Money.Continuous currency) ->
+  [ QC.testProperty "Dense" $
+      QC.forAll QC.arbitrary $ \(x :: Money.Dense currency) ->
          x === read (show x)
   ]
 
@@ -128,7 +128,7 @@ testExchangeRate ps pd =
                ==> (xr === Money.flipExchangeRate xr')
   , QC.testProperty "exchange (flipExchangeRate x) . exchange x == id" $
       QC.forAll QC.arbitrary $
-         \( c0 :: Money.Continuous src
+         \( c0 :: Money.Dense src
           , xr :: Money.ExchangeRate src dst
           ) -> c0 === Money.exchange (Money.flipExchangeRate xr)
                                      (Money.exchange xr c0)
@@ -148,6 +148,6 @@ testRounding _ _ =
     , QC.testProperty "truncate" $ QC.forAll QC.arbitrary (g Money.truncate)
     ]
   where
-    g f = \(x :: Money.Continuous currency) -> x === case f x of
+    g f = \(x :: Money.Dense currency) -> x === case f x of
       (y, Nothing) -> Money.fromDiscrete (y :: Money.Discrete currency unit)
       (y, Just z)  -> Money.fromDiscrete y + z

@@ -21,8 +21,8 @@ module Data.Money
  ( Discrete
  , fromDiscrete
 
- , Continuous
- , continuous
+ , Dense
+ , dense
  , round
  , ceiling
  , floor
@@ -56,46 +56,46 @@ import qualified Text.ParserCombinators.ReadP as ReadP
 import Text.Read (readPrec)
 
 --------------------------------------------------------------------------------
--- | 'Continuous' represents a continuous monetary value for @currency@.
+-- | 'Dense' represents a dense monetary value for @currency@.
 --
 -- While monetary values associated with a particular currency are discrete, you
--- can still treat monetary values as continuous while operating on them. For
+-- can still treat monetary values as dense while operating on them. For
 -- example, the half of @USD 3.41@ is @USD 1.705@, which is not an amount that
 -- can't be represented as a number of USD cents (the smallest unit that can
 -- represent USD amounts). Nevertheless, if you eventually multiply @USD 1.705@
 -- by @4@, for example, you end up with @USD 6.82@, which is again a value
--- representable as USD cents. In other words, 'Continuous' monetary values
+-- representable as USD cents. In other words, 'Dense' monetary values
 -- allow us to perform precise calculations deferring the conversion to a
 -- 'Discrete' monetary values as much as posible. Once you are ready to
--- aproximate a 'Continuous' value to a 'Discrete' value you can use one of
+-- aproximate a 'Dense' value to a 'Discrete' value you can use one of
 -- 'round', 'floor', 'ceiling' or 'truncate'. Otherwise, using 'toRational' you
 -- can obtain a precise 'Rational' representation.
 --
--- Construct 'Continuous' monetary values using 'continuous', or
+-- Construct 'Dense' monetary values using 'dense', or
 -- 'fromInteger'/'fromIntegral' if that suffices.
-newtype Continuous (currency :: Symbol) = Continuous Rational
+newtype Dense (currency :: Symbol) = Dense Rational
   deriving (Eq, Ord, Num, Real, Fractional, Show)
 
-instance Read (Continuous currency) where
+instance Read (Dense currency) where
   readPrec = do
-    _ <- ReadPrec.lift (ReadP.string "Continuous ")
-    maybe empty pure =<< fmap continuous readPrec
+    _ <- ReadPrec.lift (ReadP.string "Dense ")
+    maybe empty pure =<< fmap dense readPrec
 
--- | Build a 'Continuous' monetary value from a 'Rational' value.
+-- | Build a 'Dense' monetary value from a 'Rational' value.
 --
 -- For example, if you want to represent @USD 12.52316@, then you can use:
 --
 -- @
--- 'continuous' (125316 % 10000)
+-- 'dense' (125316 % 10000)
 -- @
 --
 -- This function returns 'Nothing' in case the given 'Rational' is 'infinity' or
 -- 'notANumber'.
-continuous :: Rational -> Maybe (Continuous currency)
-continuous = \r0 ->
+dense :: Rational -> Maybe (Dense currency)
+dense = \r0 ->
   if (infinity == r0 || notANumber == r0)
-  then Nothing else Just (Continuous r0)
-{-# INLINE continuous #-}
+  then Nothing else Just (Dense r0)
+{-# INLINE dense #-}
 
 -- | 'Discrete' represents a discrete monetary value for a @currency@ expresed
 -- as an integer amount of a particular @unit@. For example, with @currency ~
@@ -131,7 +131,7 @@ instance
        ('GHC.Text "instance. Convert the ") 'GHC.:<>:
        ('GHC.ShowType Discrete) 'GHC.:<>:
        ('GHC.Text " value to a ") 'GHC.:<>:
-       ('GHC.ShowType Continuous) 'GHC.:$$:
+       ('GHC.ShowType Dense) 'GHC.:$$:
        ('GHC.Text "value and use the ") 'GHC.:<>:
        ('GHC.ShowType Fractional) 'GHC.:<>:
        ('GHC.Text " features on it instead.")) )
@@ -139,33 +139,33 @@ instance
   fromRational = undefined
   recip = undefined
 
--- | Convert currency 'Discrete' monetary value into a 'Continuous' monetary
+-- | Convert currency 'Discrete' monetary value into a 'Dense' monetary
 -- value.
 fromDiscrete
   :: GoodScale currency unit
   => Discrete currency unit
-  -> Continuous currency -- ^
-fromDiscrete = \c@(Discrete i) -> Continuous (fromInteger i / scale c)
+  -> Dense currency -- ^
+fromDiscrete = \c@(Discrete i) -> Dense (fromInteger i / scale c)
 {-# INLINE fromDiscrete #-}
 
 -- | Internal. Used to implement 'round', 'ceiling', 'floor' and 'truncate'.
 roundf
   :: GoodScale currency unit
   => (Rational -> Integer) -- ^ 'Prelude.round', 'Prelude.ceiling' or similar.
-  -> Continuous currency
-  -> (Discrete currency unit, Maybe (Continuous currency))
+  -> Dense currency
+  -> (Discrete currency unit, Maybe (Dense currency))
 roundf f = \c0 ->
   let r0 = toRational c0 :: Rational
       r1 = r0 * scale d2 :: Rational
       i2 = f r1 :: Integer
       r2 = fromInteger i2 / scale d2 :: Rational
       ycrest | r0 == r2  = Nothing
-             | otherwise = Just (Continuous (r0 - r2))
+             | otherwise = Just (Dense (r0 - r2))
       d2 = Discrete i2
   in (d2, ycrest)
 {-# INLINE roundf #-}
 
--- | Round a 'Continuous' value @x@ to the nearest value fully representable in
+-- | Round a 'Dense' value @x@ to the nearest value fully representable in
 -- its @currency@'s @unit@ 'Scale'', which might be @x@ itself.
 --
 -- If @x@ is already fully representable in its @currency@'s @unit@ 'Scale'',
@@ -198,12 +198,12 @@ roundf f = \c0 ->
 -- @
 round
   :: GoodScale currency unit
-  => Continuous currency
-  -> (Discrete currency unit, Maybe (Continuous currency)) -- ^
+  => Dense currency
+  -> (Discrete currency unit, Maybe (Dense currency)) -- ^
 round = roundf Prelude.round
 {-# INLINE round #-}
 
--- | Round a 'Continuous' value @x@ to the nearest value fully representable in
+-- | Round a 'Dense' value @x@ to the nearest value fully representable in
 -- its @currency@'s @unit@ 'Scale'' which is greater than @x@ or equal to @x@.
 --
 --
@@ -238,12 +238,12 @@ round = roundf Prelude.round
 -- @
 ceiling
   :: GoodScale currency unit
-  => Continuous currency
-  -> (Discrete currency unit, Maybe (Continuous currency)) -- ^
+  => Dense currency
+  -> (Discrete currency unit, Maybe (Dense currency)) -- ^
 ceiling = roundf Prelude.ceiling
 {-# INLINE ceiling #-}
 
--- | Round a 'Continuous' value @x@ to the nearest value fully representable in
+-- | Round a 'Dense' value @x@ to the nearest value fully representable in
 -- its @currency@'s @unit@ 'Scale'' which is smaller than @x@ or equal to @x@.
 --
 --
@@ -278,12 +278,12 @@ ceiling = roundf Prelude.ceiling
 -- @
 floor
   :: GoodScale currency unit
-  => Continuous currency
-  -> (Discrete currency unit, Maybe (Continuous currency)) -- ^
+  => Dense currency
+  -> (Discrete currency unit, Maybe (Dense currency)) -- ^
 floor = roundf Prelude.floor
 {-# INLINE floor #-}
 
--- | Round a 'Continuous' value @x@ to the nearest value between zero and
+-- | Round a 'Dense' value @x@ to the nearest value between zero and
 -- @x@ (inclusive) which is fully representable in its @currency@'s @unit@
 -- 'Scale''.
 --
@@ -315,8 +315,8 @@ floor = roundf Prelude.floor
 -- @
 truncate
   :: GoodScale currency unit
-  => Continuous currency
-  -> (Discrete currency unit, Maybe (Continuous currency)) -- ^
+  => Dense currency
+  -> (Discrete currency unit, Maybe (Dense currency)) -- ^
 truncate = roundf Prelude.truncate
 {-# INLINE truncate #-}
 
@@ -336,7 +336,7 @@ type Scale (currency :: Symbol) = Scale' currency currency
 
 -- | @'Scale'' currency unit@ is a rational number (expressed as @'(numerator,
 -- denominator)@) indicating how many pieces of @unit@ fit in @currency@.
--- The 'Scale'' will determine how to convert a 'Continuous' value into a
+-- The 'Scale'' will determine how to convert a 'Dense' value into a
 -- 'Discrete' value and vice-versa.
 --
 -- For example, there are 100 USD cents in 1 USD, so the scale for this
@@ -482,7 +482,7 @@ flipExchangeRate :: ExchangeRate a b -> ExchangeRate b a
 flipExchangeRate = \(ExchangeRate x) -> ExchangeRate (1 / x)
 {-# INLINE flipExchangeRate #-}
 
--- | Apply the 'ExchangeRate' to the given @'Continuous' src@ monetary value.
+-- | Apply the 'ExchangeRate' to the given @'Dense' src@ monetary value.
 --
 -- Identity law:
 --
@@ -493,8 +493,8 @@ flipExchangeRate = \(ExchangeRate x) -> ExchangeRate (1 / x)
 -- Use the /Identity law/ for reasoning about going back and forth between @src@
 -- and @dst@ in order to manage any leftovers that might not be representable as
 -- a 'Discrete' monetary value of @src@.
-exchange :: ExchangeRate src dst -> Continuous src -> Continuous dst
-exchange = \(ExchangeRate r) -> \(Continuous s) -> Continuous (r * s)
+exchange :: ExchangeRate src dst -> Dense src -> Dense dst
+exchange = \(ExchangeRate r) -> \(Dense s) -> Dense (r * s)
 {-# INLINE exchange #-}
 
 --------------------------------------------------------------------------------
