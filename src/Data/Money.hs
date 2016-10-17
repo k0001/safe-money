@@ -470,7 +470,7 @@ fromExchangeRate = \(ExchangeRate r0) -> r0
 --
 -- For construction to succeed, this 'Rational' must be greater than 0,
 -- different from 'infinity' and different from 'notANumber'.
-exchangeRate :: Rational -> Maybe (ExchangeRate (src :: Symbol) (dst :: Symbol))
+exchangeRate :: Rational -> Maybe (ExchangeRate src dst)
 exchangeRate = \r0 ->
   if (r0 <= 0 || infinity == r0 || notANumber == r0)
   then Nothing else Just (ExchangeRate r0)
