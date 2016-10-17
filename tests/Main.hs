@@ -65,7 +65,7 @@ testCurrency
 testCurrency pc =
   Tasty.testGroup ("Currency " ++ symbolVal pc)
   [ testShowReadContinuous pc
-  , testExchangeRate pc pc
+  -- , testExchangeRate pc pc
   ]
 
 testCurrencyUnit

@@ -44,10 +44,10 @@ module Data.Money
 
 import Control.Applicative (empty)
 import Data.Proxy (Proxy(..))
-import Data.Ratio ((%), numerator, denominator)
+import Data.Ratio ((%))
 import GHC.Real (infinity, notANumber)
 import GHC.TypeLits
-  (Symbol, Nat, CmpNat, KnownNat, KnownSymbol, symbolVal, natVal)
+  (Symbol, Nat, CmpNat, KnownNat, KnownSymbol, natVal)
 import qualified GHC.TypeLits as GHC
 import Prelude hiding (round, ceiling, floor, truncate)
 import qualified Prelude
@@ -74,33 +74,12 @@ import Text.Read (readPrec)
 -- Construct 'Continuous' monetary values using 'continuous', or
 -- 'fromInteger'/'fromIntegral' if that suffices.
 newtype Continuous (currency :: Symbol) = Continuous Rational
-  deriving (Eq, Ord, Num, Real, Fractional)
+  deriving (Eq, Ord, Num, Real, Fractional, Show)
 
-instance
-  forall (currency :: Symbol).
-  ( KnownSymbol currency
-  ) => Show (Continuous currency) where
-  show = \(Continuous r0) -> mconcat
-    [ "Continuous "
-    , if r0 < 0 then "-" else "+"
-    , show (abs (numerator r0))
-    , "/", show (abs (denominator r0))
-    , " ", symbolVal (Proxy :: Proxy currency)
-    ]
-
-instance
-  forall (currency :: Symbol).
-  ( KnownSymbol currency
-  ) => Read (Continuous currency) where
+instance Read (Continuous currency) where
   readPrec = do
-    _ <- ReadPrec.lift $ ReadP.string "Continuous "
-    f <- ReadPrec.get >>= \case { '+' -> pure id; '-' -> pure negate; _ -> empty }
-    n <- readPrec
-    _ <- ReadPrec.lift $ ReadP.satisfy (== '/')
-    d <- readPrec
-    _ <- ReadPrec.lift $ ReadP.satisfy (== ' ')
-    _ <- ReadPrec.lift $ ReadP.string (symbolVal (Proxy :: Proxy currency))
-    maybe empty pure (continuous (f n % d))
+    _ <- ReadPrec.lift (ReadP.string "Continuous ")
+    maybe empty pure =<< fmap continuous readPrec
 
 -- | Build a 'Continuous' monetary value from a 'Rational' value.
 --
@@ -136,36 +115,12 @@ continuous = \r0 ->
 --
 -- Because @2015 / 100 == 20.15@.
 newtype Discrete (currency :: Symbol) (unit :: Symbol) = Discrete Integer
-  deriving (Eq, Ord, Enum, Num, Real, Integral)
+  deriving (Eq, Ord, Enum, Show, Num, Real, Integral)
 
-instance
-  forall currency unit num den.
-  ( GoodScale currency unit num den
-  ) => Show (Discrete currency unit) where
-  show = \(Discrete i0) -> mconcat
-    [ "Discrete "
-    , if i0 < 0 then "-" else "+"
-    , show (abs i0)
-    , " ", symbolVal (Proxy :: Proxy currency)
-    , ":", show (natVal (Proxy :: Proxy num))
-    , "/", show (natVal (Proxy :: Proxy den))
-    ]
-
-instance
-  forall currency unit num den.
-  ( GoodScale currency unit num den
-  ) => Read (Discrete currency unit) where
+instance Read (Discrete currency unit) where
   readPrec = do
-    _ <- ReadPrec.lift $ ReadP.string "Discrete "
-    f <- ReadPrec.get >>= \case { '+' -> pure id; '-' -> pure negate; _ -> empty }
-    i <- readPrec
-    _ <- ReadPrec.lift $ ReadP.satisfy (== ' ')
-    _ <- ReadPrec.lift $ ReadP.string (symbolVal (Proxy :: Proxy currency))
-    _ <- ReadPrec.lift $ ReadP.satisfy (== ':')
-    _ <- ReadPrec.lift $ ReadP.string $ show (natVal (Proxy :: Proxy num))
-    _ <- ReadPrec.lift $ ReadP.satisfy (== '/')
-    _ <- ReadPrec.lift $ ReadP.string $ show (natVal (Proxy :: Proxy den))
-    pure (Discrete (f i))
+    _ <- ReadPrec.lift (ReadP.string "Discrete ")
+    Discrete <$> readPrec
 
 instance
   ( GHC.TypeError
