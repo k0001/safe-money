@@ -9,11 +9,11 @@ module Main where
 
 import qualified Test.Tasty as Tasty
 import qualified Test.Tasty.Runners as Tasty
-import Test.Tasty.QuickCheck ((===))
+import Test.Tasty.QuickCheck ((===), (==>))
 import qualified Test.Tasty.QuickCheck as QC
 
 import GHC.TypeLits (Nat, Symbol, KnownSymbol, symbolVal)
-import Data.Maybe (catMaybes)
+import Data.Maybe (catMaybes, isJust)
 import Data.Proxy (Proxy(Proxy))
 import Data.Scientific (Scientific, scientific)
 
@@ -26,12 +26,17 @@ instance QC.Arbitrary (Money.Discrete currency unit) where
   shrink = fmap fromInteger . QC.shrink . toInteger
 
 instance QC.Arbitrary (Money.Continuous currency) where
-  arbitrary = maybe QC.arbitrary pure . Money.continuous =<< QC.arbitrary
+  arbitrary = do
+    Just x <- QC.suchThat (fmap Money.continuous QC.arbitrary) isJust
+    pure x
   shrink = catMaybes . fmap Money.continuous . QC.shrink . toRational
 
 instance QC.Arbitrary (Money.ExchangeRate src dst) where
-  arbitrary = maybe QC.arbitrary pure . Money.exchangeRate =<< QC.arbitrary
-  shrink = catMaybes . fmap Money.exchangeRate . QC.shrink . Money.fromExchangeRate
+  arbitrary = do
+    Just x <- QC.suchThat (fmap Money.exchangeRate QC.arbitrary) isJust
+    pure x
+  shrink =
+    catMaybes . fmap Money.exchangeRate . QC.shrink . Money.fromExchangeRate
 
 --------------------------------------------------------------------------------
 
@@ -65,7 +70,7 @@ testCurrency
 testCurrency pc =
   Tasty.testGroup ("Currency " ++ symbolVal pc)
   [ testShowReadContinuous pc
-  -- , testExchangeRate pc pc
+  , testExchangeRate pc pc
   ]
 
 testCurrencyUnit
@@ -75,7 +80,8 @@ testCurrencyUnit
   -> Proxy unit
   -> Tasty.TestTree
 testCurrencyUnit pc pu =
-  Tasty.testGroup ("Currency unit " ++ symbolVal pc ++ " " ++ symbolVal pu)
+  Tasty.testGroup ("Currency unit " ++ show (symbolVal pc) ++ " "
+                                    ++ show (symbolVal pu))
   [ testShowReadDiscrete pc pu
   , testRounding pc pu
   ]
@@ -107,16 +113,19 @@ testShowReadDiscrete _ _ =
 
 testExchangeRate
   :: forall (src :: Symbol) (dst :: Symbol)
-  .  KnownSymbol src
+  .  (KnownSymbol src, KnownSymbol dst)
   => Proxy src
   -> Proxy dst
   -> Tasty.TestTree
-testExchangeRate _ _ =
-  Tasty.testGroup "ExchangeRate"
+testExchangeRate ps pd =
+  Tasty.testGroup ("ExchangeRate " ++ show (symbolVal ps) ++ " "
+                                   ++ show (symbolVal pd))
   -- TODO: these diverge.
   [ QC.testProperty "flipExchangeRate . flipExchangeRate == id" $
       QC.forAll QC.arbitrary $ \(xr :: Money.ExchangeRate src dst) ->
-         xr === Money.flipExchangeRate (Money.flipExchangeRate xr)
+         let xr' = Money.flipExchangeRate xr
+         in (Money.fromExchangeRate xr /= Money.fromExchangeRate xr')
+               ==> (xr === Money.flipExchangeRate xr')
   , QC.testProperty "exchange (flipExchangeRate x) . exchange x == id" $
       QC.forAll QC.arbitrary $
          \( c0 :: Money.Continuous src

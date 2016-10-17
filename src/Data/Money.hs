@@ -504,6 +504,8 @@ exchange = \(ExchangeRate r) -> \(Continuous s) -> Continuous (r * s)
 
 --------------------------------------------------------------------------------
 
+-- | A friendly 'GHC.TypeError' to use for a @currency@ that doesn't have a
+-- cannonical small unit.
 type family ErrScaleNonCanonical (currency :: Symbol) :: k where
   ErrScaleNonCanonical c = GHC.TypeError
     ( 'GHC.Text c 'GHC.:<>:
