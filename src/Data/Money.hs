@@ -47,7 +47,7 @@ import Data.Proxy (Proxy(..))
 import Data.Ratio ((%))
 import GHC.Real (infinity, notANumber)
 import GHC.TypeLits
-  (Symbol, Nat, CmpNat, KnownNat, KnownSymbol, natVal)
+  (Symbol, Nat, CmpNat, KnownNat, natVal)
 import qualified GHC.TypeLits as GHC
 import Prelude hiding (round, ceiling, floor, truncate)
 import qualified Prelude
@@ -142,7 +142,7 @@ instance
 -- | Convert currency 'Discrete' monetary value into a 'Continuous' monetary
 -- value.
 fromDiscrete
-  :: GoodScale currency unit num den
+  :: GoodScale currency unit
   => Discrete currency unit
   -> Continuous currency -- ^
 fromDiscrete = \c@(Discrete i) -> Continuous (fromInteger i / scale c)
@@ -150,7 +150,7 @@ fromDiscrete = \c@(Discrete i) -> Continuous (fromInteger i / scale c)
 
 -- | Internal. Used to implement 'round', 'ceiling', 'floor' and 'truncate'.
 roundf
-  :: GoodScale currency unit num den
+  :: GoodScale currency unit
   => (Rational -> Integer) -- ^ 'Prelude.round', 'Prelude.ceiling' or similar.
   -> Continuous currency
   -> (Discrete currency unit, Maybe (Continuous currency))
@@ -197,7 +197,7 @@ roundf f = \c0 ->
 --        (y, 'Just' z)  -> y + z
 -- @
 round
-  :: GoodScale currency unit num den
+  :: GoodScale currency unit
   => Continuous currency
   -> (Discrete currency unit, Maybe (Continuous currency)) -- ^
 round = roundf Prelude.round
@@ -237,7 +237,7 @@ round = roundf Prelude.round
 --        (y, 'Just' z)  -> y + z
 -- @
 ceiling
-  :: GoodScale currency unit num den
+  :: GoodScale currency unit
   => Continuous currency
   -> (Discrete currency unit, Maybe (Continuous currency)) -- ^
 ceiling = roundf Prelude.ceiling
@@ -277,7 +277,7 @@ ceiling = roundf Prelude.ceiling
 --        (y, 'Just' z)  -> y + z
 -- @
 floor
-  :: GoodScale currency unit num den
+  :: GoodScale currency unit
   => Continuous currency
   -> (Discrete currency unit, Maybe (Continuous currency)) -- ^
 floor = roundf Prelude.floor
@@ -314,7 +314,7 @@ floor = roundf Prelude.floor
 --        (y, 'Just' z)  -> y + z
 -- @
 truncate
-  :: GoodScale currency unit nat dem
+  :: GoodScale currency unit
   => Continuous currency
   -> (Discrete currency unit, Maybe (Continuous currency)) -- ^
 truncate = roundf Prelude.truncate
@@ -406,14 +406,11 @@ type family Scale' (currency :: Symbol) (unit :: Symbol) :: (Nat, Nat)
 --
 -- Notice that there is a functional dependency @currency unit -> num dem@,
 -- which means you can leave @num@ and @den@ polymorphic in constraints.
-type GoodScale (currency :: Symbol) (unit :: Symbol) (num :: Nat) (den :: Nat)
-  = ( Scale' currency unit ~ '(num, den)
-    , CmpNat 0 num ~ 'LT
-    , CmpNat 0 den ~ 'LT
-    , KnownNat num
-    , KnownNat den
-    , KnownSymbol currency
-    , KnownSymbol unit
+type GoodScale (currency :: Symbol) (unit :: Symbol)
+  = ( CmpNat 0 (Fst (Scale' currency unit)) ~ 'LT
+    , CmpNat 0 (Snd (Scale' currency unit)) ~ 'LT
+    , KnownNat (Fst (Scale' currency unit))
+    , KnownNat (Snd (Scale' currency unit))
     )
 
 -- | Term-level representation for the @currency@'s @unit@ 'Scale''.
@@ -423,22 +420,23 @@ type GoodScale (currency :: Symbol) (unit :: Symbol) (num :: Nat) (den :: Nat)
 -- The returned 'Rational' is statically guaranteed to be a positive number, and
 -- to be different from both 'notANumber' and 'infinity'.
 scale
-  :: forall currency unit num den
-  .  GoodScale currency unit num den
+  :: forall currency unit
+  .  GoodScale currency unit
   => Discrete currency unit
   -> Rational
-scale = \_ -> natVal (Proxy :: Proxy num) % natVal (Proxy :: Proxy den)
+scale = \_ -> scaleFromProxy (Proxy :: Proxy currency) (Proxy :: Proxy unit)
 {-# INLINE scale #-}
 
 -- | Like 'scale', but takes proxies (e.g., 'Proxy') instead of 'Discrete'.
 scaleFromProxy
-  :: forall currency unit num den proxy1 proxy2
-  .  GoodScale currency unit num den
+  :: forall currency unit proxy1 proxy2
+  .  GoodScale currency unit
   => proxy1 currency
   -> proxy2 unit
   -> Rational
 scaleFromProxy = \_ _ ->
-   natVal (Proxy :: Proxy num) % natVal (Proxy :: Proxy den)
+   natVal (Proxy :: Proxy (Fst (Scale' currency unit))) %
+   natVal (Proxy :: Proxy (Snd (Scale' currency unit)))
 {-# INLINE scaleFromProxy #-}
 
 --------------------------------------------------------------------------------
@@ -541,3 +539,9 @@ type instance Scale' "XAU" "gram" = '(31103477, 1000000)
 type instance Scale' "XAU" "milligram" = '(31103477, 1000)
 type instance Scale' "XAU" "microgram" = '(31103477, 1)
 
+
+--------------------------------------------------------------------------------
+-- Miscellaneous
+
+type family Fst (ab :: (ka, kb)) :: ka where Fst '(a,b) = a
+type family Snd (ab :: (ka, kb)) :: ka where Snd '(a,b) = b

@@ -74,8 +74,8 @@ testCurrency pc =
   ]
 
 testCurrencyUnit
-  :: forall (currency :: Symbol) (unit :: Symbol) (num :: Nat) (den :: Nat)
-  .  Money.GoodScale currency unit num den
+  :: forall (currency :: Symbol) (unit :: Symbol)
+  .  (Money.GoodScale currency unit, KnownSymbol currency, KnownSymbol unit)
   => Proxy currency
   -> Proxy unit
   -> Tasty.TestTree
@@ -99,8 +99,8 @@ testShowReadContinuous _ =
   ]
 
 testShowReadDiscrete
-  :: forall (currency :: Symbol) (unit :: Symbol) (num :: Nat) (den :: Nat)
-  .  Money.GoodScale currency unit num den
+  :: forall (currency :: Symbol) (unit :: Symbol)
+  .  Money.GoodScale currency unit
   => Proxy currency
   -> Proxy unit
   -> Tasty.TestTree
@@ -135,8 +135,8 @@ testExchangeRate ps pd =
   ]
 
 testRounding
-  :: forall (currency :: Symbol) (unit :: Symbol) (num :: Nat) (den :: Nat)
-  .  Money.GoodScale currency unit num den
+  :: forall (currency :: Symbol) (unit :: Symbol)
+  .  Money.GoodScale currency unit
   => Proxy currency
   -> Proxy unit
   -> Tasty.TestTree
