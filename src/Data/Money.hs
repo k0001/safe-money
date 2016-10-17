@@ -492,7 +492,7 @@ flipExchangeRate = \(ExchangeRate x) -> ExchangeRate (1 / x)
 -- Identity law:
 --
 -- @
--- 'exchange' ('flipExchangeRate 'x') . 'exchange' x  ==  'id'
+-- 'exchange' ('flipExchangeRate' x) . 'exchange' x  ==  'id'
 -- @
 --
 -- Use the /Identity law/ for reasoning about going back and forth between @src@
