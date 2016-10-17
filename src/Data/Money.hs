@@ -400,12 +400,9 @@ type Scale (currency :: Symbol) = Scale' currency currency
 -- representable @unit@, like XAU, you will get a compile error.
 type family Scale' (currency :: Symbol) (unit :: Symbol) :: (Nat, Nat)
 
--- | Constraints to @'Scale'' currency unit ~ '(num, den)@ expected to always be
--- satisfied. In particular, the scale is always guaranteed to be a positive
--- rational number ('infinity' and 'notANumber' are forbidden by 'GoodScale').
---
--- Notice that there is a functional dependency @currency unit -> num dem@,
--- which means you can leave @num@ and @den@ polymorphic in constraints.
+-- | Constraints to @'Scale'' currency unit@ expected to always be satisfied. In
+-- particular, the scale is always guaranteed to be a positive rational number
+-- ('infinity' and 'notANumber' are forbidden by 'GoodScale').
 type GoodScale (currency :: Symbol) (unit :: Symbol)
   = ( CmpNat 0 (Fst (Scale' currency unit)) ~ 'LT
     , CmpNat 0 (Snd (Scale' currency unit)) ~ 'LT
