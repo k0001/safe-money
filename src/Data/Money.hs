@@ -522,455 +522,654 @@ type family ErrScaleNonCanonical (currency :: Symbol) :: k where
       'GHC.Text "be explicit about the currency unit you want to use." )
 
 -- | United Arab Emirates dirham
-type instance Scale' "AED" "AED" = '(1, 1)
+type instance Scale' "AED" "AED" = '(100, 1)
 type instance Scale' "AED" "dirham" = '(1, 1)
 type instance Scale' "AED" "fils" = '(100, 1)
 -- | Afghan afghani
-type instance Scale' "AFN" "AFN" = '(1, 1)
+type instance Scale' "AFN" "AFN" = '(100, 1)
 type instance Scale' "AFN" "afghani" = '(1, 1)
 type instance Scale' "AFN" "pul" = '(100, 1)
 -- | Albanian lek
-type instance Scale' "ALL" "ALL" = '(1, 1)
+type instance Scale' "ALL" "ALL" = '(100, 1)
 type instance Scale' "ALL" "lek" = '(1, 1)
 type instance Scale' "ALL" "qindarkë" = '(100, 1)
 -- | Armenian dram
-type instance Scale' "AMD" "AMD" = '(1, 1)
+type instance Scale' "AMD" "AMD" = '(100, 1)
 type instance Scale' "AMD" "dram" = '(1, 1)
 type instance Scale' "AMD" "luma" = '(100, 1)
 -- | Netherlands Antillean guilder
-type instance Scale' "ANG" "ANG" = '(1, 1)
+type instance Scale' "ANG" "ANG" = '(100, 1)
 type instance Scale' "ANG" "guilder" = '(1, 1)
 type instance Scale' "ANG" "cent" = '(100, 1)
 -- | Angolan kwanza
-type instance Scale' "AOA" "AOA" = '(1, 1)
+type instance Scale' "AOA" "AOA" = '(100, 1)
 type instance Scale' "AOA" "kwanza" = '(1, 1)
 type instance Scale' "AOA" "cêntimo" = '(100, 1)
 -- | Argentine peso
-type instance Scale' "ARS" "ARS" = '(1, 1)
+type instance Scale' "ARS" "ARS" = '(100, 1)
 type instance Scale' "ARS" "peso" = '(1, 1)
 type instance Scale' "ARS" "centavo" = '(100, 1)
 -- | Australian dollar
-type instance Scale' "AUD" "AUD" = '(1, 1)
+type instance Scale' "AUD" "AUD" = '(100, 1)
 type instance Scale' "AUD" "dollar" = '(1, 1)
 type instance Scale' "AUD" "cent" = '(100, 1)
 -- | Aruban florin
-type instance Scale' "AWG" "AWG" = '(1, 1)
+type instance Scale' "AWG" "AWG" = '(100, 1)
 type instance Scale' "AWG" "florin" = '(1, 1)
 type instance Scale' "AWG" "cent" = '(100, 1)
 -- | Azerbaijani manat
-type instance Scale' "AZN" "AZN" = '(1, 1)
+type instance Scale' "AZN" "AZN" = '(100, 1)
 type instance Scale' "AZN" "manat" = '(1, 1)
 type instance Scale' "AZN" "qəpik" = '(100, 1)
 -- | Bosnia and Herzegovina convertible mark
-type instance Scale' "BAM" "BAM" = '(1, 1)
+type instance Scale' "BAM" "BAM" = '(100, 1)
 type instance Scale' "BAM" "mark" = '(1, 1)
 type instance Scale' "BAM" "fening" = '(100, 1)
 -- | Barbadian dollar
-type instance Scale' "BBD" "BBD" = '(1, 1)
+type instance Scale' "BBD" "BBD" = '(100, 1)
 type instance Scale' "BBD" "dollar" = '(1, 1)
 type instance Scale' "BBD" "cent" = '(100, 1)
 -- | Bangladeshi taka
-type instance Scale' "BDT" "BDT" = '(1, 1)
+type instance Scale' "BDT" "BDT" = '(100, 1)
 type instance Scale' "BDT" "taka" = '(1, 1)
 type instance Scale' "BDT" "paisa" = '(100, 1)
 -- | Bulgarian lev
-type instance Scale' "BGN" "BGN" = '(1, 1)
+type instance Scale' "BGN" "BGN" = '(100, 1)
 type instance Scale' "BGN" "lev" = '(1, 1)
 type instance Scale' "BGN" "stotinka" = '(100, 1)
 -- | Bahraini dinar
-type instance Scale' "BHD" "BHD" = '(1, 1)
+type instance Scale' "BHD" "BHD" = '(1000, 1)
 type instance Scale' "BHD" "dinar" = '(1, 1)
 type instance Scale' "BHD" "fils" = '(1000, 1)
 -- | Burundi franc
-type instance Scale' "BIF" "BIF" = '(1, 1)
+type instance Scale' "BIF" "BIF" = '(100, 1)
 type instance Scale' "BIF" "franc" = '(1, 1)
 type instance Scale' "BIF" "centime" = '(100, 1)
 -- | Bermudian dollar
-type instance Scale' "BMD" "BMD" = '(1, 1)
+type instance Scale' "BMD" "BMD" = '(100, 1)
 type instance Scale' "BMD" "dollar" = '(1, 1)
 type instance Scale' "BMD" "cent" = '(100, 1)
 -- | Brunei dollar
-type instance Scale' "BND" "BND" = '(1, 1)
+type instance Scale' "BND" "BND" = '(100, 1)
 type instance Scale' "BND" "dollar" = '(1, 1)
 type instance Scale' "BND" "sen" = '(100, 1)
 -- | Bolivian boliviano
-type instance Scale' "BOB" "BOB" = '(1, 1)
+type instance Scale' "BOB" "BOB" = '(100, 1)
 type instance Scale' "BOB" "boliviano" = '(1, 1)
 type instance Scale' "BOB" "centavo" = '(100, 1)
 -- | Bolivian Mvdol
-type instance Scale' "BOV" "BOV" = '(1, 1)
+type instance Scale' "BOV" "BOV" = '(100, 1)
 -- | Brazilian real
-type instance Scale' "BRL" "BRL" = '(1, 1)
+type instance Scale' "BRL" "BRL" = '(100, 1)
 type instance Scale' "BRL" "real" = '(1, 1)
 type instance Scale' "BRL" "centavo" = '(100, 1)
 -- | Bahamian dollar
-type instance Scale' "BSD" "BSD" = '(1, 1)
+type instance Scale' "BSD" "BSD" = '(100, 1)
 type instance Scale' "BSD" "dollar" = '(1, 1)
 type instance Scale' "BSD" "cent" = '(1, 1)
 -- | Bhutanese ngultrum
-type instance Scale' "BTN" "BTN" = '(1, 1)
+type instance Scale' "BTN" "BTN" = '(100, 1)
 type instance Scale' "BTN" "ngultrum" = '(1, 1)
 type instance Scale' "BTN" "chetrum" = '(100, 1)
 -- | Botswana pula
-type instance Scale' "BWP" "BWP" = '(1, 1)
+type instance Scale' "BWP" "BWP" = '(100, 1)
 type instance Scale' "BWP" "pula" = '(1, 1)
 type instance Scale' "BWP" "thebe" = '(100, 1)
 -- | Belarusian ruble
-type instance Scale' "BYN" "BYN" = '(1, 1)
+type instance Scale' "BYN" "BYN" = '(100, 1)
 -- | Belarusian ruble
-type instance Scale' "BYR" "BYR" = '(1, 1)
+type instance Scale' "BYR" "BYR" = '(100, 1)
 type instance Scale' "BYR" "ruble" = '(1, 1)
 type instance Scale' "BYR" "kapyeyka" = '(100, 1)
 -- | Belize dollar
-type instance Scale' "BZD" "BZD" = '(1, 1)
+type instance Scale' "BZD" "BZD" = '(100, 1)
 type instance Scale' "BZD" "dollar" = '(1, 1)
 type instance Scale' "BZD" "cent" = '(100, 1)
 -- | Canadian dollar
-type instance Scale' "CAD" "CAD" = '(1, 1)
+type instance Scale' "CAD" "CAD" = '(100, 1)
 type instance Scale' "CAD" "dollar" = '(1, 1)
 type instance Scale' "CAD" "cent" = '(100, 1)
 -- | Congolese franc
-type instance Scale' "CDF" "CDF" = '(1, 1)
+type instance Scale' "CDF" "CDF" = '(100, 1)
 type instance Scale' "CDF" "franc" = '(1, 1)
 type instance Scale' "CDF" "centime" = '(100, 1)
 -- | WIR euro
-type instance Scale' "CHE" "CHE" = '(1, 1)
+type instance Scale' "CHE" "CHE" = '(100, 1)
 -- | Swiss franc
-type instance Scale' "CHF" "CHF" = '(1, 1)
+type instance Scale' "CHF" "CHF" = '(100, 1)
 type instance Scale' "CHF" "franc" = '(1, 1)
 type instance Scale' "CHF" "rappen" = '(100, 1)
 -- | WIR franc
-type instance Scale' "CHW" "CHW" = '(1, 1)
+type instance Scale' "CHW" "CHW" = '(100, 1)
 -- | Chilean unidad de fomento
-type instance Scale' "CLF" "CLF" = '(1, 1)
+type instance Scale' "CLF" "CLF" = '(100, 1)
 -- | Chilean peso
-type instance Scale' "CLP" "CLP" = '(1, 1)
+type instance Scale' "CLP" "CLP" = '(100, 1)
 type instance Scale' "CLP" "peso" = '(1, 1)
 type instance Scale' "CLP" "centavo" = '(100, 1)
 -- | Chinese Renminbi
-type instance Scale' "CNY" "CNY" = '(1, 1)
+type instance Scale' "CNY" "CNY" = '(100, 1)
 type instance Scale' "CNY" "yuan" = '(1, 1)
 type instance Scale' "CNY" "fen" = '(100, 1)
 -- | Colombian peso
-type instance Scale' "COP" "COP" = '(1, 1)
+type instance Scale' "COP" "COP" = '(100, 1)
 type instance Scale' "COP" "peso" = '(1, 1)
 type instance Scale' "COP" "centavo" = '(100, 1)
 -- | Colombian unidad de valor real
-type instance Scale' "COU" "COU" = '(1, 1)
+type instance Scale' "COU" "COU" = '(100, 1)
 -- | Costa Rican colon
-type instance Scale' "CRC" "CRC" = '(1, 1)
+type instance Scale' "CRC" "CRC" = '(100, 1)
 type instance Scale' "CRC" "colon" = '(1, 1)
-type instance Scale' "CRC" "céntimo" = '(100, 1)
+type instance Scale' "CRC" "centimo" = '(100, 1)
 -- | Cuban peso convertible
-type instance Scale' "CUC" "CUC" = '(1, 1)
+type instance Scale' "CUC" "CUC" = '(100, 1)
 type instance Scale' "CUC" "peso" = '(1, 1)
 type instance Scale' "CUC" "centavo" = '(100, 1)
 -- | Cuban peso
-type instance Scale' "CUP" "CUP" = '(1, 1)
+type instance Scale' "CUP" "CUP" = '(100, 1)
 type instance Scale' "CUP" "peso" = '(1, 1)
 type instance Scale' "CUP" "centavo" = '(100, 1)
 -- | Cape Verdean escudo
-type instance Scale' "CVE" "CVE" = '(1, 1)
+type instance Scale' "CVE" "CVE" = '(100, 1)
 type instance Scale' "CVE" "escudo" = '(1, 1)
 type instance Scale' "CVE" "centavo" = '(100, 1)
 -- | Czech koruna
-type instance Scale' "CZK" "CZK" = '(1, 1)
+type instance Scale' "CZK" "CZK" = '(100, 1)
 type instance Scale' "CZK" "koruna" = '(1, 1)
-type instance Scale' "CZK" "haléř" = '(100, 1)
+type instance Scale' "CZK" "haler" = '(100, 1)
 -- | Djiboutian franc
-type instance Scale' "DJF" "DJF" = '(1, 1)
+type instance Scale' "DJF" "DJF" = '(100, 1)
 type instance Scale' "DJF" "franc" = '(1, 1)
 type instance Scale' "DJF" "centime" = '(100, 1)
 -- | Danish krone
-type instance Scale' "DKK" "DKK" = '(1, 1)
+type instance Scale' "DKK" "DKK" = '(100, 1)
 type instance Scale' "DKK" "krone" = '(1, 1)
 type instance Scale' "DKK" "øre" = '(100, 1)
 -- | Dominican peso
-type instance Scale' "DOP" "DOP" = '(1, 1)
+type instance Scale' "DOP" "DOP" = '(100, 1)
 type instance Scale' "DOP" "peso" = '(1, 1)
 type instance Scale' "DOP" "centavo" = '(100, 1)
 -- | Algerian dinar
-type instance Scale' "DZD" "DZD" = '(1, 1)
+type instance Scale' "DZD" "DZD" = '(100, 1)
 type instance Scale' "DZD" "dinar" = '(1, 1)
 type instance Scale' "DZD" "santeem" = '(100, 1)
 -- | Egyptian pound
-type instance Scale' "EGP" "EGP" = '(1, 1)
+type instance Scale' "EGP" "EGP" = '(100, 1)
 type instance Scale' "EGP" "pound" = '(1, 1)
 type instance Scale' "EGP" "piastre" = '(100, 1)
 -- | Eritrean nakfa
-type instance Scale' "ERN" "ERN" = '(1, 1)
+type instance Scale' "ERN" "ERN" = '(100, 1)
 type instance Scale' "ERN" "nafka" = '(1, 1)
 type instance Scale' "ERN" "cent" = '(100, 1)
 -- | Ethiopian birr
-type instance Scale' "ETB" "ETB" = '(1, 1)
+type instance Scale' "ETB" "ETB" = '(100, 1)
 type instance Scale' "ETB" "birr" = '(1, 1)
 type instance Scale' "ETB" "santim" = '(100, 1)
 -- | European euro
-type instance Scale' "EUR" "EUR" = '(1, 1)
+type instance Scale' "EUR" "EUR" = '(100, 1)
 type instance Scale' "EUR" "euro" = '(1, 1)
 type instance Scale' "EUR" "cent" = '(100, 1)
 -- | Fijian dollar
-type instance Scale' "FJD" "FJD" = '(1, 1)
+type instance Scale' "FJD" "FJD" = '(100, 1)
 -- | Falkland Islands pound
-type instance Scale' "FKP" "FKP" = '(1, 1)
+type instance Scale' "FKP" "FKP" = '(100, 1)
 type instance Scale' "FKP" "pound" = '(1, 1)
 type instance Scale' "FKP" "penny" = '(100, 1)
 -- | Pound sterling
-type instance Scale' "GBP" "GBP" = '(1, 1)
+type instance Scale' "GBP" "GBP" = '(100, 1)
 type instance Scale' "GBP" "pound" = '(1, 1)
 type instance Scale' "GBP" "penny" = '(100, 1)
 -- | Georgian lari
-type instance Scale' "GEL" "GEL" = '(1, 1)
+type instance Scale' "GEL" "GEL" = '(100, 1)
 type instance Scale' "GEL" "lari" = '(1, 1)
 type instance Scale' "GEL" "tetri" = '(100, 1)
 -- | Ghanaian cedi
-type instance Scale' "GHS" "GHS" = '(1, 1)
+type instance Scale' "GHS" "GHS" = '(100, 1)
 type instance Scale' "GHS" "cedi" = '(1, 1)
 type instance Scale' "GHS" "pesewa" = '(100, 1)
 -- | Gibraltar pound
-type instance Scale' "GIP" "GIP" = '(1, 1)
+type instance Scale' "GIP" "GIP" = '(100, 1)
 type instance Scale' "GIP" "pound" = '(1, 1)
 type instance Scale' "GIP" "penny" = '(100, 1)
 -- | Gambian dalasi
-type instance Scale' "GMD" "GMD" = '(1, 1)
+type instance Scale' "GMD" "GMD" = '(100, 1)
 type instance Scale' "GMD" "dalasi" = '(1, 1)
 type instance Scale' "GMD" "butut" = '(100, 1)
 -- | Guinean franc
-type instance Scale' "GNF" "GNF" = '(1, 1)
+type instance Scale' "GNF" "GNF" = '(100, 1)
 type instance Scale' "GNF" "franc" = '(1, 1)
 type instance Scale' "GNF" "centime" = '(100, 1)
 -- | Guatemalan quetzal
-type instance Scale' "GTQ" "GTQ" = '(1, 1)
+type instance Scale' "GTQ" "GTQ" = '(100, 1)
 type instance Scale' "GTQ" "quetzal" = '(1, 1)
 type instance Scale' "GTQ" "centavo" = '(100, 1)
 -- | Guyanese dollar
-type instance Scale' "GYD" "GYD" = '(1, 1)
+type instance Scale' "GYD" "GYD" = '(100, 1)
 type instance Scale' "GYD" "dollar" = '(1, 1)
 type instance Scale' "GYD" "cent" = '(100, 1)
 -- | Hong Kong dollar
-type instance Scale' "HKD" "HKD" = '(1, 1)
+type instance Scale' "HKD" "HKD" = '(100, 1)
 type instance Scale' "HKD" "dollar" = '(1, 1)
 type instance Scale' "HKD" "cent" = '(100, 1)
 -- | Honduran lempira
-type instance Scale' "HNL" "HNL" = '(1, 1)
+type instance Scale' "HNL" "HNL" = '(100, 1)
 type instance Scale' "HNL" "lempira" = '(1, 1)
 type instance Scale' "HNL" "centavo" = '(100, 1)
 -- | Croatian kuna
-type instance Scale' "HRK" "HRK" = '(1, 1)
+type instance Scale' "HRK" "HRK" = '(100, 1)
 type instance Scale' "HRK" "kuna" = '(1, 1)
 type instance Scale' "HRK" "lipa" = '(100, 1)
 -- | Haitian gourde
-type instance Scale' "HTG" "HTG" = '(1, 1)
+type instance Scale' "HTG" "HTG" = '(100, 1)
+type instance Scale' "HTG" "gourde" = '(1, 1)
+type instance Scale' "HTG" "centime" = '(1, 1)
 -- | Hungarian forint
-type instance Scale' "HUF" "HUF" = '(1, 1)
+type instance Scale' "HUF" "HUF" = '(100, 1)
+type instance Scale' "HUF" "forint" = '(1, 1)
+type instance Scale' "HUF" "filler" = '(100, 1)
 -- | Indonesian rupiah
-type instance Scale' "IDR" "IDR" = '(1, 1)
+type instance Scale' "IDR" "IDR" = '(100, 1)
+type instance Scale' "IDR" "rupiah" = '(1, 1)
+type instance Scale' "IDR" "sen" = '(100, 1)
 -- | Israeli new shekel
-type instance Scale' "ILS" "ILS" = '(1, 1)
+type instance Scale' "ILS" "ILS" = '(100, 1)
+type instance Scale' "ILS" "shekel" = '(1, 1)
+type instance Scale' "ILS" "agora" = '(100, 1)
 -- | Indian rupee
-type instance Scale' "INR" "INR" = '(1, 1)
+type instance Scale' "INR" "INR" = '(100, 1)
+type instance Scale' "INR" "rupee" = '(1, 1)
+type instance Scale' "INR" "paisa" = '(100, 1)
 -- | Iraqi dinar
-type instance Scale' "IQD" "IQD" = '(1, 1)
+type instance Scale' "IQD" "IQD" = '(1000, 1)
+type instance Scale' "IQD" "dinar" = '(1, 1)
+type instance Scale' "IQD" "fils" = '(1000, 1)
 -- | Iranian rial
-type instance Scale' "IRR" "IRR" = '(1, 1)
--- | Icelandic krona
-type instance Scale' "ISK" "ISK" = '(1, 1)
+type instance Scale' "IRR" "IRR" = '(100, 1)
+type instance Scale' "IRR" "rial" = '(1, 1)
+type instance Scale' "IRR" "dinar" = '(100, 1)
+-- | Icelandic króna
+type instance Scale' "ISK" "ISK" = '(100, 1)
+type instance Scale' "ISK" "króna" = '(1, 1)
+type instance Scale' "ISK" "eyir" = '(100, 1)
 -- | Jamaican dollar
-type instance Scale' "JMD" "JMD" = '(1, 1)
+type instance Scale' "JMD" "JMD" = '(100, 1)
+type instance Scale' "JMD" "dollar" = '(1, 1)
+type instance Scale' "JMD" "cent" = '(100, 1)
 -- | Jordanian dinar
-type instance Scale' "JOD" "JOD" = '(1, 1)
+type instance Scale' "JOD" "JOD" = '(100, 1)
+type instance Scale' "JOD" "dinar" = '(1, 1)
+type instance Scale' "JOD" "piastre" = '(100, 1)
 -- | Japanese yen
-type instance Scale' "JPY" "JPY" = '(1, 1)
+type instance Scale' "JPY" "JPY" = '(100, 1)
+type instance Scale' "JPY" "yen" = '(1, 1)
+type instance Scale' "JPY" "sen" = '(100, 1)
 -- | Kenyan shilling
-type instance Scale' "KES" "KES" = '(1, 1)
+type instance Scale' "KES" "KES" = '(100, 1)
+type instance Scale' "KES" "shilling" = '(1, 1)
+type instance Scale' "KES" "cent" = '(100, 1)
 -- | Kyrgyzstani som
-type instance Scale' "KGS" "KGS" = '(1, 1)
+type instance Scale' "KGS" "KGS" = '(100, 1)
+type instance Scale' "KGS" "som" = '(1, 1)
+type instance Scale' "KGS" "tyiyn" = '(100, 1)
 -- | Cambodian riel
-type instance Scale' "KHR" "KHR" = '(1, 1)
+type instance Scale' "KHR" "KHR" = '(100, 1)
+type instance Scale' "KHR" "riel" = '(1, 1)
+type instance Scale' "KHR" "sen" = '(100, 1)
 -- | Comorian franc
-type instance Scale' "KMF" "KMF" = '(1, 1)
+type instance Scale' "KMF" "KMF" = '(100, 1)
+type instance Scale' "KMF" "franc" = '(1, 1)
+type instance Scale' "KMF" "centime" = '(100, 1)
 -- | North Korean won
-type instance Scale' "KPW" "KPW" = '(1, 1)
+type instance Scale' "KPW" "KPW" = '(100, 1)
+type instance Scale' "KPW" "won" = '(1, 1)
+type instance Scale' "KPW" "chon" = '(100, 1)
 -- | South Korean won
-type instance Scale' "KRW" "KRW" = '(1, 1)
+type instance Scale' "KRW" "KRW" = '(100, 1)
+type instance Scale' "KRW" "won" = '(1, 1)
+type instance Scale' "KRW" "jeon" = '(100, 1)
 -- | Kuwaiti dinar
-type instance Scale' "KWD" "KWD" = '(1, 1)
+type instance Scale' "KWD" "KWD" = '(1000, 1)
+type instance Scale' "KWD" "dinar" = '(1, 1)
+type instance Scale' "KWD" "fils" = '(1000, 1)
 -- | Cayman Islands dollar
-type instance Scale' "KYD" "KYD" = '(1, 1)
+type instance Scale' "KYD" "KYD" = '(100, 1)
+type instance Scale' "KYD" "dollar" = '(1, 1)
+type instance Scale' "KYD" "cent" = '(100, 1)
 -- | Kazakhstani tenge
-type instance Scale' "KZT" "KZT" = '(1, 1)
+type instance Scale' "KZT" "KZT" = '(100, 1)
+type instance Scale' "KZT" "tenge" = '(1, 1)
+type instance Scale' "KZT" "tiyin" = '(100, 1)
 -- | Lao kip
-type instance Scale' "LAK" "LAK" = '(1, 1)
+type instance Scale' "LAK" "LAK" = '(100, 1)
+type instance Scale' "LAK" "kip" = '(1, 1)
+type instance Scale' "LAK" "att" = '(100, 1)
 -- | Lebanese pound
-type instance Scale' "LBP" "LBP" = '(1, 1)
+type instance Scale' "LBP" "LBP" = '(100, 1)
+type instance Scale' "LBP" "pound" = '(1, 1)
+type instance Scale' "LBP" "piastre" = '(100, 1)
 -- | Sri Lankan rupee
-type instance Scale' "LKR" "LKR" = '(1, 1)
+type instance Scale' "LKR" "LKR" = '(100, 1)
+type instance Scale' "LKR" "rupee" = '(1, 1)
+type instance Scale' "LKR" "cent" = '(100, 1)
 -- | Liberian dollar
-type instance Scale' "LRD" "LRD" = '(1, 1)
+type instance Scale' "LRD" "LRD" = '(100, 1)
+type instance Scale' "LRD" "dollar" = '(1, 1)
+type instance Scale' "LRD" "cent" = '(100, 1)
 -- | Lesotho loti
-type instance Scale' "LSL" "LSL" = '(1, 1)
+type instance Scale' "LSL" "LSL" = '(100, 1)
+type instance Scale' "LSL" "loti" = '(1, 1)
+type instance Scale' "LSL" "sente" = '(100, 1)
 -- | Libyan dinar
-type instance Scale' "LYD" "LYD" = '(1, 1)
+type instance Scale' "LYD" "LYD" = '(100, 1)
+type instance Scale' "LYD" "dinar" = '(1, 1)
+type instance Scale' "LYD" "dirham" = '(1000, 1)
 -- | Moroccan dirham
-type instance Scale' "MAD" "MAD" = '(1, 1)
+type instance Scale' "MAD" "MAD" = '(100, 1)
+type instance Scale' "MAD" "dirham" = '(1, 1)
+type instance Scale' "MAD" "centime" = '(100, 1)
 -- | Moldovan leu
-type instance Scale' "MDL" "MDL" = '(1, 1)
+type instance Scale' "MDL" "MDL" = '(100, 1)
+type instance Scale' "MDL" "leu" = '(100, 1)
+type instance Scale' "MDL" "ban" = '(100, 1)
 -- | Malagasy ariary
-type instance Scale' "MGA" "MGA" = '(1, 1)
+type instance Scale' "MGA" "MGA" = '(5, 1)
+type instance Scale' "MGA" "ariary" = '(1, 1)
+type instance Scale' "MGA" "iraimbilanja" = '(5, 1)
 -- | Macedonian denar
-type instance Scale' "MKD" "MKD" = '(1, 1)
+type instance Scale' "MKD" "MKD" = '(100, 1)
+type instance Scale' "MKD" "denar" = '(1, 1)
+type instance Scale' "MKD" "deni" = '(100, 1)
 -- | Myanmar kyat
-type instance Scale' "MMK" "MMK" = '(1, 1)
+type instance Scale' "MMK" "MMK" = '(100, 1)
+type instance Scale' "MMK" "kyat" = '(1, 1)
+type instance Scale' "MMK" "pya" = '(100, 1)
 -- | Mongolian tugrik
-type instance Scale' "MNT" "MNT" = '(1, 1)
+type instance Scale' "MNT" "MNT" = '(100, 1)
+type instance Scale' "MNT" "tugrik" = '(1, 1)
+type instance Scale' "MNT" "mongo" = '(100, 1)
 -- | Macanese pataca
-type instance Scale' "MOP" "MOP" = '(1, 1)
+type instance Scale' "MOP" "MOP" = '(100, 1)
+type instance Scale' "MOP" "pataca" = '(1, 1)
+type instance Scale' "MOP" "avo" = '(100, 1)
 -- | Mauritanian ouguiya
-type instance Scale' "MRO" "MRO" = '(1, 1)
+type instance Scale' "MRO" "MRO" = '(5, 1)
+type instance Scale' "MRO" "ouguiya" = '(1, 1)
+type instance Scale' "MRO" "khoums" = '(5, 1)
 -- | Mauritian rupee
-type instance Scale' "MUR" "MUR" = '(1, 1)
+type instance Scale' "MUR" "MUR" = '(100, 1)
+type instance Scale' "MUR" "rupee" = '(1, 1)
+type instance Scale' "MUR" "cent" = '(100, 1)
 -- | Maldivian rufiyaa
-type instance Scale' "MVR" "MVR" = '(1, 1)
+type instance Scale' "MVR" "MVR" = '(100, 1)
+type instance Scale' "MVR" "rufiyaa" = '(1, 1)
+type instance Scale' "MVR" "laari" = '(100, 1)
 -- | Malawian kwacha
-type instance Scale' "MWK" "MWK" = '(1, 1)
+type instance Scale' "MWK" "MWK" = '(100, 1)
+type instance Scale' "MWK" "kwacha" = '(1, 1)
+type instance Scale' "MWK" "tambala" = '(100, 1)
 -- | Mexican peso
-type instance Scale' "MXN" "MXN" = '(1, 1)
+type instance Scale' "MXN" "MXN" = '(100, 1)
+type instance Scale' "MXN" "peso" = '(1, 1)
+type instance Scale' "MXN" "centavo" = '(100, 1)
 -- | Mexican unidad de inversion
-type instance Scale' "MXV" "MXV" = '(1, 1)
+type instance Scale' "MXV" "MXV" = '(100, 1)
 -- | Malaysian ringgit
-type instance Scale' "MYR" "MYR" = '(1, 1)
+type instance Scale' "MYR" "MYR" = '(100, 1)
+type instance Scale' "MYR" "ringgit" = '(1, 1)
+type instance Scale' "MYR" "sen" = '(100, 1)
 -- | Mozambican metical
-type instance Scale' "MZN" "MZN" = '(1, 1)
+type instance Scale' "MZN" "MZN" = '(100, 1)
+type instance Scale' "MZN" "metical" = '(1, 1)
+type instance Scale' "MZN" "centavo" = '(100, 1)
 -- | Namibian dollar
-type instance Scale' "NAD" "NAD" = '(1, 1)
+type instance Scale' "NAD" "NAD" = '(100, 1)
+type instance Scale' "NAD" "dollar" = '(1, 1)
+type instance Scale' "NAD" "cent" = '(100, 1)
 -- | Nigerian naira
-type instance Scale' "NGN" "NGN" = '(1, 1)
+type instance Scale' "NGN" "NGN" = '(100, 1)
+type instance Scale' "NGN" "naira" = '(1, 1)
+type instance Scale' "NGN" "kobo" = '(100, 1)
 -- | Nicaraguan cordoba
-type instance Scale' "NIO" "NIO" = '(1, 1)
+type instance Scale' "NIO" "NIO" = '(100, 1)
+type instance Scale' "NIO" "cordoba" = '(1, 1)
+type instance Scale' "NIO" "centavo" = '(100, 1)
 -- | Norwegian krone
-type instance Scale' "NOK" "NOK" = '(1, 1)
+type instance Scale' "NOK" "NOK" = '(100, 1)
+type instance Scale' "NOK" "krone" = '(1, 1)
+type instance Scale' "NOK" "øre" = '(100, 1)
 -- | Nepalese rupee
-type instance Scale' "NPR" "NPR" = '(1, 1)
+type instance Scale' "NPR" "NPR" = '(100, 1)
+type instance Scale' "NPR" "rupee" = '(1, 1)
+type instance Scale' "NPR" "paisa" = '(100, 1)
 -- | New Zealand dollar
-type instance Scale' "NZD" "NZD" = '(1, 1)
+type instance Scale' "NZD" "NZD" = '(100, 1)
+type instance Scale' "NZD" "dollar" = '(1, 1)
+type instance Scale' "NZD" "cent" = '(100, 1)
 -- | Omani rial
-type instance Scale' "OMR" "OMR" = '(1, 1)
+type instance Scale' "OMR" "OMR" = '(1000, 1)
+type instance Scale' "OMR" "rial" = '(1, 1)
+type instance Scale' "OMR" "baisa" = '(1000, 1)
 -- | Panamenian balboa
-type instance Scale' "PAB" "PAB" = '(1, 1)
+type instance Scale' "PAB" "PAB" = '(100, 1)
+type instance Scale' "PAB" "balboa" = '(1, 1)
+type instance Scale' "PAB" "centésimo" = '(100, 1)
 -- | Peruvian sol
-type instance Scale' "PEN" "PEN" = '(1, 1)
+type instance Scale' "PEN" "PEN" = '(100, 1)
+type instance Scale' "PEN" "sol" = '(1, 1)
+type instance Scale' "PEN" "céntimo" = '(100, 1)
 -- | Papua New Guinean kina
-type instance Scale' "PGK" "PGK" = '(1, 1)
+type instance Scale' "PGK" "PGK" = '(100, 1)
+type instance Scale' "PGK" "kina" = '(1, 1)
+type instance Scale' "PGK" "toea" = '(100, 1)
 -- | Philippine peso
-type instance Scale' "PHP" "PHP" = '(1, 1)
+type instance Scale' "PHP" "PHP" = '(100, 1)
+type instance Scale' "PHP" "peso" = '(1, 1)
+type instance Scale' "PHP" "centavo" = '(100, 1)
 -- | Pakistani rupee
-type instance Scale' "PKR" "PKR" = '(1, 1)
+type instance Scale' "PKR" "PKR" = '(100, 1)
+type instance Scale' "PKR" "rupee" = '(1, 1)
+type instance Scale' "PKR" "paisa" = '(100, 1)
 -- | Polish zloty
-type instance Scale' "PLN" "PLN" = '(1, 1)
+type instance Scale' "PLN" "PLN" = '(100, 1)
+type instance Scale' "PLN" "złoty" = '(1, 1)
+type instance Scale' "PLN" "grosz" = '(100, 1)
 -- | Paraguayan guarani
-type instance Scale' "PYG" "PYG" = '(1, 1)
+type instance Scale' "PYG" "PYG" = '(100, 1)
+type instance Scale' "PYG" "guaraní" = '(1, 1)
+type instance Scale' "PYG" "céntimo" = '(100, 1)
 -- | Qatari riyal
-type instance Scale' "QAR" "QAR" = '(1, 1)
+type instance Scale' "QAR" "QAR" = '(100, 1)
+type instance Scale' "QAR" "riyal" = '(1, 1)
+type instance Scale' "QAR" "dirham" = '(100, 1)
 -- | Romanian leu
-type instance Scale' "RON" "RON" = '(1, 1)
+type instance Scale' "RON" "RON" = '(100, 1)
+type instance Scale' "RON" "leu" = '(1, 1)
+type instance Scale' "RON" "ban" = '(100, 1)
 -- | Serbian dinar
-type instance Scale' "RSD" "RSD" = '(1, 1)
+type instance Scale' "RSD" "RSD" = '(100, 1)
+type instance Scale' "RSD" "dinar" = '(1, 1)
+type instance Scale' "RSD" "para" = '(100, 1)
 -- | Russian ruble
-type instance Scale' "RUB" "RUB" = '(1, 1)
+type instance Scale' "RUB" "RUB" = '(100, 1)
+type instance Scale' "RUB" "ruble" = '(1, 1)
+type instance Scale' "RUB" "kopek" = '(100, 1)
 -- | Rwandan franc
-type instance Scale' "RWF" "RWF" = '(1, 1)
+type instance Scale' "RWF" "RWF" = '(100, 1)
+type instance Scale' "RWF" "franc" = '(1, 1)
+type instance Scale' "RWF" "centime" = '(100, 1)
 -- | Saudi Arabian riyal
-type instance Scale' "SAR" "SAR" = '(1, 1)
+type instance Scale' "SAR" "SAR" = '(100, 1)
+type instance Scale' "SAR" "riyal" = '(1, 1)
+type instance Scale' "SAR" "halala" = '(100, 1)
 -- | Solomon Islands dollar
-type instance Scale' "SBD" "SBD" = '(1, 1)
+type instance Scale' "SBD" "SBD" = '(100, 1)
+type instance Scale' "SBD" "dollar" = '(100, 1)
+type instance Scale' "SBD" "cent" = '(100, 1)
 -- | Seychellois rupee
-type instance Scale' "SCR" "SCR" = '(1, 1)
+type instance Scale' "SCR" "SCR" = '(100, 1)
+type instance Scale' "SCR" "rupee" = '(1, 1)
+type instance Scale' "SCR" "cent" = '(100, 1)
 -- | Sudanese pound
-type instance Scale' "SDG" "SDG" = '(1, 1)
+type instance Scale' "SDG" "SDG" = '(100, 1)
+type instance Scale' "SDG" "pound" = '(1, 1)
+type instance Scale' "SDG" "piastre" = '(100, 1)
 -- | Swedish krona
-type instance Scale' "SEK" "SEK" = '(1, 1)
+type instance Scale' "SEK" "SEK" = '(100, 1)
+type instance Scale' "SEK" "krona" = '(1, 1)
+type instance Scale' "SEK" "öre" = '(100, 1)
 -- | Singapore dollar
-type instance Scale' "SGD" "SGD" = '(1, 1)
+type instance Scale' "SGD" "SGD" = '(100, 1)
+type instance Scale' "SGD" "dollar" = '(1, 1)
+type instance Scale' "SGD" "cent" = '(100, 1)
 -- | Saint Helena pound
-type instance Scale' "SHP" "SHP" = '(1, 1)
+type instance Scale' "SHP" "SHP" = '(100, 1)
+type instance Scale' "SHP" "pound" = '(1, 1)
+type instance Scale' "SHP" "penny" = '(100, 1)
 -- | Sierra Leonean leone
-type instance Scale' "SLL" "SLL" = '(1, 1)
+type instance Scale' "SLL" "SLL" = '(100, 1)
+type instance Scale' "SLL" "leone" = '(1, 1)
+type instance Scale' "SLL" "cent" = '(100, 1)
 -- | Somali shilling
-type instance Scale' "SOS" "SOS" = '(1, 1)
+type instance Scale' "SOS" "SOS" = '(100, 1)
+type instance Scale' "SOS" "shilling" = '(1, 1)
+type instance Scale' "SOS" "cent" = '(100, 1)
 -- | Surinamese dollar
-type instance Scale' "SRD" "SRD" = '(1, 1)
+type instance Scale' "SRD" "SRD" = '(100, 1)
+type instance Scale' "SRD" "dollar" = '(1, 1)
+type instance Scale' "SRD" "cent" = '(100, 1)
 -- | South Sudanese pound
-type instance Scale' "SSP" "SSP" = '(1, 1)
+type instance Scale' "SSP" "SSP" = '(100, 1)
+type instance Scale' "SSP" "pound" = '(1, 1)
+type instance Scale' "SSP" "piastre" = '(100, 1)
 -- | Sao Tome and Principe dobra
-type instance Scale' "STD" "STD" = '(1, 1)
+type instance Scale' "STD" "STD" = '(100, 1)
+type instance Scale' "STD" "dobra" = '(1, 1)
+type instance Scale' "STD" "cêntimo" = '(100, 1)
 -- | Salvadoran colon
-type instance Scale' "SVC" "SVC" = '(1, 1)
+type instance Scale' "SVC" "SVC" = '(100, 1)
+type instance Scale' "SVC" "colón" = '(1, 1)
+type instance Scale' "SVC" "centavo" = '(100, 1)
 -- | Syrian pound
-type instance Scale' "SYP" "SYP" = '(1, 1)
+type instance Scale' "SYP" "SYP" = '(100, 1)
+type instance Scale' "SYP" "pound" = '(1, 1)
+type instance Scale' "SYP" "piastre" = '(100, 1)
 -- | Swazi lilangeni
-type instance Scale' "SZL" "SZL" = '(1, 1)
+type instance Scale' "SZL" "SZL" = '(100, 1)
+type instance Scale' "SZL" "lilangeni" = '(1, 1)
+type instance Scale' "SZL" "cent" = '(100, 1)
 -- | Thai baht
-type instance Scale' "THB" "THB" = '(1, 1)
+type instance Scale' "THB" "THB" = '(100, 1)
+type instance Scale' "THB" "baht" = '(1, 1)
+type instance Scale' "THB" "satang" = '(100, 1)
 -- | Tajikistani somoni
-type instance Scale' "TJS" "TJS" = '(1, 1)
+type instance Scale' "TJS" "TJS" = '(100, 1)
+type instance Scale' "TJS" "somoni" = '(1, 1)
+type instance Scale' "TJS" "diram" = '(100, 1)
 -- | Turkmen manat
-type instance Scale' "TMT" "TMT" = '(1, 1)
+type instance Scale' "TMT" "TMT" = '(100, 1)
+type instance Scale' "TMT" "manat" = '(1, 1)
+type instance Scale' "TMT" "tennesi" = '(100, 1)
 -- | Tunisian dinar
-type instance Scale' "TND" "TND" = '(1, 1)
+type instance Scale' "TND" "TND" = '(1000, 1)
+type instance Scale' "TND" "dinar" = '(1, 1)
+type instance Scale' "TND" "millime" = '(1000, 1)
 -- | Tongan pa’anga
-type instance Scale' "TOP" "TOP" = '(1, 1)
+type instance Scale' "TOP" "TOP" = '(100, 1)
+type instance Scale' "TOP" "pa'anga" = '(1, 1)
+type instance Scale' "TOP" "seniti" = '(100, 1)
 -- | Turkish lira
-type instance Scale' "TRY" "TRY" = '(1, 1)
+type instance Scale' "TRY" "TRY" = '(100, 1)
+type instance Scale' "TRY" "lira" = '(1, 1)
+type instance Scale' "TRY" "kuruş" = '(100, 1)
 -- | Tobago Trinidad and Tobago dollar
-type instance Scale' "TTD" "TTD" = '(1, 1)
+type instance Scale' "TTD" "TTD" = '(100, 1)
+type instance Scale' "TTD" "dollar" = '(1, 1)
+type instance Scale' "TTD" "cent" = '(100, 1)
 -- | New Taiwan dollar
-type instance Scale' "TWD" "TWD" = '(1, 1)
+type instance Scale' "TWD" "TWD" = '(100, 1)
+type instance Scale' "TWD" "dollar" = '(1, 1)
+type instance Scale' "TWD" "cent" = '(100, 1)
 -- | Tanzanian shilling
-type instance Scale' "TZS" "TZS" = '(1, 1)
+type instance Scale' "TZS" "TZS" = '(100, 1)
+type instance Scale' "TZS" "shilling" = '(1, 1)
+type instance Scale' "TZS" "cent" = '(100, 1)
 -- | Ukrainian hryvnia
-type instance Scale' "UAH" "UAH" = '(1, 1)
+type instance Scale' "UAH" "UAH" = '(100, 1)
+type instance Scale' "UAH" "hryvnia" = '(1, 1)
+type instance Scale' "UAH" "kopiyka" = '(100, 1)
 -- | Ugandan shilling
-type instance Scale' "UGX" "UGX" = '(1, 1)
+type instance Scale' "UGX" "UGX" = '(100, 1)
+type instance Scale' "UGX" "shilling" = '(1, 1)
+type instance Scale' "UGX" "cent" = '(100, 1)
 -- | United States dollar
-type instance Scale' "USD" "USD" = '(1, 1)
+type instance Scale' "USD" "USD" = '(100, 1)
+type instance Scale' "USD" "dollar" = '(1, 1)
+type instance Scale' "USD" "cent" = '(100, 1)
 -- | United States dollar (next day)
-type instance Scale' "USN" "USN" = '(1, 1)
+type instance Scale' "USN" "USN" = '(100, 1)
 -- | Uruguayan peso en unidades
-type instance Scale' "UYI" "UYI" = '(1, 1)
+type instance Scale' "UYI" "UYI" = '(100, 1)
 -- | Uruguayan peso
-type instance Scale' "UYU" "UYU" = '(1, 1)
+type instance Scale' "UYU" "UYU" = '(100, 1)
+type instance Scale' "UYU" "peso" = '(1, 1)
+type instance Scale' "UYU" "centésimo" = '(100, 1)
 -- | Uzbekistani som
-type instance Scale' "UZS" "UZS" = '(1, 1)
+type instance Scale' "UZS" "UZS" = '(100, 1)
+type instance Scale' "UZS" "som" = '(1, 1)
+type instance Scale' "UZS" "tiyin" = '(100, 1)
 -- | Venezuelan bolivar
-type instance Scale' "VEF" "VEF" = '(1, 1)
+type instance Scale' "VEF" "VEF" = '(100, 1)
+type instance Scale' "VEF" "bolivar" = '(1, 1)
+type instance Scale' "VEF" "céntimo" = '(100, 1)
 -- | Vietnamese dong
-type instance Scale' "VND" "VND" = '(1, 1)
+type instance Scale' "VND" "VND" = '(10, 1)
+type instance Scale' "VND" "dong" = '(1, 1)
+type instance Scale' "VND" "hào" = '(10, 1)
 -- | Vanuatu vatu
 type instance Scale' "VUV" "VUV" = '(1, 1)
--- | Samoan tala
-type instance Scale' "WST" "WST" = '(1, 1)
+type instance Scale' "VUV" "vatu" = '(1, 1)
+-- | Samoan tālā
+type instance Scale' "WST" "WST" = '(100, 1)
+type instance Scale' "WST" "tālā" = '(1, 1)
+type instance Scale' "WST" "sene" = '(100, 1)
 -- | Central African CFA franc
-type instance Scale' "XAF" "XAF" = '(1, 1)
+type instance Scale' "XAF" "XAF" = '(100, 1)
+type instance Scale' "XAF" "franc" = '(1, 1)
+type instance Scale' "XAF" "centime" = '(100, 1)
 -- | East Caribbean dollar
-type instance Scale' "XCD" "XCD" = '(1, 1)
+type instance Scale' "XCD" "XCD" = '(100, 1)
+type instance Scale' "XCD" "dollar" = '(1, 1)
+type instance Scale' "XCD" "cent" = '(100, 1)
 -- | International Monetary Fund Special Drawing Right
-type instance Scale' "XDR" "XDR" = '(1, 1)
+type instance Scale' "XDR" "XDR" = '(100, 1)
 -- | West African CFA franc
-type instance Scale' "XOF" "XOF" = '(1, 1)
+type instance Scale' "XOF" "XOF" = '(100, 1)
+type instance Scale' "XOF" "franc" = '(1, 1)
+type instance Scale' "XOF" "centime" = '(100, 1)
 -- | CFP franc
-type instance Scale' "XPF" "XPF" = '(1, 1)
+type instance Scale' "XPF" "XPF" = '(100, 1)
+type instance Scale' "XPF" "franc" = '(1, 1)
+type instance Scale' "XPF" "centime" = '(100, 1)
 -- | Sucre
-type instance Scale' "XSU" "XSU" = '(1, 1)
+type instance Scale' "XSU" "XSU" = '(100, 1)
 -- | African Development Bank unit of account
-type instance Scale' "XUA" "XUA" = '(1, 1)
+type instance Scale' "XUA" "XUA" = '(100, 1)
 -- | Yemeni rial
-type instance Scale' "YER" "YER" = '(1, 1)
+type instance Scale' "YER" "YER" = '(100, 1)
+type instance Scale' "YER" "rial" = '(1, 1)
+type instance Scale' "YER" "fils" = '(100, 1)
 -- | South African rand
-type instance Scale' "ZAR" "ZAR" = '(1, 1)
+type instance Scale' "ZAR" "ZAR" = '(100, 1)
+type instance Scale' "ZAR" "rand" = '(1, 1)
+type instance Scale' "ZAR" "cent" = '(100, 1)
 -- | Zambian kwacha
-type instance Scale' "ZMW" "ZMW" = '(1, 1)
+type instance Scale' "ZMW" "ZMW" = '(100, 1)
+type instance Scale' "ZMW" "kwacha" = '(1, 1)
+type instance Scale' "ZMW" "ngwee" = '(100, 1)
 -- | Zimbawe dollar
-type instance Scale' "ZWL" "ZWL" = '(1, 1)
+type instance Scale' "ZWL" "ZWL" = '(100, 1)
+type instance Scale' "ZWL" "dollar" = '(1, 1)
+type instance Scale' "ZWL" "cent" = '(100, 1)
 
 -- | Gold
 type instance Scale' "XAU" "XAU" = ErrScaleNonCanonical "XAU"
@@ -1025,3 +1224,19 @@ type instance Scale' "BTC" "satoshi" = '(100000000, 1)
 type instance Scale' "XBT" "XBT" = '(100000000, 1)
 type instance Scale' "XBT" "bitcoin" = '(1, 1)
 type instance Scale' "XBT" "satoshi" = '(100000000, 1)
+
+-- | Ether
+type instance Scale' "ETH" "ETH" = '(1000000000000000000, 1)
+type instance Scale' "ETH" "ether" = '(1, 1)
+type instance Scale' "ETH" "kwei" = '(1000, 1)
+type instance Scale' "ETH" "babbage" = '(1000, 1)
+type instance Scale' "ETH" "mwei" = '(1000000, 1)
+type instance Scale' "ETH" "lovelace" = '(1000000, 1)
+type instance Scale' "ETH" "gwei" = '(1000000000, 1)
+type instance Scale' "ETH" "shannon" = '(1000000000, 1)
+type instance Scale' "ETH" "microether" = '(1000000000000, 1)
+type instance Scale' "ETH" "szabo" = '(1000000000000, 1)
+type instance Scale' "ETH" "finney" = '(1000000000000000, 1)
+type instance Scale' "ETH" "milliether" = '(1000000000000000, 1)
+type instance Scale' "ETH" "wei" = '(1000000000000000000, 1)
+
