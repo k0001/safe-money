@@ -24,6 +24,7 @@ module Data.Money
    -- * Discrete monetary values
  , Discrete
  , fromDiscrete
+ , coerceUnit
  , round
  , ceiling
  , floor
@@ -151,6 +152,19 @@ fromDiscrete
   -> Dense currency -- ^
 fromDiscrete = \c@(Discrete i) -> Dense (fromInteger i / scale c)
 {-# INLINE fromDiscrete #-}
+
+-- | Rename a 'Discrete''s @unit@, provided the new unit shares the same 'Scale'
+-- as the original.
+--
+-- This is useful for converting between cases such as @'Discrete' \"USD\"
+-- \"USD\"@ and @'Discrete' \"USD\" \"cent\"@, which have the same meaning yet
+-- different types.
+coerceUnit
+  :: Scale' currency unit1 ~ Scale' currency unit2
+  => Discrete currency unit1
+  -> Discrete currency unit2
+coerceUnit = \(Discrete i) -> Discrete i
+{-# INLINE coerceUnit #-}
 
 -- | Internal. Used to implement 'round', 'ceiling', 'floor' and 'truncate'.
 roundf
