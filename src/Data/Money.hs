@@ -814,8 +814,9 @@ type instance Scale' "JOD" "JOD" = '(100, 1)
 type instance Scale' "JOD" "dinar" = '(1, 1)
 type instance Scale' "JOD" "piastre" = '(100, 1)
 -- | Japanese yen
-type instance Scale' "JPY" "JPY" = '(1, 1)
+type instance Scale' "JPY" "JPY" = '(100, 1)
 type instance Scale' "JPY" "yen" = '(1, 1)
+type instance Scale' "JPY" "sen" = '(100, 1)
 -- | Kenyan shilling
 type instance Scale' "KES" "KES" = '(100, 1)
 type instance Scale' "KES" "shilling" = '(1, 1)
