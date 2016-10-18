@@ -950,7 +950,7 @@ type instance Scale' "NIO" "centavo" = '(100, 1)
 -- | Norwegian krone
 type instance Scale' "NOK" "NOK" = '(100, 1)
 type instance Scale' "NOK" "krone" = '(1, 1)
-type instance Scale' "NOK" "øre" = '(100, 1)
+type instance Scale' "NOK" "ore" = '(100, 1)
 -- | Nepalese rupee
 type instance Scale' "NPR" "NPR" = '(100, 1)
 type instance Scale' "NPR" "rupee" = '(1, 1)
@@ -1094,7 +1094,7 @@ type instance Scale' "TOP" "seniti" = '(100, 1)
 -- | Turkish lira
 type instance Scale' "TRY" "TRY" = '(100, 1)
 type instance Scale' "TRY" "lira" = '(1, 1)
-type instance Scale' "TRY" "kuruş" = '(100, 1)
+type instance Scale' "TRY" "kurus" = '(100, 1)
 -- | Tobago Trinidad and Tobago dollar
 type instance Scale' "TTD" "TTD" = '(100, 1)
 type instance Scale' "TTD" "dollar" = '(1, 1)
