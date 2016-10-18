@@ -574,7 +574,7 @@ type instance Scale' "AWG" "cent" = '(100, 1)
 -- | Azerbaijani manat
 type instance Scale' "AZN" "AZN" = '(100, 1)
 type instance Scale' "AZN" "manat" = '(1, 1)
-type instance Scale' "AZN" "qəpik" = '(100, 1)
+type instance Scale' "AZN" "qapik" = '(100, 1)
 -- | Bosnia and Herzegovina convertible mark
 type instance Scale' "BAM" "BAM" = '(100, 1)
 type instance Scale' "BAM" "mark" = '(1, 1)
