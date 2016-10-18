@@ -18,28 +18,29 @@
 -- import qualified Data.Money as Money
 -- @
 module Data.Money
- ( Discrete
- , fromDiscrete
-
- , Dense
+ ( -- * Dense monetary values
+   Dense
  , dense
+   -- * Discrete monetary values
+ , Discrete
+ , fromDiscrete
  , round
  , ceiling
  , floor
  , truncate
-
+   -- * Currency scales
+ , Scale
+ , Scale'
+ , GoodScale
+ , ErrScaleNonCanonical
+ , scale
+ , scaleFromProxy
+   -- * Currency exchange
  , ExchangeRate
  , exchangeRate
  , fromExchangeRate
  , flipExchangeRate
  , exchange
-
- , Scale
- , Scale'
- , GoodScale
- , scale
- , scaleFromProxy
- , ErrScaleNonCanonical
  ) where
 
 import Control.Applicative (empty)
