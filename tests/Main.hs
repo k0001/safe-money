@@ -49,15 +49,30 @@ main =  Tasty.defaultMainWithIngredients
 tests :: Tasty.TestTree
 tests =
   Tasty.testGroup "root"
-  [ testCurrency     (Proxy :: Proxy "USD")
+  [ testCurrencies
+  , testCurrencyUnits
+  , testExchange
+  ]
+
+testCurrencies :: Tasty.TestTree
+testCurrencies =
+  Tasty.testGroup "Currency"
+  [ testCurrency (Proxy :: Proxy "BTC")
+  , testCurrency (Proxy :: Proxy "USD")
+  , testCurrency (Proxy :: Proxy "VUV")
+  , testCurrency (Proxy :: Proxy "XAU")
+  ]
+
+testCurrencyUnits :: Tasty.TestTree
+testCurrencyUnits =
+  Tasty.testGroup "Currency units"
+  [ testCurrencyUnit (Proxy :: Proxy "BTC") (Proxy :: Proxy "BTC")
+  , testCurrencyUnit (Proxy :: Proxy "BTC") (Proxy :: Proxy "satoshi")
+  , testCurrencyUnit (Proxy :: Proxy "BTC") (Proxy :: Proxy "bitcoin")
   , testCurrencyUnit (Proxy :: Proxy "USD") (Proxy :: Proxy "USD")
   , testCurrencyUnit (Proxy :: Proxy "USD") (Proxy :: Proxy "cent")
   , testCurrencyUnit (Proxy :: Proxy "USD") (Proxy :: Proxy "dollar")
-  , testCurrency     (Proxy :: Proxy "BTC")
-  , testCurrencyUnit (Proxy :: Proxy "BTC") (Proxy :: Proxy "BTC")
-  , testCurrencyUnit (Proxy :: Proxy "BTC") (Proxy :: Proxy "satoshi")
-  , testCurrencyUnit (Proxy :: Proxy "BTC") (Proxy :: Proxy "bitcoin")
-  , testCurrency     (Proxy :: Proxy "XAU")
+  , testCurrencyUnit (Proxy :: Proxy "VUV") (Proxy :: Proxy "vatu")
   , testCurrencyUnit (Proxy :: Proxy "XAU") (Proxy :: Proxy "micrograin")
   , testCurrencyUnit (Proxy :: Proxy "XAU") (Proxy :: Proxy "milligrain")
   , testCurrencyUnit (Proxy :: Proxy "XAU") (Proxy :: Proxy "grain")
@@ -70,7 +85,27 @@ testCurrency
 testCurrency pc =
   Tasty.testGroup ("Currency " ++ symbolVal pc)
   [ testShowReadDense pc
-  , testExchangeRate pc pc
+  ]
+
+testExchange :: Tasty.TestTree
+testExchange =
+  Tasty.testGroup "Exchange"
+  [ testExchangeRate (Proxy :: Proxy "BTC") (Proxy :: Proxy "BTC")
+  , testExchangeRate (Proxy :: Proxy "BTC") (Proxy :: Proxy "USD")
+  , testExchangeRate (Proxy :: Proxy "BTC") (Proxy :: Proxy "VUV")
+  , testExchangeRate (Proxy :: Proxy "BTC") (Proxy :: Proxy "XAU")
+  , testExchangeRate (Proxy :: Proxy "USD") (Proxy :: Proxy "BTC")
+  , testExchangeRate (Proxy :: Proxy "USD") (Proxy :: Proxy "USD")
+  , testExchangeRate (Proxy :: Proxy "USD") (Proxy :: Proxy "VUV")
+  , testExchangeRate (Proxy :: Proxy "USD") (Proxy :: Proxy "XAU")
+  , testExchangeRate (Proxy :: Proxy "VUV") (Proxy :: Proxy "BTC")
+  , testExchangeRate (Proxy :: Proxy "VUV") (Proxy :: Proxy "USD")
+  , testExchangeRate (Proxy :: Proxy "VUV") (Proxy :: Proxy "VUV")
+  , testExchangeRate (Proxy :: Proxy "VUV") (Proxy :: Proxy "XAU")
+  , testExchangeRate (Proxy :: Proxy "XAU") (Proxy :: Proxy "BTC")
+  , testExchangeRate (Proxy :: Proxy "XAU") (Proxy :: Proxy "USD")
+  , testExchangeRate (Proxy :: Proxy "XAU") (Proxy :: Proxy "VUV")
+  , testExchangeRate (Proxy :: Proxy "XAU") (Proxy :: Proxy "XAU")
   ]
 
 testCurrencyUnit
@@ -92,8 +127,8 @@ testShowReadDense
   => Proxy currency
   -> Tasty.TestTree
 testShowReadDense _ =
-  Tasty.testGroup "read . show == id"
-  [ QC.testProperty "Dense" $
+  Tasty.testGroup "Dense"
+  [ QC.testProperty "read . show == id" $
       QC.forAll QC.arbitrary $ \(x :: Money.Dense currency) ->
          x === read (show x)
   ]
@@ -105,10 +140,13 @@ testShowReadDiscrete
   -> Proxy unit
   -> Tasty.TestTree
 testShowReadDiscrete _ _ =
-  Tasty.testGroup "read . show == id"
-  [ QC.testProperty "Discrete" $
+  Tasty.testGroup "Discrete"
+  [ QC.testProperty "read . show == id" $
       QC.forAll QC.arbitrary $ \(x :: Money.Discrete currency unit) ->
          x === read (show x)
+  , QC.testProperty "coerceUnit == id" $
+      QC.forAll QC.arbitrary $ \(x :: Money.Discrete currency unit) ->
+         x == Money.coerceUnit x
   ]
 
 testExchangeRate
@@ -132,6 +170,17 @@ testExchangeRate ps pd =
           , xr :: Money.ExchangeRate src dst
           ) -> c0 === Money.exchange (Money.flipExchangeRate xr)
                                      (Money.exchange xr c0)
+  , QC.testProperty "x == 1 ===> exchange x == id" $
+      QC.forAll QC.arbitrary $
+         \( c0 :: Money.Dense src
+          ) -> let Just xr = Money.exchangeRate 1
+               in toRational c0 === toRational (Money.exchange xr c0)
+  , QC.testProperty "x /= 1 ===> exchange x /= id" $
+      QC.forAll QC.arbitrary $
+         \( c0 :: Money.Dense src
+          , xr :: Money.ExchangeRate src dst
+          ) -> (Money.fromExchangeRate xr /= 1)
+                  ==> (toRational c0 /= toRational (Money.exchange xr c0))
   ]
 
 testRounding
