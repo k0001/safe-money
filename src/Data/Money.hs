@@ -30,12 +30,10 @@ module Data.Money
  , I.flipExchangeRate
  , I.exchange
    -- * Serializable representations
-   -- * Serializable representations
  , I.DenseRep
  , I.denseRep
  , I.fromDenseRep
  , I.withDenseRep
-   -- * Serializable representations
  , I.DiscreteRep
  , I.discreteRep
  , I.fromDiscreteRep

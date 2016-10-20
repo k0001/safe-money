@@ -44,7 +44,6 @@ module Data.Money.Internal
  , mkDenseRep
  , fromDenseRep
  , withDenseRep
-   -- * Serializable representations
  , DiscreteRep
  , discreteRep
  , mkDiscreteRep
