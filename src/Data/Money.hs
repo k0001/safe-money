@@ -33,13 +33,11 @@ module Data.Money
    -- * Serializable representations
  , I.DenseRep
  , I.denseRep
- , I.mkDenseRep
  , I.fromDenseRep
  , I.withDenseRep
    -- * Serializable representations
  , I.DiscreteRep
  , I.discreteRep
- , I.mkDiscreteRep
  , I.fromDiscreteRep
  , I.withDiscreteRep
  ) where

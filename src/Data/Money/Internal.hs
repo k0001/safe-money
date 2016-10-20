@@ -538,8 +538,8 @@ deriving instance Ord DenseRep
 -- | Internal. Build a 'DenseRep' from raw values.
 mkDenseRep
   :: String -- ^ Currency.
-  -> Integer -- ^ Nominator.
-  -> Integer -- ^ Denominator (positive, non zero)
+  -> Integer -- ^ Scale nominator.
+  -> Integer -- ^ Scale denominator (positive, non zero)
   -> Maybe DenseRep
 mkDenseRep = \c n d -> if d > 0 then Just (DenseRep c n d) else Nothing
 {-# INLINE mkDenseRep #-}
@@ -571,7 +571,7 @@ fromDenseRep = \(DenseRep c n d) ->
 withDenseRep
   :: DenseRep
   -> (forall currency. KnownSymbol currency => Dense currency -> r)
-  -> r
+  -> r  -- ^
 withDenseRep (DenseRep c n d) = \f ->
    case someSymbolVal c of
       SomeSymbol (Proxy :: Proxy currency) ->
@@ -643,7 +643,7 @@ withDiscreteRep
          , GoodScale scale
          ) => Discrete' currency scale
            -> r )
-  -> r
+  -> r  -- ^
 withDiscreteRep (DiscreteRep c n d a) = \f ->
   case someSymbolVal c of
      SomeSymbol (Proxy :: Proxy currency) -> case someNatVal n of
