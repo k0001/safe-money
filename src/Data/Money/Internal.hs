@@ -21,19 +21,17 @@ module Data.Money.Internal
  , dense
    -- * Discrete monetary values
  , Discrete
+ , Discrete'
  , fromDiscrete
- , coerceUnit
  , round
  , ceiling
  , floor
  , truncate
    -- * Currency scales
  , Scale
- , Scale'
  , GoodScale
  , ErrScaleNonCanonical
  , scale
- , scaleFromProxy
    -- * Currency exchange
  , ExchangeRate
  , exchangeRate
@@ -46,21 +44,29 @@ module Data.Money.Internal
  , mkDenseRep
  , fromDenseRep
  , withDenseRep
+   -- * Serializable representations
+ , DiscreteRep
+ , discreteRep
+ , mkDiscreteRep
+ , fromDiscreteRep
+ , withDiscreteRep
  ) where
 
 import Control.Applicative (empty)
+import Data.Constraint (Dict(Dict))
 import Data.Proxy (Proxy(..))
 import Data.Ratio ((%), numerator, denominator)
 import GHC.Real (infinity, notANumber)
 import GHC.TypeLits
-  (Symbol, SomeSymbol(..), Nat, CmpNat, KnownSymbol, KnownNat,
-   natVal, symbolVal, someSymbolVal)
+  (Symbol, SomeSymbol(..), Nat, SomeNat(..), CmpNat, KnownSymbol, KnownNat,
+   natVal, someNatVal, symbolVal, someSymbolVal)
 import qualified GHC.TypeLits as GHC
 import Prelude hiding (round, ceiling, floor, truncate)
 import qualified Prelude
 import qualified Text.ParserCombinators.ReadPrec as ReadPrec
 import qualified Text.ParserCombinators.ReadP as ReadP
 import Text.Read (readPrec)
+import Unsafe.Coerce (unsafeCoerce)
 
 --------------------------------------------------------------------------------
 -- | 'Dense' represents a dense monetary value for @currency@ (usually a
@@ -116,7 +122,7 @@ dense = \r0 ->
 --
 -- For example, if you want to represent @GBP 21.05@, where the smallest
 -- represetable unit for a GBP (United Kingdom Pound) is the /penny/, and 100
--- /pennies/ equal 1 GBP (i.e., @'Scale'' \"GBP\" ~ '(100, 1)@), then you can
+-- /pennies/ equal 1 GBP (i.e., @'Scale' \"GBP\" ~ '(100, 1)@), then you can
 -- use:
 --
 -- @
@@ -124,10 +130,21 @@ dense = \r0 ->
 -- @
 --
 -- Because @2015 / 100 == 20.15@.
-newtype Discrete (currency :: Symbol) (unit :: Symbol) = Discrete Integer
+type Discrete (currency :: Symbol) (unit :: Symbol)
+  = Discrete' currency (Scale currency unit)
+
+-- | 'Discrete'' represents a discrete monetary value for a @currency@ expresed
+-- as an amount of @scale@, which is a rational number expressed as @(numerator,
+-- denominator)@.
+--
+-- You'll be using 'Discrete' instead of 'Discrete'' most of the time, which
+-- mentions the unit name (such as /cent/ or /centavo/) instead of explicitely
+-- mentioning the unit scale.
+newtype Discrete' (currency :: Symbol) (scale :: (Nat, Nat))
+  = Discrete Integer
   deriving (Eq, Ord, Enum, Show, Num, Real, Integral)
 
-instance Read (Discrete currency unit) where
+instance Read (Discrete' currency scale) where
   readPrec = do
     _ <- ReadPrec.lift (ReadP.string "Discrete ")
     Discrete <$> readPrec
@@ -135,48 +152,35 @@ instance Read (Discrete currency unit) where
 instance
   ( GHC.TypeError
       (('GHC.Text "The ") 'GHC.:<>:
-       ('GHC.ShowType Discrete) 'GHC.:<>:
+       ('GHC.ShowType Discrete') 'GHC.:<>:
        ('GHC.Text " type is deliberately not a ") 'GHC.:<>:
        ('GHC.ShowType Fractional) 'GHC.:$$:
        ('GHC.Text "instance. Convert the ") 'GHC.:<>:
-       ('GHC.ShowType Discrete) 'GHC.:<>:
+       ('GHC.ShowType Discrete') 'GHC.:<>:
        ('GHC.Text " value to a ") 'GHC.:<>:
        ('GHC.ShowType Dense) 'GHC.:$$:
        ('GHC.Text "value and use the ") 'GHC.:<>:
        ('GHC.ShowType Fractional) 'GHC.:<>:
        ('GHC.Text " features on it instead.")) )
-  => Fractional (Discrete currency unit) where
+  => Fractional (Discrete' currency scale) where
   fromRational = undefined
   recip = undefined
 
 -- | Convert currency 'Discrete' monetary value into a 'Dense' monetary
 -- value.
 fromDiscrete
-  :: GoodScale currency unit
-  => Discrete currency unit
+  :: GoodScale scale
+  => Discrete' currency scale
   -> Dense currency -- ^
 fromDiscrete = \c@(Discrete i) -> Dense (fromInteger i / scale c)
 {-# INLINE fromDiscrete #-}
 
--- | Rename a 'Discrete''s @unit@, provided the new unit shares the same 'Scale'
--- as the original.
---
--- This is useful for converting between cases such as @'Discrete' \"USD\"
--- \"USD\"@ and @'Discrete' \"USD\" \"cent\"@, which have the same meaning yet
--- different types.
-coerceUnit
-  :: Scale' currency unit1 ~ Scale' currency unit2
-  => Discrete currency unit1
-  -> Discrete currency unit2
-coerceUnit = \(Discrete i) -> Discrete i
-{-# INLINE coerceUnit #-}
-
 -- | Internal. Used to implement 'round', 'ceiling', 'floor' and 'truncate'.
 roundf
-  :: GoodScale currency unit
+  :: GoodScale scale
   => (Rational -> Integer) -- ^ 'Prelude.round', 'Prelude.ceiling' or similar.
   -> Dense currency
-  -> (Discrete currency unit, Maybe (Dense currency))
+  -> (Discrete' currency scale, Maybe (Dense currency))
 roundf f = \c0 ->
   let r0 = toRational c0 :: Rational
       r1 = r0 * scale d2 :: Rational
@@ -189,9 +193,9 @@ roundf f = \c0 ->
 {-# INLINE roundf #-}
 
 -- | Round a 'Dense' value @x@ to the nearest value fully representable in
--- its @currency@'s @unit@ 'Scale'', which might be @x@ itself.
+-- its @currency@'s @unit@ 'Scale', which might be @x@ itself.
 --
--- If @x@ is already fully representable in its @currency@'s @unit@ 'Scale'',
+-- If @x@ is already fully representable in its @currency@'s @unit@ 'Scale',
 -- then the following holds:
 --
 -- @
@@ -199,14 +203,14 @@ roundf f = \c0 ->
 -- @
 --
 -- Otherwise, if the nearest value to @x@ that is fully representable in its
--- @currency@'s @unit@ 'Scale'' is greater than @x@, then the following holds:
+-- @currency@'s @unit@ 'Scale' is greater than @x@, then the following holds:
 --
 -- @
 -- 'round' == 'ceiling'
 -- @
 --
 -- Otherwise, the nearest value to @x@ that is fully representable in its
--- @currency@'s @unit@ 'Scale'' is smaller than @x@, and the following holds:
+-- @currency@'s @unit@ 'Scale' is smaller than @x@, and the following holds:
 --
 -- @
 -- 'round' == 'floor'
@@ -220,24 +224,24 @@ roundf f = \c0 ->
 --        (y, 'Just' z)  -> y + z
 -- @
 round
-  :: GoodScale currency unit
+  :: GoodScale scale
   => Dense currency
-  -> (Discrete currency unit, Maybe (Dense currency)) -- ^
+  -> (Discrete' currency scale, Maybe (Dense currency)) -- ^
 round = roundf Prelude.round
 {-# INLINE round #-}
 
 -- | Round a 'Dense' value @x@ to the nearest value fully representable in
--- its @currency@'s @unit@ 'Scale'' which is greater than @x@ or equal to @x@.
+-- its @currency@'s @unit@ 'Scale' which is greater than @x@ or equal to @x@.
 --
 --
--- If @x@ is already fully representable in its @currency@'s @unit@ 'Scale'',
+-- If @x@ is already fully representable in its @currency@'s @unit@ 'Scale',
 -- then the following holds:
 --
 -- @
 -- 'ceiling' x == (x, 'Nothing')
 -- @
 --
--- Otherwise, if @x@ is not representable in its @currency@'s @unit@ 'Scale'',
+-- Otherwise, if @x@ is not representable in its @currency@'s @unit@ 'Scale',
 -- then the following holds:
 --
 -- @
@@ -260,24 +264,24 @@ round = roundf Prelude.round
 --        (y, 'Just' z)  -> y + z
 -- @
 ceiling
-  :: GoodScale currency unit
+  :: GoodScale scale
   => Dense currency
-  -> (Discrete currency unit, Maybe (Dense currency)) -- ^
+  -> (Discrete' currency scale, Maybe (Dense currency)) -- ^
 ceiling = roundf Prelude.ceiling
 {-# INLINE ceiling #-}
 
 -- | Round a 'Dense' value @x@ to the nearest value fully representable in
--- its @currency@'s @unit@ 'Scale'' which is smaller than @x@ or equal to @x@.
+-- its @currency@'s @unit@ 'Scale' which is smaller than @x@ or equal to @x@.
 --
 --
--- If @x@ is already fully representable in its @currency@'s @unit@ 'Scale'',
+-- If @x@ is already fully representable in its @currency@'s @unit@ 'Scale',
 -- then the following holds:
 --
 -- @
 -- 'floor' x == (x, 'Nothing')
 -- @
 --
--- Otherwise, if @x@ is not representable in its @currency@'s @unit@ 'Scale'',
+-- Otherwise, if @x@ is not representable in its @currency@'s @unit@ 'Scale',
 -- then the following holds:
 --
 -- @
@@ -300,17 +304,17 @@ ceiling = roundf Prelude.ceiling
 --        (y, 'Just' z)  -> y + z
 -- @
 floor
-  :: GoodScale currency unit
+  :: GoodScale scale
   => Dense currency
-  -> (Discrete currency unit, Maybe (Dense currency)) -- ^
+  -> (Discrete' currency scale, Maybe (Dense currency)) -- ^
 floor = roundf Prelude.floor
 {-# INLINE floor #-}
 
 -- | Round a 'Dense' value @x@ to the nearest value between zero and
 -- @x@ (inclusive) which is fully representable in its @currency@'s @unit@
--- 'Scale''.
+-- 'Scale'.
 --
--- If @x@ is already fully representable in its @currency@'s @unit@ 'Scale'',
+-- If @x@ is already fully representable in its @currency@'s @unit@ 'Scale',
 -- then the following holds:
 --
 -- @
@@ -337,67 +341,47 @@ floor = roundf Prelude.floor
 --        (y, 'Just' z)  -> y + z
 -- @
 truncate
-  :: GoodScale currency unit
+  :: GoodScale scale
   => Dense currency
-  -> (Discrete currency unit, Maybe (Dense currency)) -- ^
+  -> (Discrete' currency scale, Maybe (Dense currency)) -- ^
 truncate = roundf Prelude.truncate
 {-# INLINE truncate #-}
 
 --------------------------------------------------------------------------------
 
--- | Like 'Scale'', but the @currency@'s @unit@ is expected to be the smallest
--- discrete unit that can represent the it in its full extent. For example,
--- cents are the smallest unit that can represent United States Dollars, so:
---
--- @
--- 'Scale' \"USD\"  ~  'Scale'' \"USD\" \"USD\"  ~  'Scale'' \"USD\" \"cent\"
--- @
---
--- If you try to obtain the 'Scale' of a @currency@ without an obvious smallest
--- representable @unit@, like XAU, you will get a compile error.
-type Scale (currency :: Symbol) = Scale' currency currency
-
--- | @'Scale'' currency unit@ is a rational number (expressed as @'(numerator,
+-- | @'Scale' currency unit@ is a rational number (expressed as @'(numerator,
 -- denominator)@) indicating how many pieces of @unit@ fit in @currency@.
 --
 -- @currency@ is usually a ISO-4217 currency code, but not necessarily.
 --
--- The 'Scale'' will determine how to convert a 'Dense' value into a
+-- The 'Scale' will determine how to convert a 'Dense' value into a
 -- 'Discrete' value and vice-versa.
 --
 -- For example, there are 100 USD cents in 1 USD, so the scale for this
 -- relationship is:
 --
 -- @
--- type instance 'Scale'' \"USD\" \"cent\" = '(100, 1)
+-- type instance 'Scale' \"USD\" \"cent\" = '(100, 1)
 -- @
 --
 -- As another example, there is 1 dollar in USD, so the scale for this
 -- relationship is:
 --
 -- @
--- type instance 'Scale'' \"USD\" \"dollar\" = '(1, 1)
+-- type instance 'Scale' \"USD\" \"dollar\" = '(1, 1)
 -- @
 --
 -- When using 'Discrete' values to represent money, it will be impossible to
 -- represent an amount of @currency@ smaller than @unit@. So, if you decide to
--- use @Scale' \"USD\" \"dollar\"@ as your scale, you will not be able to
+-- use @Scale \"USD\" \"dollar\"@ as your scale, you will not be able to
 -- represent values such as USD 3.50 or USD 21.87, since they are not exact
 -- multiples of a dollar.
 --
 -- If there exists a cannonical smallest @unit@ that can fully represent the
--- currency, then an instance @'Scale'' currency currency@ exists.
+-- currency, then an instance @'Scale' currency currency@ exists.
 --
 -- @
--- type instance 'Scale'' \"USD\" \"USD\" = Scale' \"USD\" \"cent\"
--- @
---
--- There is a convenient type synonym 'Scale' for this 'Scale'' case where the
--- @currency@ and @unit@ match:
---
--- @
--- type 'Scale' a = 'Scale'' a a
--- 'Scale' \"USD\" ~ 'Scale'' \"USD\" \"USD\"
+-- type instance 'Scale' \"USD\" \"USD\" = Scale \"USD\" \"cent\"
 -- @
 --
 -- For some monetary values, such as precious metals, the smallest representable
@@ -411,7 +395,7 @@ type Scale (currency :: Symbol) = Scale' currency currency
 -- ounce/ equals 480000 /milligrains/.
 --
 -- @
--- type instance 'Scale'' \"XAG\" \"milligrain\" = '(480000, 1)
+-- type instance 'Scale' \"XAG\" \"milligrain\" = '(480000, 1)
 -- @
 --
 -- You can use other units such as /milligrams/ for measuring XAU, for example.
@@ -419,12 +403,12 @@ type Scale (currency :: Symbol) = Scale' currency currency
 -- not integral, we need to use rational number to express it.
 --
 -- @
--- type instance 'Scale'' \"XAU\" \"milligram\" = '(31103477, 1000)
+-- type instance 'Scale' \"XAU\" \"milligram\" = '(31103477, 1000)
 -- @
 --
--- If you try to obtain the 'Scale' of a @currency@ without an obvious smallest
+-- If you try to obtain the 'Scale of a @currency@ without an obvious smallest
 -- representable @unit@, like XAU, you will get a compile error.
-type family Scale' (currency :: Symbol) (unit :: Symbol) :: (Nat, Nat)
+type family Scale (currency :: Symbol) (unit :: Symbol) :: (Nat, Nat)
 
 -- | A friendly 'GHC.TypeError' to use for a @currency@ that doesn't have a
 -- cannonical small unit.
@@ -434,41 +418,49 @@ type family ErrScaleNonCanonical (currency :: Symbol) :: k where
       'GHC.Text " is not a currency with a canonical smallest unit," 'GHC.:$$:
       'GHC.Text "be explicit about the currency unit you want to use." )
 
--- | Constraints to @'Scale'' currency unit@ expected to always be satisfied. In
--- particular, the scale is always guaranteed to be a positive rational number
--- ('infinity' and 'notANumber' are forbidden by 'GoodScale').
-type GoodScale (currency :: Symbol) (unit :: Symbol)
-  = ( CmpNat 0 (Fst (Scale' currency unit)) ~ 'LT
-    , CmpNat 0 (Snd (Scale' currency unit)) ~ 'LT
-    , KnownNat (Fst (Scale' currency unit))
-    , KnownNat (Snd (Scale' currency unit))
-    )
+-- | Constraints to a scale (like the one returned by @'Scale' currency unit@)
+-- expected to always be satisfied. In particular, the scale is always
+-- guaranteed to be a positive rational number ('infinity' and 'notANumber' are
+-- forbidden by 'GoodScale).
+type GoodScale (scale :: (Nat, Nat))
+   = ( CmpNat 0 (Fst scale) ~ 'LT
+     , CmpNat 0 (Snd scale) ~ 'LT
+     , KnownNat (Fst scale)
+     , KnownNat (Snd scale)
+     )
 
--- | Term-level representation for the @currency@'s @unit@ 'Scale''.
+-- | If the given @numerator@ and @denominator@ satisfy the expectations of
+-- 'GoodScale at the type level, then construct a proof for 'GoodScale.
+
+-- TODO: Check that this actually a safe thing to do.
+mkGoodScale
+  :: forall num den
+  .  (KnownNat num, KnownNat den)
+  => Proxy '(num, den)
+  -> Maybe (Dict (GoodScale '(num, den)))
+mkGoodScale _ =
+  let n = natVal (Proxy :: Proxy num)
+      d = natVal (Proxy :: Proxy den)
+  in if (n > 0) && (d > 0)
+     then Just (unsafeCoerce (Dict :: Dict ()))
+     else Nothing
+{-# INLINE mkGoodScale #-}
+
+-- | Term-level representation for the @currency@'s @unit@ 'Scale'.
 --
--- For example, the 'Scale'' for @\"USD\"@ in @\"cent\"@s is @100/1@.
+-- For example, the 'Scale' for @\"USD\"@ in @\"cent\"@s is @100/1@.
 --
 -- The returned 'Rational' is statically guaranteed to be a positive number, and
 -- to be different from both 'notANumber' and 'infinity'.
 scale
-  :: forall currency unit
-  .  GoodScale currency unit
-  => Discrete currency unit
+  :: forall proxy scale
+  .  GoodScale scale
+  => proxy scale
   -> Rational
-scale = \_ -> scaleFromProxy (Proxy :: Proxy currency) (Proxy :: Proxy unit)
+scale = \_ ->
+   natVal (Proxy :: Proxy (Fst scale)) %
+   natVal (Proxy :: Proxy (Snd scale))
 {-# INLINE scale #-}
-
--- | Like 'scale', but takes proxies (e.g., 'Proxy') instead of 'Discrete'.
-scaleFromProxy
-  :: forall currency unit proxy1 proxy2
-  .  GoodScale currency unit
-  => proxy1 currency
-  -> proxy2 unit
-  -> Rational
-scaleFromProxy = \_ _ ->
-   natVal (Proxy :: Proxy (Fst (Scale' currency unit))) %
-   natVal (Proxy :: Proxy (Snd (Scale' currency unit)))
-{-# INLINE scaleFromProxy #-}
 
 --------------------------------------------------------------------------------
 
@@ -571,7 +563,7 @@ fromDenseRep = \(DenseRep c n d) ->
    then Just (Dense (n % d)) else Nothing
 {-# INLINE fromDenseRep #-}
 
--- | Convert a 'DenseRep' to a 'Dense' without knowing the @target@ currency.
+-- | Convert a 'DenseRep' to a 'Dense' without knowing the target @currency@.
 --
 -- Notice that @currency@ here can't leave its intended scope unless you can
 -- prove equality with some other type at the outer scope, but in that case you
@@ -587,11 +579,85 @@ withDenseRep (DenseRep c n d) = \f ->
 {-# INLINE withDenseRep #-}
 
 --------------------------------------------------------------------------------
+-- DiscreteRep
+
+data DiscreteRep = DiscreteRep
+  { _discreteRepCurrency         :: !String   -- ^ Currency name.
+  , _discreteRepScaleNumerator   :: !Integer  -- ^ Positive, non-zero.
+  , _discreteRepScaleDenominator :: !Integer  -- ^ Positive, non-zero.
+  , _discreteRepAmount           :: !Integer  -- ^ Amount of unit.
+  } deriving (Eq, Show, Read)
+
+-- | WARNING: This instance does not compare monetary amounts, it just helps you
+-- sort 'Discrete' values in case you need to put them in a 'Data.Set.Set' or
+-- similar.
+deriving instance Ord DiscreteRep
+
+-- | Internal. Build a 'DiscreteRep' from raw values.
+mkDiscreteRep
+  :: String   -- ^ Currency name.
+  -> Integer  -- ^ Scale numerator. Positive, non-zero.
+  -> Integer  -- ^ Scale denominator. Positive, non-zero.
+  -> Integer  -- ^ Amount of unit.
+  -> Maybe DiscreteRep
+mkDiscreteRep = \c n d a ->
+  if (n > 0) && (d > 0) then Just (DiscreteRep c n d a) else Nothing
+{-# INLINE mkDiscreteRep #-}
+
+-- | Convert a 'Discrete' to a 'DiscreteRep' for ease of serialization.
+discreteRep
+  :: (KnownSymbol currency, GoodScale scale)
+  => Discrete' currency scale
+  -> DiscreteRep -- ^
+discreteRep = \(Discrete i0 :: Discrete' currency scale) ->
+  let c = symbolVal (Proxy :: Proxy currency)
+      n = natVal (Proxy :: Proxy (Fst scale))
+      d = natVal (Proxy :: Proxy (Snd scale))
+  in DiscreteRep c n d i0
+{-# INLINE discreteRep #-}
+
+-- | Attempt to convert a 'DiscreteRep' to a 'Discrete', provided you know the
+-- target @currency@ and @unit@.
+fromDiscreteRep
+  :: forall currency scale
+  .  (KnownSymbol currency, GoodScale scale)
+  => DiscreteRep
+  -> Maybe (Discrete' currency scale)  -- ^
+fromDiscreteRep = \(DiscreteRep c n d a) ->
+   if (c == symbolVal (Proxy :: Proxy currency)) &&
+      (n == natVal (Proxy :: Proxy (Fst scale))) &&
+      (d == natVal (Proxy :: Proxy (Snd scale)))
+   then Just (Discrete a) else Nothing
+{-# INLINE fromDiscreteRep #-}
+
+-- | Convert a 'DiscreteRep' to a 'Discrete' without knowing the target
+-- @currency@ and @unit@.
+--
+-- Notice that @currency@ and @unit@ here can't leave its intended scope unless
+-- you can prove equality with some other type at the outer scope, but in that
+-- case you would be better off using 'fromDiscreteRep' directly.
+withDiscreteRep
+  :: DiscreteRep
+  -> ( forall currency scale.
+         ( KnownSymbol currency
+         , GoodScale scale
+         ) => Discrete' currency scale
+           -> r )
+  -> r
+withDiscreteRep (DiscreteRep c n d a) = \f ->
+  case someSymbolVal c of
+     SomeSymbol (Proxy :: Proxy currency) -> case someNatVal n of
+        Nothing -> error "withDiscreteRep: impossible: n < 0"
+        Just (SomeNat (Proxy :: Proxy num)) -> case someNatVal d of
+           Nothing -> error "withDiscreteRep: impossible: d < 0"
+           Just (SomeNat (Proxy :: Proxy den)) ->
+              case mkGoodScale (Proxy :: Proxy '(num, den)) of
+                 Nothing -> error "withDiscreteRep: impossible: mkGoodScale"
+                 Just Dict -> f (Discrete a :: Discrete' currency '(num, den))
+
+--------------------------------------------------------------------------------
 -- Miscellaneous
 
 type family Fst (ab :: (ka, kb)) :: ka where Fst '(a,b) = a
 type family Snd (ab :: (ka, kb)) :: ka where Snd '(a,b) = b
-
---------------------------------------------------------------------------------
--- Currency scales
 
