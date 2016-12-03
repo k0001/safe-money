@@ -17,6 +17,7 @@ import Data.Maybe (catMaybes, isJust)
 import Data.Proxy (Proxy(Proxy))
 
 import qualified Data.Money as Money
+import qualified Data.Money.Internal as Money
 
 --------------------------------------------------------------------------------
 
@@ -24,11 +25,26 @@ instance QC.Arbitrary (Money.Discrete' currency scale) where
   arbitrary = fmap fromInteger QC.arbitrary
   shrink = fmap fromInteger . QC.shrink . toInteger
 
+instance QC.Arbitrary Money.DiscreteRep where
+  arbitrary = do
+    let md = Money.mkDiscreteRep <$> QC.arbitrary <*> QC.arbitrary
+                                 <*> QC.arbitrary <*> QC.arbitrary
+    Just x <- QC.suchThat md isJust
+    pure x
+  shrink = \x -> Money.withDiscreteRep x (map Money.discreteRep . QC.shrink)
+
 instance QC.Arbitrary (Money.Dense currency) where
   arbitrary = do
-    Just x <- QC.suchThat (fmap Money.dense QC.arbitrary) isJust
+    Just x <- QC.suchThat (Money.dense <$> QC.arbitrary) isJust
     pure x
   shrink = catMaybes . fmap Money.dense . QC.shrink . toRational
+
+instance QC.Arbitrary Money.DenseRep where
+  arbitrary = do
+    let md = Money.mkDenseRep <$> QC.arbitrary <*> QC.arbitrary <*> QC.arbitrary
+    Just x <- QC.suchThat md isJust
+    pure x
+  shrink = \x -> Money.withDenseRep x (map Money.denseRep . QC.shrink)
 
 instance QC.Arbitrary (Money.ExchangeRate src dst) where
   arbitrary = do
