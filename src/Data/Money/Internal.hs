@@ -420,7 +420,7 @@ type family ErrScaleNonCanonical (currency :: Symbol) :: k where
 -- | Constraints to a scale (like the one returned by @'Scale' currency unit@)
 -- expected to always be satisfied. In particular, the scale is always
 -- guaranteed to be a positive rational number ('infinity' and 'notANumber' are
--- forbidden by 'GoodScale).
+-- forbidden by 'GoodScale').
 type GoodScale (scale :: (Nat, Nat))
    = ( CmpNat 0 (Fst scale) ~ 'LT
      , CmpNat 0 (Snd scale) ~ 'LT
@@ -428,16 +428,13 @@ type GoodScale (scale :: (Nat, Nat))
      , KnownNat (Snd scale)
      )
 
--- | If the given @numerator@ and @denominator@ satisfy the expectations of
--- 'GoodScale at the type level, then construct a proof for 'GoodScale.
-
--- TODO: Check that this actually a safe thing to do.
+-- | If the specified @num@ and @den@ satisfy the expectations of 'GoodScale' at
+-- the type level, then construct a proof for 'GoodScale'.
 mkGoodScale
   :: forall num den
   .  (KnownNat num, KnownNat den)
-  => Proxy '(num, den)
-  -> Maybe (Dict (GoodScale '(num, den)))
-mkGoodScale _ =
+  => Maybe (Dict (GoodScale '(num, den)))
+mkGoodScale =
   let n = natVal (Proxy :: Proxy num)
       d = natVal (Proxy :: Proxy den)
   in if (n > 0) && (d > 0)
@@ -451,11 +448,7 @@ mkGoodScale _ =
 --
 -- The returned 'Rational' is statically guaranteed to be a positive number, and
 -- to be different from both 'notANumber' and 'infinity'.
-scale
-  :: forall proxy scale
-  .  GoodScale scale
-  => proxy scale
-  -> Rational
+scale :: forall proxy scale. GoodScale scale => proxy scale -> Rational -- ^
 scale = \_ ->
    natVal (Proxy :: Proxy (Fst scale)) %
    natVal (Proxy :: Proxy (Snd scale))
@@ -650,9 +643,10 @@ withDiscreteRep (DiscreteRep c n d a) = \f ->
         Just (SomeNat (Proxy :: Proxy num)) -> case someNatVal d of
            Nothing -> error "withDiscreteRep: impossible: d < 0"
            Just (SomeNat (Proxy :: Proxy den)) ->
-              case mkGoodScale (Proxy :: Proxy '(num, den)) of
+              case mkGoodScale of
                  Nothing -> error "withDiscreteRep: impossible: mkGoodScale"
-                 Just Dict -> f (Discrete a :: Discrete' currency '(num, den))
+                 Just (Dict :: Dict (GoodScale '(num, den))) ->
+                    f (Discrete a :: Discrete' currency '(num, den))
 
 --------------------------------------------------------------------------------
 -- Miscellaneous
