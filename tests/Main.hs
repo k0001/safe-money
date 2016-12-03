@@ -15,13 +15,12 @@ import qualified Test.Tasty.QuickCheck as QC
 import GHC.TypeLits (Nat, Symbol, KnownSymbol, symbolVal)
 import Data.Maybe (catMaybes, isJust)
 import Data.Proxy (Proxy(Proxy))
-import Data.Scientific (Scientific, scientific)
 
 import qualified Data.Money as Money
 
 --------------------------------------------------------------------------------
 
-instance QC.Arbitrary (Money.Discrete currency unit) where
+instance QC.Arbitrary (Money.Discrete' currency scale) where
   arbitrary = fmap fromInteger QC.arbitrary
   shrink = fmap fromInteger . QC.shrink . toInteger
 
@@ -110,7 +109,9 @@ testExchange =
 
 testCurrencyUnit
   :: forall (currency :: Symbol) (unit :: Symbol)
-  .  (Money.GoodScale currency unit, KnownSymbol currency, KnownSymbol unit)
+  .  ( Money.GoodScale (Money.Scale currency unit)
+     , KnownSymbol currency
+     , KnownSymbol unit )
   => Proxy currency
   -> Proxy unit
   -> Tasty.TestTree
@@ -135,7 +136,7 @@ testShowReadDense _ =
 
 testShowReadDiscrete
   :: forall (currency :: Symbol) (unit :: Symbol)
-  .  Money.GoodScale currency unit
+  .  Money.GoodScale (Money.Scale currency unit)
   => Proxy currency
   -> Proxy unit
   -> Tasty.TestTree
@@ -144,9 +145,6 @@ testShowReadDiscrete _ _ =
   [ QC.testProperty "read . show == id" $
       QC.forAll QC.arbitrary $ \(x :: Money.Discrete currency unit) ->
          x === read (show x)
-  , QC.testProperty "coerceUnit == id" $
-      QC.forAll QC.arbitrary $ \(x :: Money.Discrete currency unit) ->
-         x == Money.coerceUnit x
   ]
 
 testExchangeRate
@@ -185,7 +183,7 @@ testExchangeRate ps pd =
 
 testRounding
   :: forall (currency :: Symbol) (unit :: Symbol)
-  .  Money.GoodScale currency unit
+  .  Money.GoodScale (Money.Scale currency unit)
   => Proxy currency
   -> Proxy unit
   -> Tasty.TestTree
