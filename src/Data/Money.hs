@@ -1,3 +1,4 @@
+{-# LANGUAGE CPP #-}
 {-# LANGUAGE DataKinds #-}
 {-# LANGUAGE TypeFamilies #-}
 {-# LANGUAGE UndecidableInstances #-}
@@ -696,7 +697,9 @@ type instance I.Scale "ZWL" "dollar" = '(1, 1)
 type instance I.Scale "ZWL" "cent" = '(100, 1)
 
 -- | Gold
+#if MIN_VERSION_base(4,9,0)
 type instance I.Scale "XAU" "XAU" = I.ErrScaleNonCanonical "XAU"
+#endif
 type instance I.Scale "XAU" "troy-ounce" = '(1, 1)
 type instance I.Scale "XAU" "grain" = '(480, 1)
 type instance I.Scale "XAU" "milligrain" = '(480000, 1)
@@ -707,7 +710,9 @@ type instance I.Scale "XAU" "milligram" = '(31103477, 1000)
 type instance I.Scale "XAU" "microgram" = '(31103477, 1)
 
 -- | Silver
+#if MIN_VERSION_base(4,9,0)
 type instance I.Scale "XAG" "XAG" = I.ErrScaleNonCanonical "XAG"
+#endif
 type instance I.Scale "XAG" "troy-ounce" = '(1, 1)
 type instance I.Scale "XAG" "grain" = '(480, 1)
 type instance I.Scale "XAG" "milligrain" = '(480000, 1)
@@ -718,7 +723,9 @@ type instance I.Scale "XAG" "milligram" = '(31103477, 1000)
 type instance I.Scale "XAG" "microgram" = '(31103477, 1)
 
 -- | Palladium
+#if MIN_VERSION_base(4,9,0)
 type instance I.Scale "XPD" "XPD" = I.ErrScaleNonCanonical "XPD"
+#endif
 type instance I.Scale "XPD" "troy-ounce" = '(1, 1)
 type instance I.Scale "XPD" "grain" = '(480, 1)
 type instance I.Scale "XPD" "milligrain" = '(480000, 1)
@@ -729,7 +736,9 @@ type instance I.Scale "XPD" "milligram" = '(31103477, 1000)
 type instance I.Scale "XPD" "microgram" = '(31103477, 1)
 
 -- | Platinum
+#if MIN_VERSION_base(4,9,0)
 type instance I.Scale "XPT" "XPT" = I.ErrScaleNonCanonical "XPT"
+#endif
 type instance I.Scale "XPT" "troy-ounce" = '(1, 1)
 type instance I.Scale "XPT" "grain" = '(480, 1)
 type instance I.Scale "XPT" "milligrain" = '(480000, 1)
