@@ -106,11 +106,17 @@ import Unsafe.Coerce (unsafeCoerce)
 -- Construct 'Dense' monetary values using 'dense', or
 -- 'fromInteger'/'fromIntegral' if that suffices.
 newtype Dense (currency :: Symbol) = Dense Rational
-  deriving (Eq, Ord, Num, Real, Fractional, Show)
+  deriving (Eq, Ord, Num, Real, Fractional)
 
-instance Read (Dense currency) where
+instance forall currency. KnownSymbol currency => Show (Dense currency) where
+  show = \(Dense r0) ->
+    let c = symbolVal (Proxy :: Proxy currency)
+    in concat [ "Dense ", show c, " (", show r0, ")" ]
+
+instance forall currency. KnownSymbol currency => Read (Dense currency) where
   readPrec = do
-    _ <- ReadPrec.lift (ReadP.string "Dense ")
+    let c = symbolVal (Proxy :: Proxy currency)
+    _ <- ReadPrec.lift (ReadP.string ("Dense " ++ show c ++ " "))
     maybe empty pure =<< fmap dense readPrec
 
 -- | Build a 'Dense' monetary value from a 'Rational' value.
@@ -160,11 +166,24 @@ type Discrete (currency :: Symbol) (unit :: Symbol)
 -- mentioning the unit scale.
 newtype Discrete' (currency :: Symbol) (scale :: (Nat, Nat))
   = Discrete Integer
-  deriving (Eq, Ord, Enum, Show, Num, Real, Integral)
+  deriving (Eq, Ord, Enum, Num, Real, Integral)
 
-instance Read (Discrete' currency scale) where
+instance forall currency scale.
+  ( KnownSymbol currency, GoodScale scale
+  ) => Show (Discrete' currency scale) where
+  show = \d0@(Discrete i0) ->
+    let c = symbolVal (Proxy :: Proxy currency)
+        s = scale d0
+    in concat [ "Discrete ", show c, " (", show s, ") ", show i0 ]
+
+instance forall currency scale.
+  ( KnownSymbol currency, GoodScale scale
+  ) => Read (Discrete' currency scale) where
   readPrec = do
-    _ <- ReadPrec.lift (ReadP.string "Discrete ")
+    let c = symbolVal (Proxy :: Proxy currency)
+        s = scale (Proxy :: Proxy scale)
+    _ <- ReadPrec.lift (ReadP.string
+           ("Discrete " ++ show c ++ " (" ++ show s ++ ") ") )
     Discrete <$> readPrec
 
 instance
@@ -485,10 +504,25 @@ scale = \_ ->
 -- 'exchangeRate' (12345 % 10000) :: 'Maybe' ('ExchangeRate' \"USD\" \"GBP\")
 -- @
 newtype ExchangeRate (src :: Symbol) (dst :: Symbol) = ExchangeRate Rational
-  deriving (Eq, Ord, Show)
+  deriving (Eq, Ord)
 
-instance Read (ExchangeRate (src :: Symbol) (dst :: Symbol)) where
-  readPrec = maybe empty pure =<< fmap exchangeRate readPrec
+instance forall src dst.
+  ( KnownSymbol src, KnownSymbol dst
+  ) => Show (ExchangeRate src dst) where
+  show = \(ExchangeRate r0) ->
+    let s = symbolVal (Proxy :: Proxy src)
+        d = symbolVal (Proxy :: Proxy dst)
+    in concat [ "ExchangeRate ", show s, " ", show d, " (", show r0, ")" ]
+
+instance forall src dst.
+  ( KnownSymbol src, KnownSymbol dst
+  ) => Read (ExchangeRate (src :: Symbol) (dst :: Symbol)) where
+  readPrec = do
+    let s = symbolVal (Proxy :: Proxy src)
+        d = symbolVal (Proxy :: Proxy dst)
+    _ <- ReadPrec.lift (ReadP.string
+            ("ExchangeRate " ++ show s ++ " " ++ show d ++ " "))
+    maybe empty pure =<< fmap exchangeRate readPrec
 
 -- | Obtain a 'Rational' representation of the 'ExchangeRate'.
 --

@@ -178,7 +178,10 @@ testExchangeRate
 testExchangeRate ps pd =
   Tasty.testGroup ("ExchangeRate " ++ show (symbolVal ps) ++ " "
                                    ++ show (symbolVal pd))
-  [ QC.testProperty "flipExchangeRate . flipExchangeRate == id" $
+  [ QC.testProperty "read . show == id" $
+      QC.forAll QC.arbitrary $ \(xr :: Money.ExchangeRate src dst) ->
+         xr === read (show xr)
+  , QC.testProperty "flipExchangeRate . flipExchangeRate == id" $
       QC.forAll QC.arbitrary $ \(xr :: Money.ExchangeRate src dst) ->
          let xr' = Money.flipExchangeRate xr
          in (Money.fromExchangeRate xr /= Money.fromExchangeRate xr')
@@ -213,7 +216,7 @@ testExchangeRate ps pd =
 
 testRounding
   :: forall (currency :: Symbol) (unit :: Symbol)
-  .  Money.GoodScale (Money.Scale currency unit)
+  .  (Money.GoodScale (Money.Scale currency unit), KnownSymbol currency)
   => Proxy currency
   -> Proxy unit
   -> Tasty.TestTree
