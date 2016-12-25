@@ -58,6 +58,16 @@ module Data.Money.Internal
  , mkDiscreteRep
  , fromDiscreteRep
  , withDiscreteRep
+ , ExchangeRateRep
+ , exchangeRateRepSrcCurrency
+ , exchangeRateRepDstCurrency
+ , exchangeRateRepRate
+ , exchangeRateRepRateNumerator
+ , exchangeRateRepRateDenominator
+ , toExchangeRateRep
+ , mkExchangeRateRep
+ , fromExchangeRateRep
+ , withExchangeRateRep
  ) where
 
 import Control.Applicative (empty)
@@ -527,11 +537,18 @@ exchange = \(ExchangeRate r) -> \(Dense s) -> Dense (r * s)
 --------------------------------------------------------------------------------
 -- DenseRep
 
+-- | A monomorphic representation of 'Dense' that is easier to serialize and
+-- deserialize than 'Dense' in case you don't know the type indexes involved.
 data DenseRep = DenseRep
   { _denseRepCurrency          :: !String
   , _denseRepAmountNumerator   :: !Integer
   , _denseRepAmountDenominator :: !Integer  -- ^ Positive, non-zero.
   } deriving (Eq, Show, Read)
+
+-- | WARNING: This instance does not compare monetary amounts, it just helps you
+-- sort 'DenseRep' values in case you need to put them in a 'Data.Set.Set' or
+-- similar.
+deriving instance Ord DenseRep
 
 -- | Currency name.
 denseRepCurrency :: DenseRep -> String
@@ -553,11 +570,6 @@ denseRepAmountNumerator = _denseRepAmountNumerator
 denseRepAmountDenominator :: DenseRep -> Integer
 denseRepAmountDenominator = _denseRepAmountDenominator
 {-# INLINE denseRepAmountDenominator #-}
-
--- | WARNING: This instance does not compare monetary amounts, it just helps you
--- sort 'DenseRep' values in case you need to put them in a 'Data.Set.Set' or
--- similar.
-deriving instance Ord DenseRep
 
 -- | Internal. Build a 'DenseRep' from raw values.
 mkDenseRep
@@ -608,12 +620,19 @@ withDenseRep dr = \f ->
 --------------------------------------------------------------------------------
 -- DiscreteRep
 
+-- | A monomorphic representation of 'Discrete' that is easier to serialize and
+-- deserialize than 'Discrete' in case you don't know the type indexes involved.
 data DiscreteRep = DiscreteRep
   { _discreteRepCurrency         :: !String   -- ^ Currency name.
   , _discreteRepScaleNumerator   :: !Integer  -- ^ Positive, non-zero.
   , _discreteRepScaleDenominator :: !Integer  -- ^ Positive, non-zero.
   , _discreteRepAmount           :: !Integer  -- ^ Amount of unit.
   } deriving (Eq, Show, Read)
+
+-- | WARNING: This instance does not compare monetary amounts, it just helps you
+-- sort 'DiscreteRep' values in case you need to put them in a 'Data.Set.Set' or
+-- similar.
+deriving instance Ord DiscreteRep
 
 -- | Currency name.
 discreteRepCurrency :: DiscreteRep -> String
@@ -640,11 +659,6 @@ discreteRepScaleDenominator = _discreteRepScaleDenominator
 discreteRepAmount :: DiscreteRep -> Integer
 discreteRepAmount = _discreteRepAmount
 {-# INLINE discreteRepAmount #-}
-
--- | WARNING: This instance does not compare monetary amounts, it just helps you
--- sort 'Discrete' values in case you need to put them in a 'Data.Set.Set' or
--- similar.
-deriving instance Ord DiscreteRep
 
 -- | Internal. Build a 'DiscreteRep' from raw values.
 mkDiscreteRep
@@ -713,6 +727,110 @@ withDiscreteRep dr = \f ->
                 Just (Dict :: Dict (GoodScale '(num, den))) ->
                   f (Discrete (discreteRepAmount dr)
                        :: Discrete' currency '(num, den))
+{-# INLINABLE withDiscreteRep #-}
+
+--------------------------------------------------------------------------------
+-- ExchangeRateRep
+
+-- | A monomorphic representation of 'ExchangeRate' that is easier to serialize
+-- and deserialize than 'ExchangeRate' in case you don't know the type indexes
+-- involved.
+data ExchangeRateRep = ExchangeRateRep
+  { _exchangeRateRepSrcCurrency     :: !String
+  , _exchangeRateRepDstCurrency     :: !String
+  , _exchangeRateRepRateNumerator   :: !Integer  -- ^ Positive, non-zero.
+  , _exchangeRateRepRateDenominator :: !Integer  -- ^ Positive, non-zero.
+  } deriving (Eq, Show)
+
+-- | WARNING: This instance does not compare monetary amounts, it just helps you
+-- sort 'ExchangeRateRep' values in case you need to put them in a
+-- 'Data.Set.Set' or similar.
+deriving instance Ord ExchangeRateRep
+
+-- | Source currency name.
+exchangeRateRepSrcCurrency :: ExchangeRateRep -> String
+exchangeRateRepSrcCurrency = _exchangeRateRepSrcCurrency
+{-# INLINE exchangeRateRepSrcCurrency #-}
+
+-- | Destination currency name.
+exchangeRateRepDstCurrency :: ExchangeRateRep -> String
+exchangeRateRepDstCurrency = _exchangeRateRepDstCurrency
+{-# INLINE exchangeRateRepDstCurrency #-}
+
+-- | Exchange rate. Positive, non-zero.
+exchangeRateRepRate :: ExchangeRateRep -> Rational
+exchangeRateRepRate = \x ->
+  exchangeRateRepRateNumerator x % _exchangeRateRepRateDenominator x
+{-# INLINE exchangeRateRepRate #-}
+
+-- | Exchange rate numerator. Positive, non-zero.
+exchangeRateRepRateNumerator :: ExchangeRateRep -> Integer
+exchangeRateRepRateNumerator = _exchangeRateRepRateNumerator
+{-# INLINE exchangeRateRepRateNumerator #-}
+
+-- | Exchange rate denominator. Positive, non-zero.
+exchangeRateRepRateDenominator :: ExchangeRateRep -> Integer
+exchangeRateRepRateDenominator = _exchangeRateRepRateDenominator
+{-# INLINE exchangeRateRepRateDenominator #-}
+
+-- | Internal. Build a 'ExchangeRateRep' from raw values.
+mkExchangeRateRep
+  :: String   -- ^ Source currency name.
+  -> String   -- ^ Destination currency name.
+  -> Integer  -- ^ Exchange rate numerator. Positive, non-zero.
+  -> Integer  -- ^ Exchange rate denominator. Positive, non-zero.
+  -> Maybe ExchangeRateRep
+mkExchangeRateRep = \src dst n d -> case (n > 0) && (d > 0) of
+  False -> Nothing
+  True -> Just (ExchangeRateRep src dst n d)
+{-# INLINE mkExchangeRateRep #-}
+
+-- | Convert a 'ExchangeRate' to a 'DiscreteRep' for ease of serialization.
+toExchangeRateRep
+  :: (KnownSymbol src, KnownSymbol dst)
+  => ExchangeRate src dst
+  -> ExchangeRateRep -- ^
+toExchangeRateRep = \(ExchangeRate r0 :: ExchangeRate src dst) ->
+  let src = symbolVal (Proxy :: Proxy src)
+      dst = symbolVal (Proxy :: Proxy dst)
+  in ExchangeRateRep src dst (numerator r0) (denominator r0)
+{-# INLINE toExchangeRateRep #-}
+
+-- | Attempt to convert a 'ExchangeRateRep' to a 'ExchangeRate', provided you
+-- know the target @src@ and @dst@ types.
+fromExchangeRateRep
+  :: forall src dst
+  .  (KnownSymbol src, KnownSymbol dst)
+  => ExchangeRateRep
+  -> Maybe (ExchangeRate src dst)  -- ^
+fromExchangeRateRep = \x ->
+   if (exchangeRateRepSrcCurrency x == symbolVal (Proxy :: Proxy src)) &&
+      (exchangeRateRepDstCurrency x == symbolVal (Proxy :: Proxy dst))
+   then Just (ExchangeRate (exchangeRateRepRate x))
+   else Nothing
+{-# INLINE fromExchangeRateRep #-}
+
+-- | Convert a 'ExchangeRateRep' to a 'ExchangeRate' without knowing the target
+-- @currency@ and @unit@.
+--
+-- Notice that @src@ and @dst@ here can't leave its intended scope unless
+-- you can prove equality with some other type at the outer scope, but in that
+-- case you would be better off using 'fromExchangeRateRep' directly.
+withExchangeRateRep
+  :: ExchangeRateRep
+  -> ( forall src dst.
+         ( KnownSymbol src
+         , KnownSymbol dst
+         ) => ExchangeRate src dst
+           -> r )
+  -> r  -- ^
+withExchangeRateRep x = \f ->
+  case someSymbolVal (exchangeRateRepSrcCurrency x) of
+    SomeSymbol (Proxy :: Proxy src) ->
+      case someSymbolVal (exchangeRateRepDstCurrency x) of
+        SomeSymbol (Proxy :: Proxy dst) ->
+          f (ExchangeRate (exchangeRateRepRate x) :: ExchangeRate src dst)
+{-# INLINABLE withExchangeRateRep #-}
 
 --------------------------------------------------------------------------------
 -- Miscellaneous

@@ -38,6 +38,10 @@ module Data.Money
  , I.toDiscreteRep
  , I.fromDiscreteRep
  , I.withDiscreteRep
+ , I.ExchangeRateRep
+ , I.toExchangeRateRep
+ , I.fromExchangeRateRep
+ , I.withExchangeRateRep
  ) where
 
 import qualified Data.Money.Internal as I

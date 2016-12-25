@@ -53,6 +53,15 @@ instance QC.Arbitrary (Money.ExchangeRate src dst) where
   shrink =
     catMaybes . fmap Money.exchangeRate . QC.shrink . Money.fromExchangeRate
 
+instance QC.Arbitrary Money.ExchangeRateRep where
+  arbitrary = do
+    let md = Money.mkExchangeRateRep <$> QC.arbitrary <*> QC.arbitrary
+                                     <*> QC.arbitrary <*> QC.arbitrary
+    Just x <- QC.suchThat md isJust
+    pure x
+  shrink = \x ->
+    Money.withExchangeRateRep x (map Money.toExchangeRateRep . QC.shrink)
+
 --------------------------------------------------------------------------------
 
 main :: IO ()
@@ -154,8 +163,10 @@ testDiscrete pc pu =
   , QC.testProperty "fromDiscreteRep works only for same currency and scale" $
       QC.forAll QC.arbitrary $ \(dr :: Money.DiscreteRep) ->
         ((Money.discreteRepCurrency dr /= symbolVal pc) &&
-         (Money.discreteRepScale dr /= Money.scale (Proxy :: Proxy (Money.Scale currency unit))))
-            ==> isNothing (Money.fromDiscreteRep dr :: Maybe (Money.Discrete currency unit))
+         (Money.discreteRepScale dr /=
+             Money.scale (Proxy :: Proxy (Money.Scale currency unit)))
+        ) ==> isNothing (Money.fromDiscreteRep dr
+                          :: Maybe (Money.Discrete currency unit))
   ]
 
 testExchangeRate
@@ -189,6 +200,15 @@ testExchangeRate ps pd =
           , xr :: Money.ExchangeRate src dst
           ) -> (Money.fromExchangeRate xr /= 1)
                   ==> (toRational c0 /= toRational (Money.exchange xr c0))
+  , QC.testProperty "fromExchangeRateRep . toExchangeRateRep == Just" $
+      QC.forAll QC.arbitrary $ \(x :: Money.ExchangeRate src dst) ->
+         Just x === Money.fromExchangeRateRep (Money.toExchangeRateRep x)
+  , QC.testProperty "fromDiscreteRep works only for same currencies" $
+      QC.forAll QC.arbitrary $ \(x :: Money.ExchangeRateRep) ->
+        ((Money.exchangeRateRepSrcCurrency x /= symbolVal ps) &&
+         (Money.exchangeRateRepDstCurrency x /= symbolVal pd))
+            ==> isNothing (Money.fromExchangeRateRep x
+                            :: Maybe (Money.ExchangeRate src dst))
   ]
 
 testRounding
