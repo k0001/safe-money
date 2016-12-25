@@ -40,12 +40,21 @@ module Data.Money.Internal
  , exchange
    -- * Serializable representations
  , DenseRep
- , denseRep
+ , denseRepCurrency
+ , denseRepAmount
+ , denseRepAmountNumerator
+ , denseRepAmountDenominator
+ , toDenseRep
  , mkDenseRep
  , fromDenseRep
  , withDenseRep
  , DiscreteRep
- , discreteRep
+ , discreteRepCurrency
+ , discreteRepScale
+ , discreteRepScaleNumerator
+ , discreteRepScaleDenominator
+ , discreteRepAmount
+ , toDiscreteRep
  , mkDiscreteRep
  , fromDiscreteRep
  , withDiscreteRep
@@ -518,9 +527,32 @@ exchange = \(ExchangeRate r) -> \(Dense s) -> Dense (r * s)
 --------------------------------------------------------------------------------
 -- DenseRep
 
-data DenseRep = DenseRep !String !Integer !Integer
-  -- ^ Currency name * Numerator * Denominator (positive, not zero).
-  deriving (Eq, Show, Read)
+data DenseRep = DenseRep
+  { _denseRepCurrency          :: !String
+  , _denseRepAmountNumerator   :: !Integer
+  , _denseRepAmountDenominator :: !Integer  -- ^ Positive, non-zero.
+  } deriving (Eq, Show, Read)
+
+-- | Currency name.
+denseRepCurrency :: DenseRep -> String
+denseRepCurrency = _denseRepCurrency
+{-# INLINE denseRepCurrency #-}
+
+-- | Currency unit amount.
+denseRepAmount :: DenseRep -> Rational
+denseRepAmount = \dr ->
+  denseRepAmountNumerator dr % denseRepAmountDenominator dr
+{-# INLINE denseRepAmount #-}
+
+-- | Currency unit amount numerator.
+denseRepAmountNumerator :: DenseRep -> Integer
+denseRepAmountNumerator = _denseRepAmountNumerator
+{-# INLINE denseRepAmountNumerator #-}
+
+-- | Currency unit amount denominator. Positive, non-zero.
+denseRepAmountDenominator :: DenseRep -> Integer
+denseRepAmountDenominator = _denseRepAmountDenominator
+{-# INLINE denseRepAmountDenominator #-}
 
 -- | WARNING: This instance does not compare monetary amounts, it just helps you
 -- sort 'DenseRep' values in case you need to put them in a 'Data.Set.Set' or
@@ -533,15 +565,17 @@ mkDenseRep
   -> Integer -- ^ Scale nominator.
   -> Integer -- ^ Scale denominator (positive, non zero)
   -> Maybe DenseRep
-mkDenseRep = \c n d -> if d > 0 then Just (DenseRep c n d) else Nothing
+mkDenseRep = \c n d -> case d > 0 of
+  False -> Nothing
+  True -> Just (DenseRep c n d)
 {-# INLINE mkDenseRep #-}
 
 -- | Convert a 'Dense' to a 'DenseRep' for ease of serialization.
-denseRep :: KnownSymbol currency => Dense currency -> DenseRep
-denseRep = \(Dense r0 :: Dense currency) ->
+toDenseRep :: KnownSymbol currency => Dense currency -> DenseRep
+toDenseRep = \(Dense r0 :: Dense currency) ->
   let c = symbolVal (Proxy :: Proxy currency)
   in DenseRep c (numerator r0) (denominator r0)
-{-# INLINE denseRep #-}
+{-# INLINE toDenseRep #-}
 
 -- | Attempt to convert a 'DenseRep' to a 'Dense', provided you know the target
 -- @currency@.
@@ -550,9 +584,10 @@ fromDenseRep
   .  KnownSymbol currency
   => DenseRep
   -> Maybe (Dense currency)  -- ^
-fromDenseRep = \(DenseRep c n d) ->
-   if c == symbolVal (Proxy :: Proxy currency)
-   then Just (Dense (n % d)) else Nothing
+fromDenseRep = \dr ->
+  case denseRepCurrency dr == symbolVal (Proxy :: Proxy currency) of
+     False -> Nothing
+     True -> Just (Dense (denseRepAmount dr))
 {-# INLINE fromDenseRep #-}
 
 -- | Convert a 'DenseRep' to a 'Dense' without knowing the target @currency@.
@@ -564,10 +599,10 @@ withDenseRep
   :: DenseRep
   -> (forall currency. KnownSymbol currency => Dense currency -> r)
   -> r  -- ^
-withDenseRep (DenseRep c n d) = \f ->
-   case someSymbolVal c of
+withDenseRep dr = \f ->
+   case someSymbolVal (denseRepCurrency dr) of
       SomeSymbol (Proxy :: Proxy currency) ->
-         f (Dense (n % d) :: Dense currency)
+         f (Dense (denseRepAmount dr) :: Dense currency)
 {-# INLINE withDenseRep #-}
 
 --------------------------------------------------------------------------------
@@ -579,6 +614,32 @@ data DiscreteRep = DiscreteRep
   , _discreteRepScaleDenominator :: !Integer  -- ^ Positive, non-zero.
   , _discreteRepAmount           :: !Integer  -- ^ Amount of unit.
   } deriving (Eq, Show, Read)
+
+-- | Currency name.
+discreteRepCurrency :: DiscreteRep -> String
+discreteRepCurrency = _discreteRepCurrency
+{-# INLINE discreteRepCurrency #-}
+
+-- | Positive, non-zero.
+discreteRepScale :: DiscreteRep -> Rational
+discreteRepScale = \dr ->
+  discreteRepScaleNumerator dr % discreteRepScaleDenominator dr
+{-# INLINE discreteRepScale #-}
+
+-- | Positive, non-zero.
+discreteRepScaleNumerator :: DiscreteRep -> Integer
+discreteRepScaleNumerator = _discreteRepScaleNumerator
+{-# INLINE discreteRepScaleNumerator #-}
+
+-- | Positive, non-zero.
+discreteRepScaleDenominator :: DiscreteRep -> Integer
+discreteRepScaleDenominator = _discreteRepScaleDenominator
+{-# INLINE discreteRepScaleDenominator #-}
+
+-- | Amount of currency unit.
+discreteRepAmount :: DiscreteRep -> Integer
+discreteRepAmount = _discreteRepAmount
+{-# INLINE discreteRepAmount #-}
 
 -- | WARNING: This instance does not compare monetary amounts, it just helps you
 -- sort 'Discrete' values in case you need to put them in a 'Data.Set.Set' or
@@ -592,21 +653,22 @@ mkDiscreteRep
   -> Integer  -- ^ Scale denominator. Positive, non-zero.
   -> Integer  -- ^ Amount of unit.
   -> Maybe DiscreteRep
-mkDiscreteRep = \c n d a ->
-  if (n > 0) && (d > 0) then Just (DiscreteRep c n d a) else Nothing
+mkDiscreteRep = \c n d a -> case (n > 0) && (d > 0) of
+  False -> Nothing
+  True -> Just (DiscreteRep c n d a)
 {-# INLINE mkDiscreteRep #-}
 
 -- | Convert a 'Discrete' to a 'DiscreteRep' for ease of serialization.
-discreteRep
+toDiscreteRep
   :: (KnownSymbol currency, GoodScale scale)
   => Discrete' currency scale
   -> DiscreteRep -- ^
-discreteRep = \(Discrete i0 :: Discrete' currency scale) ->
+toDiscreteRep = \(Discrete i0 :: Discrete' currency scale) ->
   let c = symbolVal (Proxy :: Proxy currency)
       n = natVal (Proxy :: Proxy (Fst scale))
       d = natVal (Proxy :: Proxy (Snd scale))
   in DiscreteRep c n d i0
-{-# INLINE discreteRep #-}
+{-# INLINE toDiscreteRep #-}
 
 -- | Attempt to convert a 'DiscreteRep' to a 'Discrete', provided you know the
 -- target @currency@ and @unit@.
@@ -615,11 +677,12 @@ fromDiscreteRep
   .  (KnownSymbol currency, GoodScale scale)
   => DiscreteRep
   -> Maybe (Discrete' currency scale)  -- ^
-fromDiscreteRep = \(DiscreteRep c n d a) ->
-   if (c == symbolVal (Proxy :: Proxy currency)) &&
-      (n == natVal (Proxy :: Proxy (Fst scale))) &&
-      (d == natVal (Proxy :: Proxy (Snd scale)))
-   then Just (Discrete a) else Nothing
+fromDiscreteRep = \dr ->
+   if (discreteRepCurrency dr == symbolVal (Proxy :: Proxy currency)) &&
+      (discreteRepScaleNumerator dr == natVal (Proxy :: Proxy (Fst scale))) &&
+      (discreteRepScaleDenominator dr == natVal (Proxy :: Proxy (Snd scale)))
+   then Just (Discrete (discreteRepAmount dr))
+   else Nothing
 {-# INLINE fromDiscreteRep #-}
 
 -- | Convert a 'DiscreteRep' to a 'Discrete' without knowing the target
@@ -636,17 +699,20 @@ withDiscreteRep
          ) => Discrete' currency scale
            -> r )
   -> r  -- ^
-withDiscreteRep (DiscreteRep c n d a) = \f ->
-  case someSymbolVal c of
-     SomeSymbol (Proxy :: Proxy currency) -> case someNatVal n of
-        Nothing -> error "withDiscreteRep: impossible: n < 0"
-        Just (SomeNat (Proxy :: Proxy num)) -> case someNatVal d of
-           Nothing -> error "withDiscreteRep: impossible: d < 0"
-           Just (SomeNat (Proxy :: Proxy den)) ->
+withDiscreteRep dr = \f ->
+  case someSymbolVal (discreteRepCurrency dr) of
+    SomeSymbol (Proxy :: Proxy currency) ->
+      case someNatVal (discreteRepScaleNumerator dr) of
+        Nothing -> error "withDiscreteRep: impossible: numerator < 0"
+        Just (SomeNat (Proxy :: Proxy num)) ->
+          case someNatVal (discreteRepScaleDenominator dr) of
+            Nothing -> error "withDiscreteRep: impossible: denominator < 0"
+            Just (SomeNat (Proxy :: Proxy den)) ->
               case mkGoodScale of
-                 Nothing -> error "withDiscreteRep: impossible: mkGoodScale"
-                 Just (Dict :: Dict (GoodScale '(num, den))) ->
-                    f (Discrete a :: Discrete' currency '(num, den))
+                Nothing -> error "withDiscreteRep: impossible: mkGoodScale"
+                Just (Dict :: Dict (GoodScale '(num, den))) ->
+                  f (Discrete (discreteRepAmount dr)
+                       :: Discrete' currency '(num, den))
 
 --------------------------------------------------------------------------------
 -- Miscellaneous

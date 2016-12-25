@@ -13,7 +13,7 @@ import Test.Tasty.QuickCheck ((===), (==>))
 import qualified Test.Tasty.QuickCheck as QC
 
 import GHC.TypeLits (Nat, Symbol, KnownSymbol, symbolVal)
-import Data.Maybe (catMaybes, isJust)
+import Data.Maybe (catMaybes, isJust, isNothing)
 import Data.Proxy (Proxy(Proxy))
 
 import qualified Data.Money as Money
@@ -31,7 +31,7 @@ instance QC.Arbitrary Money.DiscreteRep where
                                  <*> QC.arbitrary <*> QC.arbitrary
     Just x <- QC.suchThat md isJust
     pure x
-  shrink = \x -> Money.withDiscreteRep x (map Money.discreteRep . QC.shrink)
+  shrink = \x -> Money.withDiscreteRep x (map Money.toDiscreteRep . QC.shrink)
 
 instance QC.Arbitrary (Money.Dense currency) where
   arbitrary = do
@@ -44,7 +44,7 @@ instance QC.Arbitrary Money.DenseRep where
     let md = Money.mkDenseRep <$> QC.arbitrary <*> QC.arbitrary <*> QC.arbitrary
     Just x <- QC.suchThat md isJust
     pure x
-  shrink = \x -> Money.withDenseRep x (map Money.denseRep . QC.shrink)
+  shrink = \x -> Money.withDenseRep x (map Money.toDenseRep . QC.shrink)
 
 instance QC.Arbitrary (Money.ExchangeRate src dst) where
   arbitrary = do
@@ -72,34 +72,44 @@ tests =
 testCurrencies :: Tasty.TestTree
 testCurrencies =
   Tasty.testGroup "Currency"
-  [ testCurrency (Proxy :: Proxy "BTC")
-  , testCurrency (Proxy :: Proxy "USD")
-  , testCurrency (Proxy :: Proxy "VUV")
-  , testCurrency (Proxy :: Proxy "XAU")
+  [ testDense (Proxy :: Proxy "BTC")  -- A cryptocurrency.
+  , testDense (Proxy :: Proxy "USD")  -- A fiat currency with decimal fractions.
+  , testDense (Proxy :: Proxy "VUV")  -- A fiat currency with non-decimal fractions.
+  , testDense (Proxy :: Proxy "XAU")  -- A precious metal.
   ]
 
 testCurrencyUnits :: Tasty.TestTree
 testCurrencyUnits =
   Tasty.testGroup "Currency units"
-  [ testCurrencyUnit (Proxy :: Proxy "BTC") (Proxy :: Proxy "BTC")
-  , testCurrencyUnit (Proxy :: Proxy "BTC") (Proxy :: Proxy "satoshi")
-  , testCurrencyUnit (Proxy :: Proxy "BTC") (Proxy :: Proxy "bitcoin")
-  , testCurrencyUnit (Proxy :: Proxy "USD") (Proxy :: Proxy "USD")
-  , testCurrencyUnit (Proxy :: Proxy "USD") (Proxy :: Proxy "cent")
-  , testCurrencyUnit (Proxy :: Proxy "USD") (Proxy :: Proxy "dollar")
-  , testCurrencyUnit (Proxy :: Proxy "VUV") (Proxy :: Proxy "vatu")
-  , testCurrencyUnit (Proxy :: Proxy "XAU") (Proxy :: Proxy "micrograin")
-  , testCurrencyUnit (Proxy :: Proxy "XAU") (Proxy :: Proxy "milligrain")
-  , testCurrencyUnit (Proxy :: Proxy "XAU") (Proxy :: Proxy "grain")
+  [ testDiscrete (Proxy :: Proxy "BTC") (Proxy :: Proxy "BTC")
+  , testDiscrete (Proxy :: Proxy "BTC") (Proxy :: Proxy "satoshi")
+  , testDiscrete (Proxy :: Proxy "BTC") (Proxy :: Proxy "bitcoin")
+  , testDiscrete (Proxy :: Proxy "USD") (Proxy :: Proxy "USD")
+  , testDiscrete (Proxy :: Proxy "USD") (Proxy :: Proxy "cent")
+  , testDiscrete (Proxy :: Proxy "USD") (Proxy :: Proxy "dollar")
+  , testDiscrete (Proxy :: Proxy "VUV") (Proxy :: Proxy "vatu")
+  , testDiscrete (Proxy :: Proxy "XAU") (Proxy :: Proxy "micrograin")
+  , testDiscrete (Proxy :: Proxy "XAU") (Proxy :: Proxy "milligrain")
+  , testDiscrete (Proxy :: Proxy "XAU") (Proxy :: Proxy "grain")
   ]
 
-testCurrency
-  :: KnownSymbol currency
+testDense
+  :: forall currency
+  .  KnownSymbol currency
   => Proxy currency
   -> Tasty.TestTree
-testCurrency pc =
-  Tasty.testGroup ("Currency " ++ symbolVal pc)
-  [ testShowReadDense pc
+testDense pc =
+  Tasty.testGroup ("DenseRep " ++ show (symbolVal pc))
+  [ QC.testProperty "read . show == id" $
+      QC.forAll QC.arbitrary $ \(x :: Money.Dense currency) ->
+         x === read (show x)
+  , QC.testProperty "fromDenseRep . toDenseRep == Just" $
+      QC.forAll QC.arbitrary $ \(x :: Money.Dense currency) ->
+         Just x === Money.fromDenseRep (Money.toDenseRep x)
+  , QC.testProperty "fromDenseRep works only for same currency" $
+      QC.forAll QC.arbitrary $ \(dr :: Money.DenseRep) ->
+        (Money.denseRepCurrency dr /= symbolVal pc)
+           ==> isNothing (Money.fromDenseRep dr :: Maybe (Money.Dense currency))
   ]
 
 testExchange :: Tasty.TestTree
@@ -123,7 +133,7 @@ testExchange =
   , testExchangeRate (Proxy :: Proxy "XAU") (Proxy :: Proxy "XAU")
   ]
 
-testCurrencyUnit
+testDiscrete
   :: forall (currency :: Symbol) (unit :: Symbol)
   .  ( Money.GoodScale (Money.Scale currency unit)
      , KnownSymbol currency
@@ -131,36 +141,21 @@ testCurrencyUnit
   => Proxy currency
   -> Proxy unit
   -> Tasty.TestTree
-testCurrencyUnit pc pu =
-  Tasty.testGroup ("Currency unit " ++ show (symbolVal pc) ++ " "
-                                    ++ show (symbolVal pu))
-  [ testShowReadDiscrete pc pu
-  , testRounding pc pu
-  ]
-
-testShowReadDense
-  :: forall (currency :: Symbol)
-  .  KnownSymbol currency
-  => Proxy currency
-  -> Tasty.TestTree
-testShowReadDense _ =
-  Tasty.testGroup "Dense"
-  [ QC.testProperty "read . show == id" $
-      QC.forAll QC.arbitrary $ \(x :: Money.Dense currency) ->
-         x === read (show x)
-  ]
-
-testShowReadDiscrete
-  :: forall (currency :: Symbol) (unit :: Symbol)
-  .  Money.GoodScale (Money.Scale currency unit)
-  => Proxy currency
-  -> Proxy unit
-  -> Tasty.TestTree
-testShowReadDiscrete _ _ =
-  Tasty.testGroup "Discrete"
-  [ QC.testProperty "read . show == id" $
+testDiscrete pc pu =
+  Tasty.testGroup ("Discrete " ++ show (symbolVal pc) ++ " "
+                               ++ show (symbolVal pu))
+  [ testRounding pc pu
+  , QC.testProperty "read . show == id" $
       QC.forAll QC.arbitrary $ \(x :: Money.Discrete currency unit) ->
          x === read (show x)
+  , QC.testProperty "fromDiscreteRep . toDiscreteRep == Just" $
+      QC.forAll QC.arbitrary $ \(x :: Money.Discrete currency unit) ->
+         Just x === Money.fromDiscreteRep (Money.toDiscreteRep x)
+  , QC.testProperty "fromDiscreteRep works only for same currency and scale" $
+      QC.forAll QC.arbitrary $ \(dr :: Money.DiscreteRep) ->
+        ((Money.discreteRepCurrency dr /= symbolVal pc) &&
+         (Money.discreteRepScale dr /= Money.scale (Proxy :: Proxy (Money.Scale currency unit))))
+            ==> isNothing (Money.fromDiscreteRep dr :: Maybe (Money.Discrete currency unit))
   ]
 
 testExchangeRate
@@ -172,7 +167,6 @@ testExchangeRate
 testExchangeRate ps pd =
   Tasty.testGroup ("ExchangeRate " ++ show (symbolVal ps) ++ " "
                                    ++ show (symbolVal pd))
-  -- TODO: these diverge.
   [ QC.testProperty "flipExchangeRate . flipExchangeRate == id" $
       QC.forAll QC.arbitrary $ \(xr :: Money.ExchangeRate src dst) ->
          let xr' = Money.flipExchangeRate xr
