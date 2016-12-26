@@ -1,3 +1,4 @@
+{-# LANGUAGE CPP #-}
 {-# LANGUAGE DataKinds #-}
 {-# LANGUAGE TypeFamilies #-}
 {-# LANGUAGE UndecidableInstances #-}
@@ -699,8 +700,12 @@ type instance I.Scale "ZWL" "ZWL" = '(100, 1)
 type instance I.Scale "ZWL" "dollar" = '(1, 1)
 type instance I.Scale "ZWL" "cent" = '(100, 1)
 
--- | Gold
+-- | Gold. No canonical smallest unit. Inusable instance.
+#if MIN_VERSION_base(4,9,0)
 type instance I.Scale "XAU" "XAU" = I.ErrScaleNonCanonical "XAU"
+#else
+type instance I.Scale "XAU" "XAU" = '(0, 0)
+#endif
 type instance I.Scale "XAU" "troy-ounce" = '(1, 1)
 type instance I.Scale "XAU" "grain" = '(480, 1)
 type instance I.Scale "XAU" "milligrain" = '(480000, 1)
@@ -710,8 +715,12 @@ type instance I.Scale "XAU" "gram" = '(31103477, 1000000)
 type instance I.Scale "XAU" "milligram" = '(31103477, 1000)
 type instance I.Scale "XAU" "microgram" = '(31103477, 1)
 
--- | Silver
+-- | Silver. No canonical smallest unit. Inusable instance.
+#if MIN_VERSION_base(4,9,0)
 type instance I.Scale "XAG" "XAG" = I.ErrScaleNonCanonical "XAG"
+#else
+type instance I.Scale "XAG" "XAG" = '(0, 0)
+#endif
 type instance I.Scale "XAG" "troy-ounce" = '(1, 1)
 type instance I.Scale "XAG" "grain" = '(480, 1)
 type instance I.Scale "XAG" "milligrain" = '(480000, 1)
@@ -721,8 +730,12 @@ type instance I.Scale "XAG" "gram" = '(31103477, 1000000)
 type instance I.Scale "XAG" "milligram" = '(31103477, 1000)
 type instance I.Scale "XAG" "microgram" = '(31103477, 1)
 
--- | Palladium
+-- | Palladium. No canonical smallest unit. Inusable instance.
+#if MIN_VERSION_base(4,9,0)
 type instance I.Scale "XPD" "XPD" = I.ErrScaleNonCanonical "XPD"
+#else
+type instance I.Scale "XPD" "XPD" = '(0, 0)
+#endif
 type instance I.Scale "XPD" "troy-ounce" = '(1, 1)
 type instance I.Scale "XPD" "grain" = '(480, 1)
 type instance I.Scale "XPD" "milligrain" = '(480000, 1)
@@ -732,8 +745,12 @@ type instance I.Scale "XPD" "gram" = '(31103477, 1000000)
 type instance I.Scale "XPD" "milligram" = '(31103477, 1000)
 type instance I.Scale "XPD" "microgram" = '(31103477, 1)
 
--- | Platinum
+-- | Platinum. No canonical smallest unit. Inusable instance.
+#if MIN_VERSION_base(4,9,0)
 type instance I.Scale "XPT" "XPT" = I.ErrScaleNonCanonical "XPT"
+#else
+type instance I.Scale "XPT" "XPT" = '(0, 0)
+#endif
 type instance I.Scale "XPT" "troy-ounce" = '(1, 1)
 type instance I.Scale "XPT" "grain" = '(480, 1)
 type instance I.Scale "XPT" "milligrain" = '(480000, 1)
