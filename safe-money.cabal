@@ -1,4 +1,4 @@
-name: money
+name: safe-money
 version: 0.1
 license: BSD3
 license-file: LICENSE
@@ -7,18 +7,18 @@ author: Renzo Carbonara
 maintainer: renλren!zone
 stability: Experimental
 tested-with: GHC==8.0.1
-homepage: https://github.com/k0001/haskell-money
-bug-reports: https://github.com/k0001/haskell-money/issues
+homepage: https://github.com/k0001/safe-money
+bug-reports: https://github.com/k0001/safe-money/issues
 category: Money
 build-type: Simple
 cabal-version: >=1.10
 extra-source-files: README.md changelog.md
-synopsis: Type-safe encoding and manipulation of world currencies and precious metals.
-description: Type-safe encoding and manipulation of world currencies and precious metals.
+synopsis: Type-safe and lossless encoding and manipulation of money, world currencies and precious metals.
+description: Type-safe and lossless encoding and manipulation of money, world currencies and precious metals.
 
 source-repository head
   type: git
-  location: https://github.com/k0001/haskell-money
+  location: https://github.com/k0001/safe-money
 
 library
   default-language: Haskell2010
