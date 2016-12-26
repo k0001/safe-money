@@ -39,6 +39,10 @@ module Data.Money
  , I.discreteRep
  , I.fromDiscreteRep
  , I.withDiscreteRep
+ , I.ExchangeRateRep
+ , I.exchangeRateRep
+ , I.fromExchangeRateRep
+ , I.withExchangeRateRep
  ) where
 
 import qualified Data.Money.Internal as I
