@@ -174,7 +174,7 @@ instance forall currency scale.
   show = \d0@(Discrete i0) ->
     let c = symbolVal (Proxy :: Proxy currency)
         s = scale d0
-    in concat [ "Discrete ", show c, " (", show s, ") ", show i0 ]
+    in concat [ "Discrete ", show c, " (", show (scale d0), ") ", show i0 ]
 
 instance forall currency scale.
   ( KnownSymbol currency, GoodScale scale
@@ -220,8 +220,7 @@ roundf
   -> (Discrete' currency scale, Maybe (Dense currency))
 roundf f = \c0 ->
   let r0 = toRational c0 :: Rational
-      r1 = r0 * scale d2 :: Rational
-      i2 = f r1 :: Integer
+      i2 = f (r0 * scale d2) :: Integer
       r2 = fromInteger i2 / scale d2 :: Rational
       ycrest | r0 == r2  = Nothing
              | otherwise = Just (Dense (r0 - r2))
