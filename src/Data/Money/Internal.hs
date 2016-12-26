@@ -116,7 +116,7 @@ import qualified Data.Store as Store
 
 --------------------------------------------------------------------------------
 -- | 'Dense' represents a dense monetary value for @currency@ (usually a
--- ISO-4217 currency code, but not necessarily).
+-- ISO-4217 currency code, but not necessarily) as a rational number.
 --
 -- While monetary values associated with a particular currency are discrete, you
 -- can still treat monetary values as dense while operating on them. For
@@ -133,6 +133,12 @@ import qualified Data.Store as Store
 --
 -- Construct 'Dense' monetary values using 'dense', or
 -- 'fromInteger' / 'fromIntegral' if that suffices.
+--
+-- /WARNING/ if you want to treat a dense monetary value as a /Real/ number (for
+-- example, to take the square root of that monetary value), then you are on
+-- your own. We can only guarantee lossless manipulation of rational values, so
+-- you will need to convert back and forth betwen the 'Rational' representation
+-- for 'Dense' and your (likely lossy) representation for /Real/ numbers.
 newtype Dense (currency :: Symbol) = Dense Rational
   deriving (Eq, Ord, Num, Real, Fractional, GHC.Generic)
 
