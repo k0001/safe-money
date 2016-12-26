@@ -767,7 +767,7 @@ fromDiscreteRep = \dr ->
 -- you can prove equality with some other type at the outer scope, but in that
 -- case you would be better off using 'fromDiscreteRep' directly.
 --
--- Notice that you may need to need an explicit type to the result of this
+-- Notice that you may need to add an explicit type to the result of this
 -- function in order to keep the compiler happy.
 withDiscreteRep
   :: forall r
