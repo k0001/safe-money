@@ -44,7 +44,7 @@ module Data.Money.Internal
  , denseRepAmount
  , denseRepAmountNumerator
  , denseRepAmountDenominator
- , toDenseRep
+ , denseRep
  , mkDenseRep
  , fromDenseRep
  , withDenseRep
@@ -54,7 +54,7 @@ module Data.Money.Internal
  , discreteRepScaleNumerator
  , discreteRepScaleDenominator
  , discreteRepAmount
- , toDiscreteRep
+ , discreteRep
  , mkDiscreteRep
  , fromDiscreteRep
  , withDiscreteRep
@@ -64,7 +64,7 @@ module Data.Money.Internal
  , exchangeRateRepRate
  , exchangeRateRepRateNumerator
  , exchangeRateRepRateDenominator
- , toExchangeRateRep
+ , exchangeRateRep
  , mkExchangeRateRep
  , fromExchangeRateRep
  , withExchangeRateRep
@@ -617,11 +617,11 @@ mkDenseRep = \c n d -> case d > 0 of
 {-# INLINE mkDenseRep #-}
 
 -- | Convert a 'Dense' to a 'DenseRep' for ease of serialization.
-toDenseRep :: KnownSymbol currency => Dense currency -> DenseRep
-toDenseRep = \(Dense r0 :: Dense currency) ->
+denseRep :: KnownSymbol currency => Dense currency -> DenseRep
+denseRep = \(Dense r0 :: Dense currency) ->
   let c = symbolVal (Proxy :: Proxy currency)
   in DenseRep c (numerator r0) (denominator r0)
-{-# INLINE toDenseRep #-}
+{-# INLINE denseRep #-}
 
 -- | Attempt to convert a 'DenseRep' to a 'Dense', provided you know the target
 -- @currency@.
@@ -707,16 +707,16 @@ mkDiscreteRep = \c n d a -> case (n > 0) && (d > 0) of
 {-# INLINE mkDiscreteRep #-}
 
 -- | Convert a 'Discrete' to a 'DiscreteRep' for ease of serialization.
-toDiscreteRep
+discreteRep
   :: (KnownSymbol currency, GoodScale scale)
   => Discrete' currency scale
   -> DiscreteRep -- ^
-toDiscreteRep = \(Discrete i0 :: Discrete' currency scale) ->
+discreteRep = \(Discrete i0 :: Discrete' currency scale) ->
   let c = symbolVal (Proxy :: Proxy currency)
       n = natVal (Proxy :: Proxy (Fst scale))
       d = natVal (Proxy :: Proxy (Snd scale))
   in DiscreteRep c n d i0
-{-# INLINE toDiscreteRep #-}
+{-# INLINE discreteRep #-}
 
 -- | Attempt to convert a 'DiscreteRep' to a 'Discrete', provided you know the
 -- target @currency@ and @unit@.
@@ -820,15 +820,15 @@ mkExchangeRateRep = \src dst n d -> case (n > 0) && (d > 0) of
 {-# INLINE mkExchangeRateRep #-}
 
 -- | Convert a 'ExchangeRate' to a 'DiscreteRep' for ease of serialization.
-toExchangeRateRep
+exchangeRateRep
   :: (KnownSymbol src, KnownSymbol dst)
   => ExchangeRate src dst
   -> ExchangeRateRep -- ^
-toExchangeRateRep = \(ExchangeRate r0 :: ExchangeRate src dst) ->
+exchangeRateRep = \(ExchangeRate r0 :: ExchangeRate src dst) ->
   let src = symbolVal (Proxy :: Proxy src)
       dst = symbolVal (Proxy :: Proxy dst)
   in ExchangeRateRep src dst (numerator r0) (denominator r0)
-{-# INLINE toExchangeRateRep #-}
+{-# INLINE exchangeRateRep #-}
 
 -- | Attempt to convert a 'ExchangeRateRep' to a 'ExchangeRate', provided you
 -- know the target @src@ and @dst@ types.

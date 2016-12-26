@@ -31,15 +31,15 @@ module Data.Money
  , I.exchange
    -- * Serializable representations
  , I.DenseRep
- , I.toDenseRep
+ , I.denseRep
  , I.fromDenseRep
  , I.withDenseRep
  , I.DiscreteRep
- , I.toDiscreteRep
+ , I.discreteRep
  , I.fromDiscreteRep
  , I.withDiscreteRep
  , I.ExchangeRateRep
- , I.toExchangeRateRep
+ , I.exchangeRateRep
  , I.fromExchangeRateRep
  , I.withExchangeRateRep
  ) where

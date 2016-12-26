@@ -31,7 +31,7 @@ instance QC.Arbitrary Money.DiscreteRep where
                                  <*> QC.arbitrary <*> QC.arbitrary
     Just x <- QC.suchThat md isJust
     pure x
-  shrink = \x -> Money.withDiscreteRep x (map Money.toDiscreteRep . QC.shrink)
+  shrink = \x -> Money.withDiscreteRep x (map Money.discreteRep . QC.shrink)
 
 instance QC.Arbitrary (Money.Dense currency) where
   arbitrary = do
@@ -44,7 +44,7 @@ instance QC.Arbitrary Money.DenseRep where
     let md = Money.mkDenseRep <$> QC.arbitrary <*> QC.arbitrary <*> QC.arbitrary
     Just x <- QC.suchThat md isJust
     pure x
-  shrink = \x -> Money.withDenseRep x (map Money.toDenseRep . QC.shrink)
+  shrink = \x -> Money.withDenseRep x (map Money.denseRep . QC.shrink)
 
 instance QC.Arbitrary (Money.ExchangeRate src dst) where
   arbitrary = do
@@ -60,7 +60,7 @@ instance QC.Arbitrary Money.ExchangeRateRep where
     Just x <- QC.suchThat md isJust
     pure x
   shrink = \x ->
-    Money.withExchangeRateRep x (map Money.toExchangeRateRep . QC.shrink)
+    Money.withExchangeRateRep x (map Money.exchangeRateRep . QC.shrink)
 
 --------------------------------------------------------------------------------
 
@@ -112,9 +112,9 @@ testDense pc =
   [ QC.testProperty "read . show == id" $
       QC.forAll QC.arbitrary $ \(x :: Money.Dense currency) ->
          x === read (show x)
-  , QC.testProperty "fromDenseRep . toDenseRep == Just" $
+  , QC.testProperty "fromDenseRep . denseRep == Just" $
       QC.forAll QC.arbitrary $ \(x :: Money.Dense currency) ->
-         Just x === Money.fromDenseRep (Money.toDenseRep x)
+         Just x === Money.fromDenseRep (Money.denseRep x)
   , QC.testProperty "fromDenseRep works only for same currency" $
       QC.forAll QC.arbitrary $ \(dr :: Money.DenseRep) ->
         (Money.denseRepCurrency dr /= symbolVal pc)
@@ -157,9 +157,9 @@ testDiscrete pc pu =
   , QC.testProperty "read . show == id" $
       QC.forAll QC.arbitrary $ \(x :: Money.Discrete currency unit) ->
          x === read (show x)
-  , QC.testProperty "fromDiscreteRep . toDiscreteRep == Just" $
+  , QC.testProperty "fromDiscreteRep . discreteRep == Just" $
       QC.forAll QC.arbitrary $ \(x :: Money.Discrete currency unit) ->
-         Just x === Money.fromDiscreteRep (Money.toDiscreteRep x)
+         Just x === Money.fromDiscreteRep (Money.discreteRep x)
   , QC.testProperty "fromDiscreteRep works only for same currency and scale" $
       QC.forAll QC.arbitrary $ \(dr :: Money.DiscreteRep) ->
         ((Money.discreteRepCurrency dr /= symbolVal pc) &&
@@ -203,9 +203,9 @@ testExchangeRate ps pd =
           , xr :: Money.ExchangeRate src dst
           ) -> (Money.fromExchangeRate xr /= 1)
                   ==> (toRational c0 /= toRational (Money.exchange xr c0))
-  , QC.testProperty "fromExchangeRateRep . toExchangeRateRep == Just" $
+  , QC.testProperty "fromExchangeRateRep . exchangeRateRep == Just" $
       QC.forAll QC.arbitrary $ \(x :: Money.ExchangeRate src dst) ->
-         Just x === Money.fromExchangeRateRep (Money.toExchangeRateRep x)
+         Just x === Money.fromExchangeRateRep (Money.exchangeRateRep x)
   , QC.testProperty "fromDiscreteRep works only for same currencies" $
       QC.forAll QC.arbitrary $ \(x :: Money.ExchangeRateRep) ->
         ((Money.exchangeRateRepSrcCurrency x /= symbolVal ps) &&
