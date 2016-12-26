@@ -1,6 +1,8 @@
 {-# LANGUAGE BangPatterns #-}
+{-# LANGUAGE CPP #-}
 {-# LANGUAGE ConstraintKinds #-}
 {-# LANGUAGE DataKinds #-}
+{-# LANGUAGE DeriveGeneric #-}
 {-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
 {-# LANGUAGE KindSignatures #-}
@@ -40,40 +42,42 @@ module Data.Money.Internal
  , exchange
    -- * Serializable representations
  , DenseRep
+ , denseRep
  , denseRepCurrency
  , denseRepAmount
  , denseRepAmountNumerator
  , denseRepAmountDenominator
- , denseRep
  , mkDenseRep
  , fromDenseRep
  , withDenseRep
  , DiscreteRep
+ , discreteRep
  , discreteRepCurrency
  , discreteRepScale
  , discreteRepScaleNumerator
  , discreteRepScaleDenominator
  , discreteRepAmount
- , discreteRep
  , mkDiscreteRep
  , fromDiscreteRep
  , withDiscreteRep
  , ExchangeRateRep
+ , exchangeRateRep
  , exchangeRateRepSrcCurrency
  , exchangeRateRepDstCurrency
  , exchangeRateRepRate
  , exchangeRateRepRateNumerator
  , exchangeRateRepRateDenominator
- , exchangeRateRep
  , mkExchangeRateRep
  , fromExchangeRateRep
  , withExchangeRateRep
  ) where
 
 import Control.Applicative (empty)
+import Control.Monad ((<=<))
 import Data.Constraint (Dict(Dict))
 import Data.Proxy (Proxy(..))
 import Data.Ratio ((%), numerator, denominator)
+import qualified GHC.Generics as GHC
 import GHC.Real (infinity, notANumber)
 import GHC.TypeLits
   (Symbol, SomeSymbol(..), Nat, SomeNat(..), CmpNat, KnownSymbol, KnownNat,
@@ -85,6 +89,30 @@ import qualified Text.ParserCombinators.ReadPrec as ReadPrec
 import qualified Text.ParserCombinators.ReadP as ReadP
 import Text.Read (readPrec)
 import Unsafe.Coerce (unsafeCoerce)
+
+#ifdef VERSION_aeson
+import qualified Data.Aeson as Ae
+#endif
+
+#ifdef VERSION_binary
+import qualified Data.Binary as Binary
+#endif
+
+#ifdef VERSION_cereal
+import qualified Data.Serialize as Cereal
+#endif
+
+#ifdef VERSION_deepseq
+import Control.DeepSeq (NFData)
+#endif
+
+#ifdef VERSION_hashable
+import Data.Hashable (Hashable)
+#endif
+
+#ifdef VERSION_store
+import qualified Data.Store as Store
+#endif
 
 --------------------------------------------------------------------------------
 -- | 'Dense' represents a dense monetary value for @currency@ (usually a
@@ -106,7 +134,7 @@ import Unsafe.Coerce (unsafeCoerce)
 -- Construct 'Dense' monetary values using 'dense', or
 -- 'fromInteger'/'fromIntegral' if that suffices.
 newtype Dense (currency :: Symbol) = Dense Rational
-  deriving (Eq, Ord, Num, Real, Fractional)
+  deriving (Eq, Ord, Num, Real, Fractional, GHC.Generic)
 
 instance forall currency. KnownSymbol currency => Show (Dense currency) where
   show = \(Dense r0) ->
@@ -166,14 +194,13 @@ type Discrete (currency :: Symbol) (unit :: Symbol)
 -- mentioning the unit scale.
 newtype Discrete' (currency :: Symbol) (scale :: (Nat, Nat))
   = Discrete Integer
-  deriving (Eq, Ord, Enum, Num, Real, Integral)
+  deriving (Eq, Ord, Enum, Num, Real, Integral, GHC.Generic)
 
 instance forall currency scale.
   ( KnownSymbol currency, GoodScale scale
   ) => Show (Discrete' currency scale) where
   show = \d0@(Discrete i0) ->
     let c = symbolVal (Proxy :: Proxy currency)
-        s = scale d0
     in concat [ "Discrete ", show c, " (", show (scale d0), ") ", show i0 ]
 
 instance forall currency scale.
@@ -503,7 +530,7 @@ scale = \_ ->
 -- 'exchangeRate' (12345 % 10000) :: 'Maybe' ('ExchangeRate' \"USD\" \"GBP\")
 -- @
 newtype ExchangeRate (src :: Symbol) (dst :: Symbol) = ExchangeRate Rational
-  deriving (Eq, Ord)
+  deriving (Eq, Ord, GHC.Generic)
 
 instance forall src dst.
   ( KnownSymbol src, KnownSymbol dst
@@ -576,7 +603,7 @@ data DenseRep = DenseRep
   { _denseRepCurrency          :: !String
   , _denseRepAmountNumerator   :: !Integer
   , _denseRepAmountDenominator :: !Integer  -- ^ Positive, non-zero.
-  } deriving (Eq, Show, Read)
+  } deriving (Eq, Show, GHC.Generic)
 
 -- | WARNING: This instance does not compare monetary amounts, it just helps you
 -- sort 'DenseRep' values in case you need to put them in a 'Data.Set.Set' or
@@ -660,7 +687,7 @@ data DiscreteRep = DiscreteRep
   , _discreteRepScaleNumerator   :: !Integer  -- ^ Positive, non-zero.
   , _discreteRepScaleDenominator :: !Integer  -- ^ Positive, non-zero.
   , _discreteRepAmount           :: !Integer  -- ^ Amount of unit.
-  } deriving (Eq, Show, Read)
+  } deriving (Eq, Show, GHC.Generic)
 
 -- | WARNING: This instance does not compare monetary amounts, it just helps you
 -- sort 'DiscreteRep' values in case you need to put them in a 'Data.Set.Set' or
@@ -773,7 +800,7 @@ data ExchangeRateRep = ExchangeRateRep
   , _exchangeRateRepDstCurrency     :: !String
   , _exchangeRateRepRateNumerator   :: !Integer  -- ^ Positive, non-zero.
   , _exchangeRateRepRateDenominator :: !Integer  -- ^ Positive, non-zero.
-  } deriving (Eq, Show)
+  } deriving (Eq, Show, GHC.Generic)
 
 -- | WARNING: This instance does not compare monetary amounts, it just helps you
 -- sort 'ExchangeRateRep' values in case you need to put them in a
@@ -871,3 +898,191 @@ withExchangeRateRep x = \f ->
 type family Fst (ab :: (ka, kb)) :: ka where Fst '(a,b) = a
 type family Snd (ab :: (ka, kb)) :: ka where Snd '(a,b) = b
 
+--------------------------------------------------------------------------------
+-- Extra instances: hashable
+#ifdef VERSION_hashable
+instance Hashable (Dense currency)
+instance Hashable DenseRep
+instance Hashable (Discrete' currency scale)
+instance Hashable DiscreteRep
+instance Hashable (ExchangeRate src dst)
+instance Hashable ExchangeRateRep
+#endif
+
+--------------------------------------------------------------------------------
+-- Extra instances: deepseq
+#ifdef VERSION_deepseq
+instance NFData (Dense currency)
+instance NFData DenseRep
+instance NFData (Discrete' currency scale)
+instance NFData DiscreteRep
+instance NFData (ExchangeRate src dst)
+instance NFData ExchangeRateRep
+#endif
+
+--------------------------------------------------------------------------------
+-- Extra instances: cereal
+#ifdef VERSION_cereal
+-- | Compatible with 'DenseRep'.
+instance (KnownSymbol currency) => Cereal.Serialize (Dense currency) where
+  put = Cereal.put . denseRep
+  get = maybe empty pure =<< fmap fromDenseRep Cereal.get
+-- | Compatible with 'DiscreteRep'.
+instance
+  ( KnownSymbol currency, GoodScale scale
+  ) => Cereal.Serialize (Discrete' currency scale) where
+  put = Cereal.put . discreteRep
+  get = maybe empty pure =<< fmap fromDiscreteRep Cereal.get
+-- | Compatible with 'ExchangeRateRep'.
+instance
+  ( KnownSymbol src, KnownSymbol dst
+  ) => Cereal.Serialize (ExchangeRate src dst) where
+  put = Cereal.put . exchangeRateRep
+  get = maybe empty pure =<< fmap fromExchangeRateRep Cereal.get
+-- | Compatible with 'Dense'.
+instance Cereal.Serialize DenseRep where
+  put = \(DenseRep c n d) -> Cereal.put c >> Cereal.put n >> Cereal.put d
+  get = maybe empty pure =<< mkDenseRep
+    <$> Cereal.get <*> Cereal.get <*> Cereal.get
+-- | Compatible with 'Discrete'.
+instance Cereal.Serialize DiscreteRep where
+  put = \(DiscreteRep c n d a) ->
+    Cereal.put c >> Cereal.put n >> Cereal.put d >> Cereal.put a
+  get = maybe empty pure =<< mkDiscreteRep
+    <$> Cereal.get <*> Cereal.get <*> Cereal.get <*> Cereal.get
+-- | Compatible with 'ExchangeRate'.
+instance Cereal.Serialize ExchangeRateRep where
+  put = \(ExchangeRateRep src dst n d) ->
+    Cereal.put src >> Cereal.put dst >> Cereal.put n >> Cereal.put d
+  get = maybe empty pure =<< mkExchangeRateRep
+    <$> Cereal.get <*> Cereal.get <*> Cereal.get <*> Cereal.get
+#endif
+
+--------------------------------------------------------------------------------
+-- Extra instances: binary
+#ifdef VERSION_binary
+-- | Compatible with 'DenseRep'.
+instance (KnownSymbol currency) => Binary.Binary (Dense currency) where
+  put = Binary.put . denseRep
+  get = maybe empty pure =<< fmap fromDenseRep Binary.get
+-- | Compatible with 'DiscreteRep'.
+instance
+  ( KnownSymbol currency, GoodScale scale
+  ) => Binary.Binary (Discrete' currency scale) where
+  put = Binary.put . discreteRep
+  get = maybe empty pure =<< fmap fromDiscreteRep Binary.get
+-- | Compatible with 'ExchangeRateRep'.
+instance
+  ( KnownSymbol src, KnownSymbol dst
+  ) => Binary.Binary (ExchangeRate src dst) where
+  put = Binary.put . exchangeRateRep
+  get = maybe empty pure =<< fmap fromExchangeRateRep Binary.get
+-- | Compatible with 'Dense'.
+instance Binary.Binary DenseRep where
+  put = \(DenseRep c n d) -> Binary.put c >> Binary.put n >> Binary.put d
+  get = maybe empty pure =<< mkDenseRep
+    <$> Binary.get <*> Binary.get <*> Binary.get
+-- | Compatible with 'Discrete'.
+instance Binary.Binary DiscreteRep where
+  put = \(DiscreteRep c n d a) ->
+    Binary.put c >> Binary.put n >> Binary.put d >> Binary.put a
+  get = maybe empty pure =<< mkDiscreteRep
+    <$> Binary.get <*> Binary.get <*> Binary.get <*> Binary.get
+-- | Compatible with 'ExchangeRate'.
+instance Binary.Binary ExchangeRateRep where
+  put = \(ExchangeRateRep src dst n d) ->
+    Binary.put src >> Binary.put dst >> Binary.put n >> Binary.put d
+  get = maybe empty pure =<< mkExchangeRateRep
+    <$> Binary.get <*> Binary.get <*> Binary.get <*> Binary.get
+#endif
+
+--------------------------------------------------------------------------------
+-- Extra instances: aeson
+#ifdef VERSION_aeson
+-- | Compatible with 'DenseRep'
+instance KnownSymbol currency => Ae.ToJSON (Dense currency) where
+  toJSON = Ae.toJSON . denseRep
+-- | Compatible with 'DenseRep'
+instance KnownSymbol currency => Ae.FromJSON (Dense currency) where
+  parseJSON = maybe empty pure <=< fmap fromDenseRep . Ae.parseJSON
+-- | Compatible with 'Dense'
+instance Ae.ToJSON DenseRep where
+  toJSON = \(DenseRep c n d) -> Ae.toJSON (c, n, d)
+-- | Compatible with 'Dense'
+instance Ae.FromJSON DenseRep where
+  parseJSON = \v -> do
+    (c, n, d) <- Ae.parseJSON v
+    maybe empty pure (mkDenseRep c n d)
+-- | Compatible with 'DiscreteRep'
+instance
+  ( KnownSymbol currency, GoodScale scale
+  ) => Ae.ToJSON (Discrete' currency scale) where
+  toJSON = Ae.toJSON . discreteRep
+-- | Compatible with 'DiscreteRep'
+instance
+  ( KnownSymbol currency, GoodScale scale
+  )  => Ae.FromJSON (Discrete' currency scale) where
+  parseJSON = maybe empty pure <=< fmap fromDiscreteRep . Ae.parseJSON
+-- | Compatible with 'Discrete''
+instance Ae.ToJSON DiscreteRep where
+  toJSON = \(DiscreteRep c n d a) -> Ae.toJSON (c, n, d, a)
+-- | Compatible with 'Discrete''
+instance Ae.FromJSON DiscreteRep where
+  parseJSON = \v -> do
+    (c, n, d, a) <- Ae.parseJSON v
+    maybe empty pure (mkDiscreteRep c n d a)
+-- | Compatible with 'ExchangeRateRep'
+instance
+  ( KnownSymbol src, KnownSymbol dst
+  ) => Ae.ToJSON (ExchangeRate src dst) where
+  toJSON = Ae.toJSON . exchangeRateRep
+-- | Compatible with 'ExchangeRateRep'
+instance
+  ( KnownSymbol src, KnownSymbol dst
+  ) => Ae.FromJSON (ExchangeRate src dst) where
+  parseJSON = maybe empty pure <=< fmap fromExchangeRateRep . Ae.parseJSON
+-- | Compatible with 'ExchangeRate'
+instance Ae.ToJSON ExchangeRateRep where
+  toJSON = \(ExchangeRateRep src dst n d) -> Ae.toJSON (src, dst, n, d)
+-- | Compatible with 'ExchangeRate'
+instance Ae.FromJSON ExchangeRateRep where
+  parseJSON = \v -> do
+    (src, dst, n, d) <- Ae.parseJSON v
+    maybe empty pure (mkExchangeRateRep src dst n d)
+#endif
+
+--------------------------------------------------------------------------------
+-- Extra instances: store
+#ifdef VERSION_store
+-- | Compatible with 'DenseRep'.
+instance (KnownSymbol currency) => Store.Store (Dense currency) where
+  poke = Store.poke . denseRep
+  peek = maybe (fail "peek") pure =<< fmap fromDenseRep Store.peek
+-- | Compatible with 'Dense'.
+instance Store.Store DenseRep where
+  poke = \(DenseRep c n d) -> Store.poke (c, n, d)
+  peek = do (c, n, d) <- Store.peek
+            maybe (fail "peek") pure (mkDenseRep c n d)
+-- | Compatible with 'DiscreteRep'.
+instance
+  ( KnownSymbol currency, GoodScale scale
+  ) => Store.Store (Discrete' currency scale) where
+  poke = Store.poke . discreteRep
+  peek = maybe (fail "peek") pure =<< fmap fromDiscreteRep Store.peek
+-- | Compatible with 'Discrete''.
+instance Store.Store DiscreteRep where
+  poke = \(DiscreteRep c n d a) -> Store.poke (c, n, d, a)
+  peek = do (c, n, d, a) <- Store.peek
+            maybe (fail "peek") pure (mkDiscreteRep c n d a)
+-- | Compatible with 'ExchangeRateRep'.
+instance
+  ( KnownSymbol src, KnownSymbol dst
+  ) => Store.Store (ExchangeRate src dst) where
+  poke = Store.poke . exchangeRateRep
+  peek = maybe (fail "peek") pure =<< fmap fromExchangeRateRep Store.peek
+-- | Compatible with 'ExchangeRate'.
+instance Store.Store ExchangeRateRep where
+  poke = \(ExchangeRateRep src dst n d) -> Store.poke (src, dst, n, d)
+  peek = do (src, dst, n, d) <- Store.peek
+            maybe (fail "peek") pure (mkExchangeRateRep src dst n d)
+#endif
