@@ -124,6 +124,12 @@ testDense pc =
       QC.forAll QC.arbitrary $ \(dr :: Money.DenseRep) ->
         (Money.denseRepCurrency dr /= symbolVal pc)
            ==> isNothing (Money.fromDenseRep dr :: Maybe (Money.Dense currency))
+  , QC.testProperty "withDenseRep" $
+      QC.forAll QC.arbitrary $ \(x :: Money.Dense currency) ->
+        let dr = Money.denseRep x
+        in Money.withDenseRep dr $ \x' ->
+             (show x, dr, Money.denseRep (x + 1))
+                === (show x', Money.denseRep x', Money.denseRep (x' + 1))
 
   , QC.testProperty "Aeson encoding roundtrip" $
       QC.forAll QC.arbitrary $ \(x :: Money.Dense currency) ->
@@ -220,6 +226,13 @@ testDiscrete pc pu =
              Money.scale (Proxy :: Proxy (Money.Scale currency unit)))
         ) ==> isNothing (Money.fromDiscreteRep dr
                           :: Maybe (Money.Discrete currency unit))
+  , QC.testProperty "withDiscreteRep" $
+      QC.forAll QC.arbitrary $ \(x :: Money.Discrete currency unit) ->
+        let dr = Money.discreteRep x
+        in ( Money.withDiscreteRep dr $ \x' ->
+                (show x, dr, Money.discreteRep (x + 1))
+                   === (show x', Money.discreteRep x', Money.discreteRep (x' + 1))
+           ) :: QC.Property
 
   , QC.testProperty "Aeson encoding roundtrip" $
       QC.forAll QC.arbitrary $ \(x :: Money.Discrete currency unit) ->
@@ -307,12 +320,17 @@ testExchangeRate ps pd =
   , QC.testProperty "fromExchangeRateRep . exchangeRateRep == Just" $
       QC.forAll QC.arbitrary $ \(x :: Money.ExchangeRate src dst) ->
          Just x === Money.fromExchangeRateRep (Money.exchangeRateRep x)
-  , QC.testProperty "fromDiscreteRep works only for same currencies" $
+  , QC.testProperty "fromExchangeRateRep works only for same currencies" $
       QC.forAll QC.arbitrary $ \(x :: Money.ExchangeRateRep) ->
         ((Money.exchangeRateRepSrcCurrency x /= symbolVal ps) &&
          (Money.exchangeRateRepDstCurrency x /= symbolVal pd))
             ==> isNothing (Money.fromExchangeRateRep x
                             :: Maybe (Money.ExchangeRate src dst))
+  , QC.testProperty "withExchangeRateRep" $
+      QC.forAll QC.arbitrary $ \(x :: Money.ExchangeRate src dst) ->
+        let dr = Money.exchangeRateRep x
+        in Money.withExchangeRateRep dr $ \x' ->
+             (show x, dr) === (show x', Money.exchangeRateRep x')
 
   , QC.testProperty "Aeson encoding roundtrip" $
       QC.forAll QC.arbitrary $ \(x :: Money.ExchangeRate src dst) ->

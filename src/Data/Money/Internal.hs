@@ -132,7 +132,7 @@ import qualified Data.Store as Store
 -- can obtain a precise 'Rational' representation.
 --
 -- Construct 'Dense' monetary values using 'dense', or
--- 'fromInteger'/'fromIntegral' if that suffices.
+-- 'fromInteger' / 'fromIntegral' if that suffices.
 newtype Dense (currency :: Symbol) = Dense Rational
   deriving (Eq, Ord, Num, Real, Fractional, GHC.Generic)
 
@@ -178,7 +178,7 @@ dense = \r0 ->
 -- use:
 --
 -- @
--- 'fromInteger' 2105 :: Discrete "GBP" "penny"
+-- 'fromInteger' 2105 :: Discrete \"GBP\" \"penny\"
 -- @
 --
 -- Because @2015 / 100 == 20.15@.
@@ -502,7 +502,8 @@ mkGoodScale =
   let n = natVal (Proxy :: Proxy num)
       d = natVal (Proxy :: Proxy den)
   in if (n > 0) && (d > 0)
-     then Just (unsafeCoerce (Dict :: Dict ()))
+     then Just (unsafeCoerce (Dict :: Dict ('LT ~ 'LT, 'LT ~ 'LT,
+                                            KnownNat num, KnownNat den)))
      else Nothing
 {-# INLINE mkGoodScale #-}
 
@@ -765,8 +766,12 @@ fromDiscreteRep = \dr ->
 -- Notice that @currency@ and @unit@ here can't leave its intended scope unless
 -- you can prove equality with some other type at the outer scope, but in that
 -- case you would be better off using 'fromDiscreteRep' directly.
+--
+-- Notice that you may need to need an explicit type to the result of this
+-- function in order to keep the compiler happy.
 withDiscreteRep
-  :: DiscreteRep
+  :: forall r
+  .  DiscreteRep
   -> ( forall currency scale.
          ( KnownSymbol currency
          , GoodScale scale
