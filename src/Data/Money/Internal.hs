@@ -14,7 +14,10 @@
 {-# LANGUAGE TypeFamilies #-}
 {-# LANGUAGE TypeOperators #-}
 {-# LANGUAGE UndecidableInstances #-}
+
+#if MIN_VERSION_base(4,9,0)
 {-# OPTIONS_GHC -Wno-redundant-constraints #-}
+#endif
 
 -- | This is an internal module. Import "Data.Money" instead.
 module Data.Money.Internal
@@ -32,7 +35,9 @@ module Data.Money.Internal
    -- * Currency scales
  , Scale
  , GoodScale
+#if MIN_VERSION_base(4,9,0)
  , ErrScaleNonCanonical
+#endif
  , scale
    -- * Currency exchange
  , ExchangeRate
@@ -219,6 +224,7 @@ instance forall currency scale.
            ("Discrete " ++ show c ++ " (" ++ show s ++ ") ") )
     Discrete <$> readPrec
 
+#if MIN_VERSION_base(4,9,0)
 instance
   ( GHC.TypeError
       (('GHC.Text "The ") 'GHC.:<>:
@@ -235,6 +241,7 @@ instance
   => Fractional (Discrete' currency scale) where
   fromRational = undefined
   recip = undefined
+#endif
 
 -- | Convert currency 'Discrete' monetary value into a 'Dense' monetary
 -- value.
@@ -479,6 +486,7 @@ truncate = roundf Prelude.truncate
 -- representable @unit@, like XAU, you will get a compile error.
 type family Scale (currency :: Symbol) (unit :: Symbol) :: (Nat, Nat)
 
+#if MIN_VERSION_base(4,9,0)
 -- | A friendly 'GHC.TypeError' to use for a @currency@ that doesn't have a
 -- cannonical small unit.
 type family ErrScaleNonCanonical (currency :: Symbol) :: k where
@@ -486,6 +494,7 @@ type family ErrScaleNonCanonical (currency :: Symbol) :: k where
     ( 'GHC.Text c 'GHC.:<>:
       'GHC.Text " is not a currency with a canonical smallest unit," 'GHC.:$$:
       'GHC.Text "be explicit about the currency unit you want to use." )
+#endif
 
 -- | Constraints to a scale (like the one returned by @'Scale' currency unit@)
 -- expected to always be satisfied. In particular, the scale is always
