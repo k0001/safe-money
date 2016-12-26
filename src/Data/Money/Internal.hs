@@ -1007,11 +1007,11 @@ instance KnownSymbol currency => Ae.FromJSON (Dense currency) where
   parseJSON = maybe empty pure <=< fmap fromDenseRep . Ae.parseJSON
 -- | Compatible with 'Dense'
 instance Ae.ToJSON DenseRep where
-  toJSON = \(DenseRep c n d) -> Ae.toJSON (c, n, d)
+  toJSON = \(DenseRep c n d) -> Ae.toJSON ("Dense", c, n, d)
 -- | Compatible with 'Dense'
 instance Ae.FromJSON DenseRep where
   parseJSON = \v -> do
-    (c, n, d) <- Ae.parseJSON v
+    ("Dense", c, n, d) <- Ae.parseJSON v
     maybe empty pure (mkDenseRep c n d)
 -- | Compatible with 'DiscreteRep'
 instance
@@ -1021,15 +1021,15 @@ instance
 -- | Compatible with 'DiscreteRep'
 instance
   ( KnownSymbol currency, GoodScale scale
-  )  => Ae.FromJSON (Discrete' currency scale) where
+  ) => Ae.FromJSON (Discrete' currency scale) where
   parseJSON = maybe empty pure <=< fmap fromDiscreteRep . Ae.parseJSON
 -- | Compatible with 'Discrete''
 instance Ae.ToJSON DiscreteRep where
-  toJSON = \(DiscreteRep c n d a) -> Ae.toJSON (c, n, d, a)
+  toJSON = \(DiscreteRep c n d a) -> Ae.toJSON ("Discrete", c, n, d, a)
 -- | Compatible with 'Discrete''
 instance Ae.FromJSON DiscreteRep where
   parseJSON = \v -> do
-    (c, n, d, a) <- Ae.parseJSON v
+    ("Discrete", c, n, d, a) <- Ae.parseJSON v
     maybe empty pure (mkDiscreteRep c n d a)
 -- | Compatible with 'ExchangeRateRep'
 instance
@@ -1043,11 +1043,12 @@ instance
   parseJSON = maybe empty pure <=< fmap fromExchangeRateRep . Ae.parseJSON
 -- | Compatible with 'ExchangeRate'
 instance Ae.ToJSON ExchangeRateRep where
-  toJSON = \(ExchangeRateRep src dst n d) -> Ae.toJSON (src, dst, n, d)
+  toJSON = \(ExchangeRateRep src dst n d) ->
+    Ae.toJSON ("ExchangeRate", src, dst, n, d)
 -- | Compatible with 'ExchangeRate'
 instance Ae.FromJSON ExchangeRateRep where
   parseJSON = \v -> do
-    (src, dst, n, d) <- Ae.parseJSON v
+    ("ExchangeRate", src, dst, n, d) <- Ae.parseJSON v
     maybe empty pure (mkExchangeRateRep src dst n d)
 #endif
 
