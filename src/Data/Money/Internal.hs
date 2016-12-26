@@ -219,12 +219,12 @@ roundf
   -> Dense currency
   -> (Discrete' currency scale, Maybe (Dense currency))
 roundf f = \c0 ->
-  let r0 = toRational c0 :: Rational
-      i2 = f (r0 * scale d2) :: Integer
-      r2 = fromInteger i2 / scale d2 :: Rational
-      ycrest | r0 == r2  = Nothing
-             | otherwise = Just (Dense (r0 - r2))
-      d2 = Discrete i2
+  let !r0 = toRational c0 :: Rational
+      !i2 = f (r0 * scale d2) :: Integer
+      !r2 = fromInteger i2 / scale d2 :: Rational
+      !ycrest | r0 == r2  = Nothing
+              | otherwise = Just (Dense (r0 - r2))
+      !d2 = Discrete i2
   in (d2, ycrest)
 {-# INLINE roundf #-}
 
