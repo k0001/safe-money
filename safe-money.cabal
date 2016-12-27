@@ -28,21 +28,21 @@ library
       Data.Money
       Data.Money.Internal
   build-depends:
-      base (>=4.9 && <5.0)
-    , constraints == 0.8.*
+      base (>=4.8)
+    , constraints (>= 0.6)
 
   if flag(aeson)
-    build-depends: aeson == 1.0.*
+    build-depends: aeson (>=0.9)
   if flag(binary)
-    build-depends: binary == 0.8.*
+    build-depends: binary (>=0.7)
   if flag(cereal)
-    build-depends: cereal == 0.5.*
+    build-depends: cereal (>=0.5)
   if flag(deepseq)
-    build-depends: deepseq == 1.4.*
+    build-depends: deepseq (>=1.4)
   if flag(hashable)
-    build-depends: hashable == 1.2.*
+    build-depends: hashable (>=1.2)
   if flag(store)
-    build-depends: store == 0.3.*
+    build-depends: store (>=0.2)
 
 test-suite tests
   default-language: Haskell2010

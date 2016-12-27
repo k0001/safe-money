@@ -2,8 +2,8 @@ let
 _pkgs0 = import ((import <nixpkgs> {}).fetchFromGitHub {
   owner = "NixOS";
   repo = "nixpkgs";
-  rev = "4aadb9beb345898c7f7b06090b163e7f3debea5a";
-  sha256 = "1dka2knhi8pfb83iwph7chldys1df95dc3z2v38cqzy4m06qjir9";
+  rev = "d82a1abbb4dc2d9ed914535efcc7ba53037ce525";
+  sha256 = "16a2qxyb1ahqd5xl2ih99250vz4msbh103r5bqv0564nqzsmq4q2";
 }) {};
 
 in
@@ -11,5 +11,15 @@ in
 , compiler ? "ghc801"
 }:
 
-let drv = pkgs.haskell.packages.${compiler}.callPackage (import ./pkg.nix) {};
-in if pkgs.lib.inNixShell then drv.env else drv
+let
+hsLib = pkgs.haskell.lib;
+hs = pkgs.haskell.packages.${compiler}.override {
+  overrides = self: super: {
+    tasty-ant-xml = hsLib.doJailbreak super.tasty-ant-xml;
+  };
+};
+
+drv = hs.callPackage (import ./pkg.nix) {};
+
+in
+if pkgs.lib.inNixShell then drv.env else drv

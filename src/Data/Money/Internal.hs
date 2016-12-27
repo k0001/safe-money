@@ -35,9 +35,7 @@ module Data.Money.Internal
    -- * Currency scales
  , Scale
  , GoodScale
-#if MIN_VERSION_base(4,9,0)
  , ErrScaleNonCanonical
-#endif
  , scale
    -- * Currency exchange
  , ExchangeRate
@@ -87,7 +85,6 @@ import GHC.Real (infinity, notANumber)
 import GHC.TypeLits
   (Symbol, SomeSymbol(..), Nat, SomeNat(..), CmpNat, KnownSymbol, KnownNat,
    natVal, someNatVal, symbolVal, someSymbolVal)
-import qualified GHC.TypeLits as GHC
 import Prelude hiding (round, ceiling, floor, truncate)
 import qualified Prelude
 import qualified Text.ParserCombinators.ReadPrec as ReadPrec
@@ -117,6 +114,10 @@ import Data.Hashable (Hashable)
 
 #ifdef VERSION_store
 import qualified Data.Store as Store
+#endif
+
+#if MIN_VERSION_base(4,9,0)
+import qualified GHC.TypeLits as GHC
 #endif
 
 --------------------------------------------------------------------------------
@@ -205,7 +206,14 @@ type Discrete (currency :: Symbol) (unit :: Symbol)
 -- mentioning the unit scale.
 newtype Discrete' (currency :: Symbol) (scale :: (Nat, Nat))
   = Discrete Integer
-  deriving (Eq, Ord, Enum, Num, Real, Integral, GHC.Generic)
+
+deriving instance GoodScale scale => Eq (Discrete' currency scale)
+deriving instance GoodScale scale => Ord (Discrete' currency scale)
+deriving instance GoodScale scale => Enum (Discrete' currency scale)
+deriving instance GoodScale scale => Num (Discrete' currency scale)
+deriving instance GoodScale scale => Real (Discrete' currency scale)
+deriving instance GoodScale scale => Integral (Discrete' currency scale)
+deriving instance GoodScale scale => GHC.Generic (Discrete' currency scale)
 
 instance forall currency scale.
   ( KnownSymbol currency, GoodScale scale
@@ -237,8 +245,9 @@ instance
        ('GHC.ShowType Dense) 'GHC.:$$:
        ('GHC.Text "value and use the ") 'GHC.:<>:
        ('GHC.ShowType Fractional) 'GHC.:<>:
-       ('GHC.Text " features on it instead.")) )
-  => Fractional (Discrete' currency scale) where
+       ('GHC.Text " features on it instead."))
+  , GoodScale scale
+  ) => Fractional (Discrete' currency scale) where
   fromRational = undefined
   recip = undefined
 #endif
@@ -254,14 +263,16 @@ fromDiscrete = \c@(Discrete i) -> Dense (fromInteger i / scale c)
 
 -- | Internal. Used to implement 'round', 'ceiling', 'floor' and 'truncate'.
 roundf
-  :: GoodScale scale
+  :: forall currency scale
+  .  GoodScale scale
   => (Rational -> Integer) -- ^ 'Prelude.round', 'Prelude.ceiling' or similar.
   -> Dense currency
   -> (Discrete' currency scale, Maybe (Dense currency))
 roundf f = \c0 ->
   let !r0 = toRational c0 :: Rational
-      !i2 = f (r0 * scale d2) :: Integer
-      !r2 = fromInteger i2 / scale d2 :: Rational
+      !r1 = scale (Proxy :: Proxy scale)
+      !i2 = f (r0 * r1) :: Integer
+      !r2 = fromInteger i2 / r1 :: Rational
       !ycrest | r0 == r2  = Nothing
               | otherwise = Just (Dense (r0 - r2))
       !d2 = Discrete i2
@@ -453,7 +464,7 @@ truncate = roundf Prelude.truncate
 -- represent values such as USD 3.50 or USD 21.87, since they are not exact
 -- multiples of a dollar.
 --
--- If there exists a cannonical smallest @unit@ that can fully represent the
+-- If there exists a canonical smallest @unit@ that can fully represent the
 -- currency, then an instance @'Scale' currency currency@ exists.
 --
 -- @
@@ -488,12 +499,20 @@ type family Scale (currency :: Symbol) (unit :: Symbol) :: (Nat, Nat)
 
 #if MIN_VERSION_base(4,9,0)
 -- | A friendly 'GHC.TypeError' to use for a @currency@ that doesn't have a
--- cannonical small unit.
+-- canonical small unit.
 type family ErrScaleNonCanonical (currency :: Symbol) :: k where
   ErrScaleNonCanonical c = GHC.TypeError
     ( 'GHC.Text c 'GHC.:<>:
       'GHC.Text " is not a currency with a canonical smallest unit," 'GHC.:$$:
       'GHC.Text "be explicit about the currency unit you want to use." )
+#else
+-- | Forbid a @currency@ that doesn't have a canonical small unit.
+--
+-- In GHC versions before 8.0 we can't provide a nice error message here, so we
+-- simply set this to a value that will fail to satisfy 'GoodScale'. As a
+-- consequence, trying to use this 'Scale' will result in a cryptic error saying
+-- /«@Couldn't match type ‘'EQ’ with ‘'LT’@»/.
+type ErrScaleNonCanonical (currency :: Symbol) = '(0, 0)
 #endif
 
 -- | Constraints to a scale (like the one returned by @'Scale' currency unit@)
@@ -923,7 +942,7 @@ type family Snd (ab :: (ka, kb)) :: ka where Snd '(a,b) = b
 #ifdef VERSION_hashable
 instance Hashable (Dense currency)
 instance Hashable DenseRep
-instance Hashable (Discrete' currency scale)
+instance GoodScale scale => Hashable (Discrete' currency scale)
 instance Hashable DiscreteRep
 instance Hashable (ExchangeRate src dst)
 instance Hashable ExchangeRateRep
@@ -934,7 +953,7 @@ instance Hashable ExchangeRateRep
 #ifdef VERSION_deepseq
 instance NFData (Dense currency)
 instance NFData DenseRep
-instance NFData (Discrete' currency scale)
+instance GoodScale scale => NFData (Discrete' currency scale)
 instance NFData DiscreteRep
 instance NFData (ExchangeRate src dst)
 instance NFData ExchangeRateRep
@@ -1077,33 +1096,45 @@ instance Ae.FromJSON ExchangeRateRep where
 #ifdef VERSION_store
 -- | Compatible with 'DenseRep'.
 instance (KnownSymbol currency) => Store.Store (Dense currency) where
+  size = storeContramapSize denseRep Store.size
   poke = Store.poke . denseRep
   peek = maybe (fail "peek") pure =<< fmap fromDenseRep Store.peek
 -- | Compatible with 'Dense'.
 instance Store.Store DenseRep where
-  poke = \(DenseRep c n d) -> Store.poke (c, n, d)
-  peek = do (c, n, d) <- Store.peek
-            maybe (fail "peek") pure (mkDenseRep c n d)
+  poke = \(DenseRep c n d) -> Store.poke c >> Store.poke n >> Store.poke d
+  peek = maybe (fail "peek") pure =<< do
+    mkDenseRep <$> Store.peek <*> Store.peek <*> Store.peek
+
 -- | Compatible with 'DiscreteRep'.
 instance
   ( KnownSymbol currency, GoodScale scale
   ) => Store.Store (Discrete' currency scale) where
+  size = storeContramapSize discreteRep Store.size
   poke = Store.poke . discreteRep
   peek = maybe (fail "peek") pure =<< fmap fromDiscreteRep Store.peek
 -- | Compatible with 'Discrete''.
 instance Store.Store DiscreteRep where
-  poke = \(DiscreteRep c n d a) -> Store.poke (c, n, d, a)
-  peek = do (c, n, d, a) <- Store.peek
-            maybe (fail "peek") pure (mkDiscreteRep c n d a)
+  poke = \(DiscreteRep c n d a) ->
+    Store.poke c >> Store.poke n >> Store.poke d >> Store.poke a
+  peek = maybe (fail "peek") pure =<< do
+    mkDiscreteRep <$> Store.peek <*> Store.peek <*> Store.peek <*> Store.peek
 -- | Compatible with 'ExchangeRateRep'.
 instance
   ( KnownSymbol src, KnownSymbol dst
   ) => Store.Store (ExchangeRate src dst) where
+  size = storeContramapSize exchangeRateRep Store.size
   poke = Store.poke . exchangeRateRep
   peek = maybe (fail "peek") pure =<< fmap fromExchangeRateRep Store.peek
 -- | Compatible with 'ExchangeRate'.
 instance Store.Store ExchangeRateRep where
-  poke = \(ExchangeRateRep src dst n d) -> Store.poke (src, dst, n, d)
-  peek = do (src, dst, n, d) <- Store.peek
-            maybe (fail "peek") pure (mkExchangeRateRep src dst n d)
+  poke = \(ExchangeRateRep src dst n d) ->
+    Store.poke src >> Store.poke dst >> Store.poke n >> Store.poke d
+  peek = maybe (fail "peek") pure =<< mkExchangeRateRep
+    <$> Store.peek <*> Store.peek <*> Store.peek <*> Store.peek
+
+storeContramapSize :: (a -> b) -> Store.Size b -> Store.Size a
+storeContramapSize f = \case
+  Store.VarSize g -> Store.VarSize (g . f)
+  Store.ConstSize x -> Store.ConstSize x
+{-# INLINE storeContramapSize #-}
 #endif
