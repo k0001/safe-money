@@ -1,4 +1,4 @@
-# Version HEAD
+# Version 0.2
 
 * Cabal flags are now manual (`aeson`, `binary`, `bytes`, `cereal`, `deepseq`,
   `hashable`).
