@@ -66,19 +66,25 @@ test-suite tests
 -- Provide instances for @aeson@
 flag aeson
   default: True
+  manual: True
 -- Provide instances for @binary@
 flag binary
   default: True
+  manual: True
 -- Provide instances for @cereal@
 flag cereal
   default: True
+  manual: True
 -- Provide instances for @store@
 flag store
   default: True
+  manual: True
 -- Provide instances for @hashable@
 flag hashable
   default: True
+  manual: True
 -- Provide instances for @deepseq@
 flag deepseq
   default: True
+  manual: True
 
