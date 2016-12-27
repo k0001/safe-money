@@ -28,21 +28,21 @@ library
       Data.Money
       Data.Money.Internal
   build-depends:
-      base (>=4.8)
-    , constraints (>= 0.6)
+      base (>=4.8 && <5.0)
+    , constraints (>=0.6 && <0.9)
 
   if flag(aeson)
-    build-depends: aeson (>=0.9)
+    build-depends: aeson (>=0.9 && <1.1)
   if flag(binary)
-    build-depends: binary (>=0.7)
+    build-depends: binary (>=0.7 && <0.9)
   if flag(cereal)
-    build-depends: cereal (>=0.5)
+    build-depends: cereal (>=0.5 && <0.6)
   if flag(deepseq)
-    build-depends: deepseq (>=1.4)
+    build-depends: deepseq (>=1.4 && <1.5)
   if flag(hashable)
-    build-depends: hashable (>=1.2)
+    build-depends: hashable (>=1.2 && <1.3)
   if flag(store)
-    build-depends: store (>=0.2)
+    build-depends: store (>=0.2 && <0.4)
 
 test-suite tests
   default-language: Haskell2010
@@ -63,22 +63,28 @@ test-suite tests
    , tasty-hunit
    , tasty-quickcheck
 
--- Provide instances for @aeson@
 flag aeson
+  description: Provide instances for @aeson@
   default: True
--- Provide instances for @binary@
+  manual: True
 flag binary
+  description: Provide instances for @binary@
   default: True
--- Provide instances for @cereal@
+  manual: True
 flag cereal
+  description: Provide instances for @cereal@
   default: True
--- Provide instances for @store@
+  manual: True
 flag store
+  description: Provide instances for @store@
   default: True
--- Provide instances for @hashable@
+  manual: True
 flag hashable
+  description: Provide instances for @hashable@
   default: True
--- Provide instances for @deepseq@
+  manual: True
 flag deepseq
+  description: Provide instances for @deepseq@
   default: True
+  manual: True
 
