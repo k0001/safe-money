@@ -26,7 +26,9 @@ import qualified Data.Money.Internal as Money
 
 --------------------------------------------------------------------------------
 
-instance QC.Arbitrary (Money.Discrete' currency scale) where
+instance
+  ( Money.GoodScale scale
+  ) => QC.Arbitrary (Money.Discrete' currency scale) where
   arbitrary = fmap fromInteger QC.arbitrary
   shrink = fmap fromInteger . QC.shrink . toInteger
 
@@ -178,6 +180,20 @@ testDense pc =
   , QC.testProperty "Cereal encoding roundtrip (DenseRep through Dense)" $
       QC.forAll QC.arbitrary $ \(x :: Money.Dense currency) ->
          Right (Money.denseRep x) === Cereal.decode (Cereal.encode x)
+
+  , QC.testProperty "Store encoding roundtrip" $
+      QC.forAll QC.arbitrary $ \(x :: Money.Dense currency) ->
+         Right x === Store.decode (Store.encode x)
+  , QC.testProperty "Store encoding roundtrip (DenseRep)" $
+      QC.forAll QC.arbitrary $ \(x :: Money.Dense currency) ->
+         let x' = Money.denseRep x
+         in Right x' === Store.decode (Store.encode x')
+  , QC.testProperty "Store encoding roundtrip (Dense through DenseRep)" $
+      QC.forAll QC.arbitrary $ \(x :: Money.Dense currency) ->
+         Right x === Store.decode (Store.encode (Money.denseRep x))
+  , QC.testProperty "Store encoding roundtrip (DenseRep through Dense)" $
+      QC.forAll QC.arbitrary $ \(x :: Money.Dense currency) ->
+         Right (Money.denseRep x) === Store.decode (Store.encode x)
   ]
 
 testExchange :: Tasty.TestTree
@@ -281,6 +297,20 @@ testDiscrete pc pu =
   , QC.testProperty "Cereal encoding roundtrip (DiscreteRep through Discrete)" $
       QC.forAll QC.arbitrary $ \(x :: Money.Discrete currency unit) ->
          Right (Money.discreteRep x) === Cereal.decode (Cereal.encode x)
+
+  , QC.testProperty "Store encoding roundtrip" $
+      QC.forAll QC.arbitrary $ \(x :: Money.Discrete currency unit) ->
+         Right x === Store.decode (Store.encode x)
+  , QC.testProperty "Store encoding roundtrip (DiscreteRep)" $
+      QC.forAll QC.arbitrary $ \(x :: Money.Discrete currency unit) ->
+         let x' = Money.discreteRep x
+         in Right x' === Store.decode (Store.encode x')
+  , QC.testProperty "Store encoding roundtrip (Discrete through DiscreteRep)" $
+      QC.forAll QC.arbitrary $ \(x :: Money.Discrete currency unit) ->
+         Right x === Store.decode (Store.encode (Money.discreteRep x))
+  , QC.testProperty "Store encoding roundtrip (DiscreteRep through Discrete)" $
+      QC.forAll QC.arbitrary $ \(x :: Money.Discrete currency unit) ->
+         Right (Money.discreteRep x) === Store.decode (Store.encode x)
   ]
 
 testExchangeRate
@@ -379,6 +409,20 @@ testExchangeRate ps pd =
   , QC.testProperty "Cereal encoding roundtrip (ExchangeRateRep through ExchangeRate)" $
       QC.forAll QC.arbitrary $ \(x :: Money.ExchangeRate src dst) ->
          Right (Money.exchangeRateRep x) === Cereal.decode (Cereal.encode x)
+
+  , QC.testProperty "Store encoding roundtrip" $
+      QC.forAll QC.arbitrary $ \(x :: Money.ExchangeRate src dst) ->
+         Right x === Store.decode (Store.encode x)
+  , QC.testProperty "Store encoding roundtrip (ExchangeRateRep)" $
+      QC.forAll QC.arbitrary $ \(x :: Money.ExchangeRate src dst) ->
+         let x' = Money.exchangeRateRep x
+         in Right x' === Store.decode (Store.encode x')
+  , QC.testProperty "Store encoding roundtrip (ExchangeRate through ExchangeRateRep)" $
+      QC.forAll QC.arbitrary $ \(x :: Money.ExchangeRate src dst) ->
+         Right x === Store.decode (Store.encode (Money.exchangeRateRep x))
+  , QC.testProperty "Store encoding roundtrip (ExchangeRateRep through ExchangeRate)" $
+      QC.forAll QC.arbitrary $ \(x :: Money.ExchangeRate src dst) ->
+         Right (Money.exchangeRateRep x) === Store.decode (Store.encode x)
   ]
 
 testRounding
