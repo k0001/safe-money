@@ -1,3 +1,8 @@
+# Version HEAD
+
+* Remove upper bound constraints from all dependencies except `base`.
+
+
 # Version 0.2
 
 * Cabal flags are now manual (`aeson`, `binary`, `bytes`, `cereal`, `deepseq`,
