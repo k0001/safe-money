@@ -319,7 +319,7 @@ type instance I.Scale "IRR" "dinar" = '(100, 1)
 -- | Icelandic króna
 type instance I.Scale "ISK" "ISK" = '(100, 1)
 type instance I.Scale "ISK" "krona" = '(1, 1)
-type instance I.Scale "ISK" "eyir" = '(100, 1)
+type instance I.Scale "ISK" "eyrir" = '(100, 1)
 -- | Jamaican dollar
 type instance I.Scale "JMD" "JMD" = '(100, 1)
 type instance I.Scale "JMD" "dollar" = '(1, 1)
