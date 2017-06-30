@@ -12,6 +12,8 @@
 
 * BREAKING CHANGE: Renamed `exchangeRateRep` to `toExchangeRateRep`.
 
+* BREAKING CHANGE: Renamed Iceleandic currency `"eyir"` to `"eyrir"`
+
 * Remove upper bound constraints from all dependencies except `base`.
 
 * Made dependency on `store` optional for the test suite, so that it can run on
