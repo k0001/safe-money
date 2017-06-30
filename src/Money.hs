@@ -3,12 +3,12 @@
 {-# LANGUAGE TypeFamilies #-}
 {-# LANGUAGE UndecidableInstances #-}
 
--- | Import this module qualified:
+-- | Import this module qualified as follows:
 --
 -- @
--- import qualified Data.Money as Money
+-- import qualified Money
 -- @
-module Data.Money
+module Money
  ( -- * Dense monetary values
    I.Dense
  , I.dense
@@ -32,20 +32,37 @@ module Data.Money
  , I.exchange
    -- * Serializable representations
  , I.DenseRep
- , I.denseRep
+ , I.toDenseRep
+ , I.fromRawDenseRep
  , I.fromDenseRep
  , I.withDenseRep
+ , I.denseRepCurrency
+ , I.denseRepAmount
+ , I.denseRepAmountNumerator
+ , I.denseRepAmountDenominator
  , I.DiscreteRep
- , I.discreteRep
+ , I.toDiscreteRep
+ , I.fromRawDiscreteRep
  , I.fromDiscreteRep
  , I.withDiscreteRep
+ , I.discreteRepCurrency
+ , I.discreteRepScale
+ , I.discreteRepScaleNumerator
+ , I.discreteRepScaleDenominator
+ , I.discreteRepAmount
  , I.ExchangeRateRep
- , I.exchangeRateRep
+ , I.toExchangeRateRep
+ , I.fromRawExchangeRateRep
  , I.fromExchangeRateRep
  , I.withExchangeRateRep
+ , I.exchangeRateRepSrcCurrency
+ , I.exchangeRateRepDstCurrency
+ , I.exchangeRateRepRate
+ , I.exchangeRateRepRateNumerator
+ , I.exchangeRateRepRateDenominator
  ) where
 
-import qualified Data.Money.Internal as I
+import qualified Money.Internal as I
 
 --------------------------------------------------------------------------------
 -- Currency scales

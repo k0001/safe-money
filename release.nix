@@ -1,21 +1,23 @@
 { nixpkgsBootstrap ? <nixpkgs>
-, nixpkgs ? (import nixpkgsBootstrap {}).fetchFromGitHub {
-    owner = "NixOS";
-    repo = "nixpkgs";
-    rev = "b12aacc7c18fb3f29febc842aaa3d0c0e5622546"; # release-17.03
-    sha256 = "1qklmrvfnlk1r6rqxpddllfkv3pihfms370qfsznm959i7hxcv2v"; }
+, nixpkgs ? builtins.fetchTarball
+    https://github.com/NixOS/nixpkgs-channels/archive/nixos-17.03.tar.gz
 }:
-
 let
-
 pkgs = import nixpkgs {};
-
-hsPackageSetConfig = self: super: {
-  safe-money = self.callPackage (import ./default.nix) {};
-};
-
 ghc802 = pkgs.haskell.packages.ghc802.override {
-  packageSetConfig = hsPackageSetConfig;
+  packageSetConfig = self: super: {
+    safe-money = self.callPackage (import ./pkg.nix) {};
+    #store = self.callHackage "store" "0.4.3.1" {};
+  };
+};
+ghcjsHEAD = pkgs.haskell.packages.ghcjsHEAD.override {
+  packageSetConfig = self: super: {
+    safe-money = self.callPackage (import ./pkg.nix) {};
+  };
 };
 
-in { inherit (ghc802) safe-money; }
+in {
+  ghc802_safe-money = ghc802.safe-money;
+  # upstream pkgset currently broken
+  # ghcjsHEAD_safe-money = ghcjsHEAD.safe-money;
+}
