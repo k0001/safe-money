@@ -14,15 +14,16 @@ build-type: Simple
 cabal-version: >=1.10
 extra-source-files: README.md changelog.md
 synopsis:
-  Type-safe and lossless encoding and manipulation of money, world currencies
-  and precious metals.
+  Type-safe and lossless encoding and manipulation of money, fiat currencies,
+  crypto currencies and precious metals.
 description:
-  Type-safe and lossless encoding and manipulation of money, world currencies
-  and precious metals.
+  Type-safe and lossless encoding and manipulation of money, fiat currencies,
+  crypto currencies and precious metals.
   .
   Notice that the only mandatory dependencies of this package are @base@ and
   @constraints@. The rest of the dependencies are optional but enabled by
-  default, they can be disabled with Cabal flags.
+  default (except @store@ which is also disabled when building with GHCJS), they
+  can be disabled with Cabal flags.
 
 source-repository head
   type: git

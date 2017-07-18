@@ -8,6 +8,12 @@
 -- @
 -- import qualified Money
 -- @
+--
+-- Note: This module exports many well-known currencies out-of-the-box, but
+-- you are not limited to the currencies mentioned here. You can simply create
+-- a new 'I.Scale' instance, and /voilà/. If you want to add a new currency to the
+-- out-of-the-box offer, please request so in
+-- https://github.com/k0001/safe-money/issues and the authors will see to it.
 module Money
  ( -- * Dense monetary values
    I.Dense
