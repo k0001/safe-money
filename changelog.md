@@ -1,4 +1,4 @@
-# Version HEAD
+# Version 0.3
 
 * BREAKING CHANGE: The `Data.Money` module was renamed to `Money`.
 
