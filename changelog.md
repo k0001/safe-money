@@ -3,8 +3,7 @@
 * BREAKING CHANGE: The `Data.Money` module was renamed to `Money`.
 
 * BREAKING CHANGE: The `Data.Money.Internal` module is not exposed anymore. All
-  of its contents are now exported from the `Money` module (with some renaming
-  like `mkDiscreteRep` being now called `fromRawDiscreteRep`, etc.)
+  of its contents are now exported from the `Money` module.
 
 * BREAKING CHANGE: Renamed `discreteRep` to `toDiscreteRep`.
 

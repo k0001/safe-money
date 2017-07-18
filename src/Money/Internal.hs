@@ -46,7 +46,7 @@ module Money.Internal
    -- * Serializable representations
  , DenseRep
  , toDenseRep
- , fromRawDenseRep
+ , mkDenseRep
  , fromDenseRep
  , withDenseRep
  , denseRepCurrency
@@ -55,7 +55,7 @@ module Money.Internal
  , denseRepAmountDenominator
  , DiscreteRep
  , toDiscreteRep
- , fromRawDiscreteRep
+ , mkDiscreteRep
  , fromDiscreteRep
  , withDiscreteRep
  , discreteRepCurrency
@@ -65,7 +65,7 @@ module Money.Internal
  , discreteRepAmount
  , ExchangeRateRep
  , toExchangeRateRep
- , fromRawExchangeRateRep
+ , mkExchangeRateRep
  , fromExchangeRateRep
  , withExchangeRateRep
  , exchangeRateRepSrcCurrency
@@ -636,7 +636,15 @@ exchange = \(ExchangeRate r) -> \(Dense s) -> Dense (r * s)
 -- deserialize than 'Dense' in case you don't know the type indexes involved.
 --
 -- If you are trying to construct a value of this type from some raw input, then
--- you will need to use the 'fromRawDenseRep' function.
+-- you will need to use the 'mkDenseRep' function.
+--
+-- In order to be able to effectively serialize a 'DenseRep' value, you
+-- need to serialize the following three values (which are the eventual
+-- arguments to 'mkDenseRep'):
+--
+-- * 'denseRepCurrency'
+-- * 'denseRepAmountNumerator'
+-- * 'denseRepAmountDenominator'
 data DenseRep = DenseRep
   { _denseRepCurrency          :: !String
   , _denseRepAmountNumerator   :: !Integer
@@ -674,15 +682,15 @@ denseRepAmountDenominator = _denseRepAmountDenominator
 -- This function is intended for deserialization purposes. You need to convert
 -- this 'DenseRep' value to a 'Dense' value in order to do any arithmetic
 -- operation on the monetary value.
-fromRawDenseRep
+mkDenseRep
   :: String -- ^ Currency. ('denseRepCurrency')
   -> Integer -- ^ Scale numerator. ('denseRepAmountNumerator')
   -> Integer -- ^ Scale denominator (positive, non zero). ('denseRepAmountDenominator')
   -> Maybe DenseRep
-fromRawDenseRep = \c n d -> case d > 0 of
+mkDenseRep = \c n d -> case d > 0 of
   False -> Nothing
   True -> Just (DenseRep c n d)
-{-# INLINABLE fromRawDenseRep #-}
+{-# INLINABLE mkDenseRep #-}
 
 -- | Convert a 'Dense' to a 'DenseRep' for ease of serialization.
 toDenseRep :: KnownSymbol currency => Dense currency -> DenseRep
@@ -726,7 +734,16 @@ withDenseRep dr = \f ->
 -- deserialize than 'Discrete' in case you don't know the type indexes involved.
 --
 -- If you are trying to construct a value of this type from some raw input, then
--- you will need to use the 'fromRawDiscreteRep' function.
+-- you will need to use the 'mkDiscreteRep' function.
+--
+-- In order to be able to effectively serialize a 'DiscreteRep' value, you need
+-- to serialize the following four values (which are the eventual arguments to
+-- 'mkDiscreteRep'):
+--
+-- * 'discreteRepCurrency'
+-- * 'discreteRepScaleNumerator'
+-- * 'discreteRepScaleDenominator'
+-- * 'discreteRepAmount'
 data DiscreteRep = DiscreteRep
   { _discreteRepCurrency         :: !String   -- ^ Currency name.
   , _discreteRepScaleNumerator   :: !Integer  -- ^ Positive, non-zero.
@@ -745,12 +762,6 @@ discreteRepCurrency = _discreteRepCurrency
 {-# INLINABLE discreteRepCurrency #-}
 
 -- | Positive, non-zero.
-discreteRepScale :: DiscreteRep -> Rational
-discreteRepScale = \dr ->
-  discreteRepScaleNumerator dr % discreteRepScaleDenominator dr
-{-# INLINABLE discreteRepScale #-}
-
--- | Positive, non-zero.
 discreteRepScaleNumerator :: DiscreteRep -> Integer
 discreteRepScaleNumerator = _discreteRepScaleNumerator
 {-# INLINABLE discreteRepScaleNumerator #-}
@@ -765,21 +776,28 @@ discreteRepAmount :: DiscreteRep -> Integer
 discreteRepAmount = _discreteRepAmount
 {-# INLINABLE discreteRepAmount #-}
 
+-- | Positive, non-zero.
+discreteRepScale :: DiscreteRep -> Rational
+discreteRepScale = \dr ->
+  discreteRepScaleNumerator dr % discreteRepScaleDenominator dr
+{-# INLINABLE discreteRepScale #-}
+
+
 -- | Internal. Build a 'DiscreteRep' from raw values.
 --
 -- This function is intended for deserialization purposes. You need to convert
 -- this 'DiscreteRep' value to a 'Discrete' vallue in order to do any arithmetic
 -- operation on the monetary value.
-fromRawDiscreteRep
+mkDiscreteRep
   :: String   -- ^ Currency name. ('discreteRepCurrency')
   -> Integer  -- ^ Scale numerator. Positive, non-zero. ('discreteRepScaleNumerator')
   -> Integer  -- ^ Scale denominator. Positive, non-zero. ('discreteRepScaleDenominator')
   -> Integer  -- ^ Amount of unit. ('discreteRepAmount')
   -> Maybe DiscreteRep
-fromRawDiscreteRep = \c n d a -> case (n > 0) && (d > 0) of
+mkDiscreteRep = \c n d a -> case (n > 0) && (d > 0) of
   False -> Nothing
   True -> Just (DiscreteRep c n d a)
-{-# INLINABLE fromRawDiscreteRep #-}
+{-# INLINABLE mkDiscreteRep #-}
 
 -- | Convert a 'Discrete' to a 'DiscreteRep' for ease of serialization.
 toDiscreteRep
@@ -850,7 +868,16 @@ withDiscreteRep dr = \f ->
 -- involved.
 --
 -- If you are trying to construct a value of this type from some raw input, then
--- you will need to use the 'fromRawExchangeRateRep' function.
+-- you will need to use the 'mkExchangeRateRep' function.
+--
+-- In order to be able to effectively serialize an 'ExchangeRateRep' value, you
+-- need to serialize the following four values (which are the eventual arguments
+-- to 'mkExchangeRateRep'):
+--
+-- * 'exchangeRateRepSrcCurrency'
+-- * 'exchangeRateRepDstCurrency'
+-- * 'exchangeRateRepRateNumerator'
+-- * 'exchangeRateRepRateDenominator'
 data ExchangeRateRep = ExchangeRateRep
   { _exchangeRateRepSrcCurrency     :: !String
   , _exchangeRateRepDstCurrency     :: !String
@@ -894,16 +921,16 @@ exchangeRateRepRateDenominator = _exchangeRateRepRateDenominator
 -- This function is intended for deserialization purposes. You need to convert
 -- this 'ExchangeRateRep' value to a 'ExchangeRate' value in order to do any
 -- arithmetic operation with the exchange rate.
-fromRawExchangeRateRep
+mkExchangeRateRep
   :: String   -- ^ Source currency name. ('exchangeRateRepSrcCurrency')
   -> String   -- ^ Destination currency name. ('exchangeRateRepDstCurrency')
   -> Integer  -- ^ Exchange rate numerator. Positive, non-zero. ('exchangeRateRepRateNumerator')
   -> Integer  -- ^ Exchange rate denominator. Positive, non-zero. ('exchangeRateRepRateDenominator')
   -> Maybe ExchangeRateRep
-fromRawExchangeRateRep = \src dst n d -> case (n > 0) && (d > 0) of
+mkExchangeRateRep = \src dst n d -> case (n > 0) && (d > 0) of
   False -> Nothing
   True -> Just (ExchangeRateRep src dst n d)
-{-# INLINABLE fromRawExchangeRateRep #-}
+{-# INLINABLE mkExchangeRateRep #-}
 
 -- | Convert a 'ExchangeRate' to a 'DiscreteRep' for ease of serialization.
 toExchangeRateRep
@@ -1002,19 +1029,19 @@ instance
 -- | Compatible with 'Dense'.
 instance Cereal.Serialize DenseRep where
   put = \(DenseRep c n d) -> Cereal.put c >> Cereal.put n >> Cereal.put d
-  get = maybe empty pure =<< fromRawDenseRep
+  get = maybe empty pure =<< mkDenseRep
     <$> Cereal.get <*> Cereal.get <*> Cereal.get
 -- | Compatible with 'Discrete'.
 instance Cereal.Serialize DiscreteRep where
   put = \(DiscreteRep c n d a) ->
     Cereal.put c >> Cereal.put n >> Cereal.put d >> Cereal.put a
-  get = maybe empty pure =<< fromRawDiscreteRep
+  get = maybe empty pure =<< mkDiscreteRep
     <$> Cereal.get <*> Cereal.get <*> Cereal.get <*> Cereal.get
 -- | Compatible with 'ExchangeRate'.
 instance Cereal.Serialize ExchangeRateRep where
   put = \(ExchangeRateRep src dst n d) ->
     Cereal.put src >> Cereal.put dst >> Cereal.put n >> Cereal.put d
-  get = maybe empty pure =<< fromRawExchangeRateRep
+  get = maybe empty pure =<< mkExchangeRateRep
     <$> Cereal.get <*> Cereal.get <*> Cereal.get <*> Cereal.get
 #endif
 
@@ -1040,19 +1067,19 @@ instance
 -- | Compatible with 'Dense'.
 instance Binary.Binary DenseRep where
   put = \(DenseRep c n d) -> Binary.put c >> Binary.put n >> Binary.put d
-  get = maybe empty pure =<< fromRawDenseRep
+  get = maybe empty pure =<< mkDenseRep
     <$> Binary.get <*> Binary.get <*> Binary.get
 -- | Compatible with 'Discrete'.
 instance Binary.Binary DiscreteRep where
   put = \(DiscreteRep c n d a) ->
     Binary.put c >> Binary.put n >> Binary.put d >> Binary.put a
-  get = maybe empty pure =<< fromRawDiscreteRep
+  get = maybe empty pure =<< mkDiscreteRep
     <$> Binary.get <*> Binary.get <*> Binary.get <*> Binary.get
 -- | Compatible with 'ExchangeRate'.
 instance Binary.Binary ExchangeRateRep where
   put = \(ExchangeRateRep src dst n d) ->
     Binary.put src >> Binary.put dst >> Binary.put n >> Binary.put d
-  get = maybe empty pure =<< fromRawExchangeRateRep
+  get = maybe empty pure =<< mkExchangeRateRep
     <$> Binary.get <*> Binary.get <*> Binary.get <*> Binary.get
 #endif
 
@@ -1072,7 +1099,7 @@ instance Ae.ToJSON DenseRep where
 instance Ae.FromJSON DenseRep where
   parseJSON = \v -> do
     ("Dense", c, n, d) <- Ae.parseJSON v
-    maybe empty pure (fromRawDenseRep c n d)
+    maybe empty pure (mkDenseRep c n d)
 -- | Compatible with 'DiscreteRep'
 instance
   ( KnownSymbol currency, GoodScale scale
@@ -1090,7 +1117,7 @@ instance Ae.ToJSON DiscreteRep where
 instance Ae.FromJSON DiscreteRep where
   parseJSON = \v -> do
     ("Discrete", c, n, d, a) <- Ae.parseJSON v
-    maybe empty pure (fromRawDiscreteRep c n d a)
+    maybe empty pure (mkDiscreteRep c n d a)
 -- | Compatible with 'ExchangeRateRep'
 instance
   ( KnownSymbol src, KnownSymbol dst
@@ -1109,7 +1136,7 @@ instance Ae.ToJSON ExchangeRateRep where
 instance Ae.FromJSON ExchangeRateRep where
   parseJSON = \v -> do
     ("ExchangeRate", src, dst, n, d) <- Ae.parseJSON v
-    maybe empty pure (fromRawExchangeRateRep src dst n d)
+    maybe empty pure (mkExchangeRateRep src dst n d)
 #endif
 
 --------------------------------------------------------------------------------
@@ -1124,7 +1151,7 @@ instance (KnownSymbol currency) => Store.Store (Dense currency) where
 instance Store.Store DenseRep where
   poke = \(DenseRep c n d) -> Store.poke c >> Store.poke n >> Store.poke d
   peek = maybe (fail "peek") pure =<< do
-    fromRawDenseRep <$> Store.peek <*> Store.peek <*> Store.peek
+    mkDenseRep <$> Store.peek <*> Store.peek <*> Store.peek
 
 -- | Compatible with 'DiscreteRep'.
 instance
@@ -1138,7 +1165,7 @@ instance Store.Store DiscreteRep where
   poke = \(DiscreteRep c n d a) ->
     Store.poke c >> Store.poke n >> Store.poke d >> Store.poke a
   peek = maybe (fail "peek") pure =<< do
-    fromRawDiscreteRep <$> Store.peek <*> Store.peek <*> Store.peek <*> Store.peek
+    mkDiscreteRep <$> Store.peek <*> Store.peek <*> Store.peek <*> Store.peek
 -- | Compatible with 'ExchangeRateRep'.
 instance
   ( KnownSymbol src, KnownSymbol dst
@@ -1150,7 +1177,7 @@ instance
 instance Store.Store ExchangeRateRep where
   poke = \(ExchangeRateRep src dst n d) ->
     Store.poke src >> Store.poke dst >> Store.poke n >> Store.poke d
-  peek = maybe (fail "peek") pure =<< fromRawExchangeRateRep
+  peek = maybe (fail "peek") pure =<< mkExchangeRateRep
     <$> Store.peek <*> Store.peek <*> Store.peek <*> Store.peek
 
 storeContramapSize :: (a -> b) -> Store.Size b -> Store.Size a

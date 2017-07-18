@@ -33,7 +33,7 @@ module Money
    -- * Serializable representations
  , I.DenseRep
  , I.toDenseRep
- , I.fromRawDenseRep
+ , I.mkDenseRep
  , I.fromDenseRep
  , I.withDenseRep
  , I.denseRepCurrency
@@ -42,7 +42,7 @@ module Money
  , I.denseRepAmountDenominator
  , I.DiscreteRep
  , I.toDiscreteRep
- , I.fromRawDiscreteRep
+ , I.mkDiscreteRep
  , I.fromDiscreteRep
  , I.withDiscreteRep
  , I.discreteRepCurrency
@@ -52,7 +52,7 @@ module Money
  , I.discreteRepAmount
  , I.ExchangeRateRep
  , I.toExchangeRateRep
- , I.fromRawExchangeRateRep
+ , I.mkExchangeRateRep
  , I.fromExchangeRateRep
  , I.withExchangeRateRep
  , I.exchangeRateRepSrcCurrency

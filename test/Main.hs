@@ -37,7 +37,7 @@ instance
 
 instance QC.Arbitrary Money.DiscreteRep where
   arbitrary = do
-    let md = Money.fromRawDiscreteRep <$> QC.arbitrary <*> QC.arbitrary
+    let md = Money.mkDiscreteRep <$> QC.arbitrary <*> QC.arbitrary
                                  <*> QC.arbitrary <*> QC.arbitrary
     Just x <- QC.suchThat md isJust
     pure x
@@ -51,7 +51,7 @@ instance QC.Arbitrary (Money.Dense currency) where
 
 instance QC.Arbitrary Money.DenseRep where
   arbitrary = do
-    let md = Money.fromRawDenseRep <$> QC.arbitrary <*> QC.arbitrary <*> QC.arbitrary
+    let md = Money.mkDenseRep <$> QC.arbitrary <*> QC.arbitrary <*> QC.arbitrary
     Just x <- QC.suchThat md isJust
     pure x
   shrink = \x -> Money.withDenseRep x (map Money.toDenseRep . QC.shrink)
@@ -65,7 +65,7 @@ instance QC.Arbitrary (Money.ExchangeRate src dst) where
 
 instance QC.Arbitrary Money.ExchangeRateRep where
   arbitrary = do
-    let md = Money.fromRawExchangeRateRep <$> QC.arbitrary <*> QC.arbitrary
+    let md = Money.mkExchangeRateRep <$> QC.arbitrary <*> QC.arbitrary
                                      <*> QC.arbitrary <*> QC.arbitrary
     Just x <- QC.suchThat md isJust
     pure x
