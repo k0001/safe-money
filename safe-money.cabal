@@ -68,7 +68,7 @@ test-suite test
     tasty,
     tasty-hunit,
     tasty-quickcheck
-  if (flag(store) || !impl(ghcjs))
+  if (flag(store) && !impl(ghcjs))
     build-depends: store
 
 flag aeson
