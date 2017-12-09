@@ -44,40 +44,41 @@ module Money.Internal
  , flipExchangeRate
  , exchange
    -- * Serializable representations
- , DenseRep
- , toDenseRep
- , mkDenseRep
- , fromDenseRep
- , withDenseRep
- , denseRepCurrency
- , denseRepAmount
- , denseRepAmountNumerator
- , denseRepAmountDenominator
- , DiscreteRep
- , toDiscreteRep
- , mkDiscreteRep
- , fromDiscreteRep
- , withDiscreteRep
- , discreteRepCurrency
- , discreteRepScale
- , discreteRepScaleNumerator
- , discreteRepScaleDenominator
- , discreteRepAmount
- , ExchangeRateRep
- , toExchangeRateRep
- , mkExchangeRateRep
- , fromExchangeRateRep
- , withExchangeRateRep
- , exchangeRateRepSrcCurrency
- , exchangeRateRepDstCurrency
- , exchangeRateRepRate
- , exchangeRateRepRateNumerator
- , exchangeRateRepRateDenominator
+ , SomeDense
+ , toSomeDense
+ , mkSomeDense
+ , fromSomeDense
+ , withSomeDense
+ , someDenseCurrency
+ , someDenseAmount
+ , someDenseAmountNumerator
+ , someDenseAmountDenominator
+ , SomeDiscrete
+ , toSomeDiscrete
+ , mkSomeDiscrete
+ , fromSomeDiscrete
+ , withSomeDiscrete
+ , someDiscreteCurrency
+ , someDiscreteScale
+ , someDiscreteScaleNumerator
+ , someDiscreteScaleDenominator
+ , someDiscreteAmount
+ , SomeExchangeRate
+ , toSomeExchangeRate
+ , mkSomeExchangeRate
+ , fromSomeExchangeRate
+ , withSomeExchangeRate
+ , someExchangeRateSrcCurrency
+ , someExchangeRateDstCurrency
+ , someExchangeRateRate
+ , someExchangeRateRateNumerator
+ , someExchangeRateRateDenominator
  ) where
 
 import Control.Applicative (empty)
 import Control.Monad ((<=<))
 import Data.Constraint (Dict(Dict))
+import Data.Monoid ((<>))
 import Data.Proxy (Proxy(..))
 import Data.Ratio ((%), numerator, denominator)
 import qualified GHC.Generics as GHC
@@ -110,6 +111,10 @@ import Control.DeepSeq (NFData)
 
 #ifdef VERSION_hashable
 import Data.Hashable (Hashable)
+#endif
+
+#ifdef VERSION_serialise
+import qualified Codec.Serialise as Ser
 #endif
 
 #ifdef VERSION_store
@@ -630,354 +635,354 @@ exchange = \(ExchangeRate r) -> \(Dense s) -> Dense (r * s)
 {-# INLINABLE exchange #-}
 
 --------------------------------------------------------------------------------
--- DenseRep
+-- SomeDense
 
 -- | A monomorphic representation of 'Dense' that is easier to serialize and
 -- deserialize than 'Dense' in case you don't know the type indexes involved.
 --
 -- If you are trying to construct a value of this type from some raw input, then
--- you will need to use the 'mkDenseRep' function.
+-- you will need to use the 'mkSomeDense' function.
 --
--- In order to be able to effectively serialize a 'DenseRep' value, you
+-- In order to be able to effectively serialize a 'SomeDense' value, you
 -- need to serialize the following three values (which are the eventual
--- arguments to 'mkDenseRep'):
+-- arguments to 'mkSomeDense'):
 --
--- * 'denseRepCurrency'
--- * 'denseRepAmountNumerator'
--- * 'denseRepAmountDenominator'
-data DenseRep = DenseRep
-  { _denseRepCurrency          :: !String
-  , _denseRepAmountNumerator   :: !Integer
-  , _denseRepAmountDenominator :: !Integer  -- ^ Positive, non-zero.
+-- * 'someDenseCurrency'
+-- * 'someDenseAmountNumerator'
+-- * 'someDenseAmountDenominator'
+data SomeDense = SomeDense
+  { _someDenseCurrency          :: !String
+  , _someDenseAmountNumerator   :: !Integer
+  , _someDenseAmountDenominator :: !Integer  -- ^ Positive, non-zero.
   } deriving (Eq, Show, GHC.Generic)
 
 -- | WARNING: This instance does not compare monetary amounts, it just helps you
--- sort 'DenseRep' values in case you need to put them in a 'Data.Set.Set' or
+-- sort 'SomeDense' values in case you need to put them in a 'Data.Set.Set' or
 -- similar.
-deriving instance Ord DenseRep
+deriving instance Ord SomeDense
 
 -- | Currency name.
-denseRepCurrency :: DenseRep -> String
-denseRepCurrency = _denseRepCurrency
-{-# INLINABLE denseRepCurrency #-}
+someDenseCurrency :: SomeDense -> String
+someDenseCurrency = _someDenseCurrency
+{-# INLINABLE someDenseCurrency #-}
 
 -- | Currency unit amount.
-denseRepAmount :: DenseRep -> Rational
-denseRepAmount = \dr ->
-  denseRepAmountNumerator dr % denseRepAmountDenominator dr
-{-# INLINABLE denseRepAmount #-}
+someDenseAmount :: SomeDense -> Rational
+someDenseAmount = \dr ->
+  someDenseAmountNumerator dr % someDenseAmountDenominator dr
+{-# INLINABLE someDenseAmount #-}
 
 -- | Currency unit amount numerator.
-denseRepAmountNumerator :: DenseRep -> Integer
-denseRepAmountNumerator = _denseRepAmountNumerator
-{-# INLINABLE denseRepAmountNumerator #-}
+someDenseAmountNumerator :: SomeDense -> Integer
+someDenseAmountNumerator = _someDenseAmountNumerator
+{-# INLINABLE someDenseAmountNumerator #-}
 
 -- | Currency unit amount denominator. Positive, non-zero.
-denseRepAmountDenominator :: DenseRep -> Integer
-denseRepAmountDenominator = _denseRepAmountDenominator
-{-# INLINABLE denseRepAmountDenominator #-}
+someDenseAmountDenominator :: SomeDense -> Integer
+someDenseAmountDenominator = _someDenseAmountDenominator
+{-# INLINABLE someDenseAmountDenominator #-}
 
--- | Build a 'DenseRep' from raw values.
+-- | Build a 'SomeDense' from raw values.
 --
 -- This function is intended for deserialization purposes. You need to convert
--- this 'DenseRep' value to a 'Dense' value in order to do any arithmetic
+-- this 'SomeDense' value to a 'Dense' value in order to do any arithmetic
 -- operation on the monetary value.
-mkDenseRep
-  :: String -- ^ Currency. ('denseRepCurrency')
-  -> Integer -- ^ Scale numerator. ('denseRepAmountNumerator')
-  -> Integer -- ^ Scale denominator (positive, non zero). ('denseRepAmountDenominator')
-  -> Maybe DenseRep
-mkDenseRep = \c n d -> case d > 0 of
+mkSomeDense
+  :: String -- ^ Currency. ('someDenseCurrency')
+  -> Integer -- ^ Scale numerator. ('someDenseAmountNumerator')
+  -> Integer -- ^ Scale denominator (positive, non zero). ('someDenseAmountDenominator')
+  -> Maybe SomeDense
+mkSomeDense = \c n d -> case d > 0 of
   False -> Nothing
-  True -> Just (DenseRep c n d)
-{-# INLINABLE mkDenseRep #-}
+  True -> Just (SomeDense c n d)
+{-# INLINABLE mkSomeDense #-}
 
--- | Convert a 'Dense' to a 'DenseRep' for ease of serialization.
-toDenseRep :: KnownSymbol currency => Dense currency -> DenseRep
-toDenseRep = \(Dense r0 :: Dense currency) ->
+-- | Convert a 'Dense' to a 'SomeDense' for ease of serialization.
+toSomeDense :: KnownSymbol currency => Dense currency -> SomeDense
+toSomeDense = \(Dense r0 :: Dense currency) ->
   let c = symbolVal (Proxy :: Proxy currency)
-  in DenseRep c (numerator r0) (denominator r0)
-{-# INLINABLE toDenseRep #-}
+  in SomeDense c (numerator r0) (denominator r0)
+{-# INLINABLE toSomeDense #-}
 
--- | Attempt to convert a 'DenseRep' to a 'Dense', provided you know the target
+-- | Attempt to convert a 'SomeDense' to a 'Dense', provided you know the target
 -- @currency@.
-fromDenseRep
+fromSomeDense
   :: forall currency
   .  KnownSymbol currency
-  => DenseRep
+  => SomeDense
   -> Maybe (Dense currency)  -- ^
-fromDenseRep = \dr ->
-  case denseRepCurrency dr == symbolVal (Proxy :: Proxy currency) of
+fromSomeDense = \dr ->
+  case someDenseCurrency dr == symbolVal (Proxy :: Proxy currency) of
      False -> Nothing
-     True -> Just (Dense (denseRepAmount dr))
-{-# INLINABLE fromDenseRep #-}
+     True -> Just (Dense (someDenseAmount dr))
+{-# INLINABLE fromSomeDense #-}
 
--- | Convert a 'DenseRep' to a 'Dense' without knowing the target @currency@.
+-- | Convert a 'SomeDense' to a 'Dense' without knowing the target @currency@.
 --
 -- Notice that @currency@ here can't leave its intended scope unless you can
 -- prove equality with some other type at the outer scope, but in that case you
--- would be better off using 'fromDenseRep' directly.
-withDenseRep
-  :: DenseRep
+-- would be better off using 'fromSomeDense' directly.
+withSomeDense
+  :: SomeDense
   -> (forall currency. KnownSymbol currency => Dense currency -> r)
   -> r  -- ^
-withDenseRep dr = \f ->
-   case someSymbolVal (denseRepCurrency dr) of
+withSomeDense dr = \f ->
+   case someSymbolVal (someDenseCurrency dr) of
       SomeSymbol (Proxy :: Proxy currency) ->
-         f (Dense (denseRepAmount dr) :: Dense currency)
-{-# INLINABLE withDenseRep #-}
+         f (Dense (someDenseAmount dr) :: Dense currency)
+{-# INLINABLE withSomeDense #-}
 
 --------------------------------------------------------------------------------
--- DiscreteRep
+-- SomeDiscrete
 
 -- | A monomorphic representation of 'Discrete' that is easier to serialize and
 -- deserialize than 'Discrete' in case you don't know the type indexes involved.
 --
 -- If you are trying to construct a value of this type from some raw input, then
--- you will need to use the 'mkDiscreteRep' function.
+-- you will need to use the 'mkSomeDiscrete' function.
 --
--- In order to be able to effectively serialize a 'DiscreteRep' value, you need
+-- In order to be able to effectively serialize a 'SomeDiscrete' value, you need
 -- to serialize the following four values (which are the eventual arguments to
--- 'mkDiscreteRep'):
+-- 'mkSomeDiscrete'):
 --
--- * 'discreteRepCurrency'
--- * 'discreteRepScaleNumerator'
--- * 'discreteRepScaleDenominator'
--- * 'discreteRepAmount'
-data DiscreteRep = DiscreteRep
-  { _discreteRepCurrency         :: !String   -- ^ Currency name.
-  , _discreteRepScaleNumerator   :: !Integer  -- ^ Positive, non-zero.
-  , _discreteRepScaleDenominator :: !Integer  -- ^ Positive, non-zero.
-  , _discreteRepAmount           :: !Integer  -- ^ Amount of unit.
+-- * 'someDiscreteCurrency'
+-- * 'someDiscreteScaleNumerator'
+-- * 'someDiscreteScaleDenominator'
+-- * 'someDiscreteAmount'
+data SomeDiscrete = SomeDiscrete
+  { _someDiscreteCurrency         :: !String   -- ^ Currency name.
+  , _someDiscreteScaleNumerator   :: !Integer  -- ^ Positive, non-zero.
+  , _someDiscreteScaleDenominator :: !Integer  -- ^ Positive, non-zero.
+  , _someDiscreteAmount           :: !Integer  -- ^ Amount of unit.
   } deriving (Eq, Show, GHC.Generic)
 
 -- | WARNING: This instance does not compare monetary amounts, it just helps you
--- sort 'DiscreteRep' values in case you need to put them in a 'Data.Set.Set' or
+-- sort 'SomeDiscrete' values in case you need to put them in a 'Data.Set.Set' or
 -- similar.
-deriving instance Ord DiscreteRep
+deriving instance Ord SomeDiscrete
 
 -- | Currency name.
-discreteRepCurrency :: DiscreteRep -> String
-discreteRepCurrency = _discreteRepCurrency
-{-# INLINABLE discreteRepCurrency #-}
+someDiscreteCurrency :: SomeDiscrete -> String
+someDiscreteCurrency = _someDiscreteCurrency
+{-# INLINABLE someDiscreteCurrency #-}
 
 -- | Positive, non-zero.
-discreteRepScaleNumerator :: DiscreteRep -> Integer
-discreteRepScaleNumerator = _discreteRepScaleNumerator
-{-# INLINABLE discreteRepScaleNumerator #-}
+someDiscreteScaleNumerator :: SomeDiscrete -> Integer
+someDiscreteScaleNumerator = _someDiscreteScaleNumerator
+{-# INLINABLE someDiscreteScaleNumerator #-}
 
 -- | Positive, non-zero.
-discreteRepScaleDenominator :: DiscreteRep -> Integer
-discreteRepScaleDenominator = _discreteRepScaleDenominator
-{-# INLINABLE discreteRepScaleDenominator #-}
+someDiscreteScaleDenominator :: SomeDiscrete -> Integer
+someDiscreteScaleDenominator = _someDiscreteScaleDenominator
+{-# INLINABLE someDiscreteScaleDenominator #-}
 
 -- | Amount of currency unit.
-discreteRepAmount :: DiscreteRep -> Integer
-discreteRepAmount = _discreteRepAmount
-{-# INLINABLE discreteRepAmount #-}
+someDiscreteAmount :: SomeDiscrete -> Integer
+someDiscreteAmount = _someDiscreteAmount
+{-# INLINABLE someDiscreteAmount #-}
 
 -- | Positive, non-zero.
-discreteRepScale :: DiscreteRep -> Rational
-discreteRepScale = \dr ->
-  discreteRepScaleNumerator dr % discreteRepScaleDenominator dr
-{-# INLINABLE discreteRepScale #-}
+someDiscreteScale :: SomeDiscrete -> Rational
+someDiscreteScale = \dr ->
+  someDiscreteScaleNumerator dr % someDiscreteScaleDenominator dr
+{-# INLINABLE someDiscreteScale #-}
 
 
--- | Internal. Build a 'DiscreteRep' from raw values.
+-- | Internal. Build a 'SomeDiscrete' from raw values.
 --
 -- This function is intended for deserialization purposes. You need to convert
--- this 'DiscreteRep' value to a 'Discrete' vallue in order to do any arithmetic
+-- this 'SomeDiscrete' value to a 'Discrete' vallue in order to do any arithmetic
 -- operation on the monetary value.
-mkDiscreteRep
-  :: String   -- ^ Currency name. ('discreteRepCurrency')
-  -> Integer  -- ^ Scale numerator. Positive, non-zero. ('discreteRepScaleNumerator')
-  -> Integer  -- ^ Scale denominator. Positive, non-zero. ('discreteRepScaleDenominator')
-  -> Integer  -- ^ Amount of unit. ('discreteRepAmount')
-  -> Maybe DiscreteRep
-mkDiscreteRep = \c n d a -> case (n > 0) && (d > 0) of
+mkSomeDiscrete
+  :: String   -- ^ Currency name. ('someDiscreteCurrency')
+  -> Integer  -- ^ Scale numerator. Positive, non-zero. ('someDiscreteScaleNumerator')
+  -> Integer  -- ^ Scale denominator. Positive, non-zero. ('someDiscreteScaleDenominator')
+  -> Integer  -- ^ Amount of unit. ('someDiscreteAmount')
+  -> Maybe SomeDiscrete
+mkSomeDiscrete = \c n d a -> case (n > 0) && (d > 0) of
   False -> Nothing
-  True -> Just (DiscreteRep c n d a)
-{-# INLINABLE mkDiscreteRep #-}
+  True -> Just (SomeDiscrete c n d a)
+{-# INLINABLE mkSomeDiscrete #-}
 
--- | Convert a 'Discrete' to a 'DiscreteRep' for ease of serialization.
-toDiscreteRep
+-- | Convert a 'Discrete' to a 'SomeDiscrete' for ease of serialization.
+toSomeDiscrete
   :: (KnownSymbol currency, GoodScale scale)
   => Discrete' currency scale
-  -> DiscreteRep -- ^
-toDiscreteRep = \(Discrete i0 :: Discrete' currency scale) ->
+  -> SomeDiscrete -- ^
+toSomeDiscrete = \(Discrete i0 :: Discrete' currency scale) ->
   let c = symbolVal (Proxy :: Proxy currency)
       n = natVal (Proxy :: Proxy (Fst scale))
       d = natVal (Proxy :: Proxy (Snd scale))
-  in DiscreteRep c n d i0
-{-# INLINABLE toDiscreteRep #-}
+  in SomeDiscrete c n d i0
+{-# INLINABLE toSomeDiscrete #-}
 
--- | Attempt to convert a 'DiscreteRep' to a 'Discrete', provided you know the
+-- | Attempt to convert a 'SomeDiscrete' to a 'Discrete', provided you know the
 -- target @currency@ and @unit@.
-fromDiscreteRep
+fromSomeDiscrete
   :: forall currency scale
   .  (KnownSymbol currency, GoodScale scale)
-  => DiscreteRep
+  => SomeDiscrete
   -> Maybe (Discrete' currency scale)  -- ^
-fromDiscreteRep = \dr ->
-   if (discreteRepCurrency dr == symbolVal (Proxy :: Proxy currency)) &&
-      (discreteRepScaleNumerator dr == natVal (Proxy :: Proxy (Fst scale))) &&
-      (discreteRepScaleDenominator dr == natVal (Proxy :: Proxy (Snd scale)))
-   then Just (Discrete (discreteRepAmount dr))
+fromSomeDiscrete = \dr ->
+   if (someDiscreteCurrency dr == symbolVal (Proxy :: Proxy currency)) &&
+      (someDiscreteScaleNumerator dr == natVal (Proxy :: Proxy (Fst scale))) &&
+      (someDiscreteScaleDenominator dr == natVal (Proxy :: Proxy (Snd scale)))
+   then Just (Discrete (someDiscreteAmount dr))
    else Nothing
-{-# INLINABLE fromDiscreteRep #-}
+{-# INLINABLE fromSomeDiscrete #-}
 
--- | Convert a 'DiscreteRep' to a 'Discrete' without knowing the target
+-- | Convert a 'SomeDiscrete' to a 'Discrete' without knowing the target
 -- @currency@ and @unit@.
 --
 -- Notice that @currency@ and @unit@ here can't leave its intended scope unless
 -- you can prove equality with some other type at the outer scope, but in that
--- case you would be better off using 'fromDiscreteRep' directly.
+-- case you would be better off using 'fromSomeDiscrete' directly.
 --
 -- Notice that you may need to add an explicit type to the result of this
 -- function in order to keep the compiler happy.
-withDiscreteRep
+withSomeDiscrete
   :: forall r
-  .  DiscreteRep
+  .  SomeDiscrete
   -> ( forall currency scale.
          ( KnownSymbol currency
          , GoodScale scale
          ) => Discrete' currency scale
            -> r )
   -> r  -- ^
-withDiscreteRep dr = \f ->
-  case someSymbolVal (discreteRepCurrency dr) of
+withSomeDiscrete dr = \f ->
+  case someSymbolVal (someDiscreteCurrency dr) of
     SomeSymbol (Proxy :: Proxy currency) ->
-      case someNatVal (discreteRepScaleNumerator dr) of
-        Nothing -> error "withDiscreteRep: impossible: numerator < 0"
+      case someNatVal (someDiscreteScaleNumerator dr) of
+        Nothing -> error "withSomeDiscrete: impossible: numerator < 0"
         Just (SomeNat (Proxy :: Proxy num)) ->
-          case someNatVal (discreteRepScaleDenominator dr) of
-            Nothing -> error "withDiscreteRep: impossible: denominator < 0"
+          case someNatVal (someDiscreteScaleDenominator dr) of
+            Nothing -> error "withSomeDiscrete: impossible: denominator < 0"
             Just (SomeNat (Proxy :: Proxy den)) ->
               case mkGoodScale of
-                Nothing -> error "withDiscreteRep: impossible: mkGoodScale"
+                Nothing -> error "withSomeDiscrete: impossible: mkGoodScale"
                 Just (Dict :: Dict (GoodScale '(num, den))) ->
-                  f (Discrete (discreteRepAmount dr)
+                  f (Discrete (someDiscreteAmount dr)
                        :: Discrete' currency '(num, den))
-{-# INLINABLE withDiscreteRep #-}
+{-# INLINABLE withSomeDiscrete #-}
 
 --------------------------------------------------------------------------------
--- ExchangeRateRep
+-- SomeExchangeRate
 
 -- | A monomorphic representation of 'ExchangeRate' that is easier to serialize
 -- and deserialize than 'ExchangeRate' in case you don't know the type indexes
 -- involved.
 --
 -- If you are trying to construct a value of this type from some raw input, then
--- you will need to use the 'mkExchangeRateRep' function.
+-- you will need to use the 'mkSomeExchangeRate' function.
 --
--- In order to be able to effectively serialize an 'ExchangeRateRep' value, you
+-- In order to be able to effectively serialize an 'SomeExchangeRate' value, you
 -- need to serialize the following four values (which are the eventual arguments
--- to 'mkExchangeRateRep'):
+-- to 'mkSomeExchangeRate'):
 --
--- * 'exchangeRateRepSrcCurrency'
--- * 'exchangeRateRepDstCurrency'
--- * 'exchangeRateRepRateNumerator'
--- * 'exchangeRateRepRateDenominator'
-data ExchangeRateRep = ExchangeRateRep
-  { _exchangeRateRepSrcCurrency     :: !String
-  , _exchangeRateRepDstCurrency     :: !String
-  , _exchangeRateRepRateNumerator   :: !Integer  -- ^ Positive, non-zero.
-  , _exchangeRateRepRateDenominator :: !Integer  -- ^ Positive, non-zero.
+-- * 'someExchangeRateSrcCurrency'
+-- * 'someExchangeRateDstCurrency'
+-- * 'someExchangeRateRateNumerator'
+-- * 'someExchangeRateRateDenominator'
+data SomeExchangeRate = SomeExchangeRate
+  { _someExchangeRateSrcCurrency     :: !String
+  , _someExchangeRateDstCurrency     :: !String
+  , _someExchangeRateRateNumerator   :: !Integer  -- ^ Positive, non-zero.
+  , _someExchangeRateRateDenominator :: !Integer  -- ^ Positive, non-zero.
   } deriving (Eq, Show, GHC.Generic)
 
 -- | WARNING: This instance does not compare monetary amounts, it just helps you
--- sort 'ExchangeRateRep' values in case you need to put them in a
+-- sort 'SomeExchangeRate' values in case you need to put them in a
 -- 'Data.Set.Set' or similar.
-deriving instance Ord ExchangeRateRep
+deriving instance Ord SomeExchangeRate
 
 -- | Source currency name.
-exchangeRateRepSrcCurrency :: ExchangeRateRep -> String
-exchangeRateRepSrcCurrency = _exchangeRateRepSrcCurrency
-{-# INLINABLE exchangeRateRepSrcCurrency #-}
+someExchangeRateSrcCurrency :: SomeExchangeRate -> String
+someExchangeRateSrcCurrency = _someExchangeRateSrcCurrency
+{-# INLINABLE someExchangeRateSrcCurrency #-}
 
 -- | Destination currency name.
-exchangeRateRepDstCurrency :: ExchangeRateRep -> String
-exchangeRateRepDstCurrency = _exchangeRateRepDstCurrency
-{-# INLINABLE exchangeRateRepDstCurrency #-}
+someExchangeRateDstCurrency :: SomeExchangeRate -> String
+someExchangeRateDstCurrency = _someExchangeRateDstCurrency
+{-# INLINABLE someExchangeRateDstCurrency #-}
 
 -- | Exchange rate. Positive, non-zero.
-exchangeRateRepRate :: ExchangeRateRep -> Rational
-exchangeRateRepRate = \x ->
-  exchangeRateRepRateNumerator x % _exchangeRateRepRateDenominator x
-{-# INLINABLE exchangeRateRepRate #-}
+someExchangeRateRate :: SomeExchangeRate -> Rational
+someExchangeRateRate = \x ->
+  someExchangeRateRateNumerator x % _someExchangeRateRateDenominator x
+{-# INLINABLE someExchangeRateRate #-}
 
 -- | Exchange rate numerator. Positive, non-zero.
-exchangeRateRepRateNumerator :: ExchangeRateRep -> Integer
-exchangeRateRepRateNumerator = _exchangeRateRepRateNumerator
-{-# INLINABLE exchangeRateRepRateNumerator #-}
+someExchangeRateRateNumerator :: SomeExchangeRate -> Integer
+someExchangeRateRateNumerator = _someExchangeRateRateNumerator
+{-# INLINABLE someExchangeRateRateNumerator #-}
 
 -- | Exchange rate denominator. Positive, non-zero.
-exchangeRateRepRateDenominator :: ExchangeRateRep -> Integer
-exchangeRateRepRateDenominator = _exchangeRateRepRateDenominator
-{-# INLINABLE exchangeRateRepRateDenominator #-}
+someExchangeRateRateDenominator :: SomeExchangeRate -> Integer
+someExchangeRateRateDenominator = _someExchangeRateRateDenominator
+{-# INLINABLE someExchangeRateRateDenominator #-}
 
--- | Internal. Build a 'ExchangeRateRep' from raw values.
+-- | Internal. Build a 'SomeExchangeRate' from raw values.
 --
 -- This function is intended for deserialization purposes. You need to convert
--- this 'ExchangeRateRep' value to a 'ExchangeRate' value in order to do any
+-- this 'SomeExchangeRate' value to a 'ExchangeRate' value in order to do any
 -- arithmetic operation with the exchange rate.
-mkExchangeRateRep
-  :: String   -- ^ Source currency name. ('exchangeRateRepSrcCurrency')
-  -> String   -- ^ Destination currency name. ('exchangeRateRepDstCurrency')
-  -> Integer  -- ^ Exchange rate numerator. Positive, non-zero. ('exchangeRateRepRateNumerator')
-  -> Integer  -- ^ Exchange rate denominator. Positive, non-zero. ('exchangeRateRepRateDenominator')
-  -> Maybe ExchangeRateRep
-mkExchangeRateRep = \src dst n d -> case (n > 0) && (d > 0) of
+mkSomeExchangeRate
+  :: String   -- ^ Source currency name. ('someExchangeRateSrcCurrency')
+  -> String   -- ^ Destination currency name. ('someExchangeRateDstCurrency')
+  -> Integer  -- ^ Exchange rate numerator. Positive, non-zero. ('someExchangeRateRateNumerator')
+  -> Integer  -- ^ Exchange rate denominator. Positive, non-zero. ('someExchangeRateRateDenominator')
+  -> Maybe SomeExchangeRate
+mkSomeExchangeRate = \src dst n d -> case (n > 0) && (d > 0) of
   False -> Nothing
-  True -> Just (ExchangeRateRep src dst n d)
-{-# INLINABLE mkExchangeRateRep #-}
+  True -> Just (SomeExchangeRate src dst n d)
+{-# INLINABLE mkSomeExchangeRate #-}
 
--- | Convert a 'ExchangeRate' to a 'DiscreteRep' for ease of serialization.
-toExchangeRateRep
+-- | Convert a 'ExchangeRate' to a 'SomeDiscrete' for ease of serialization.
+toSomeExchangeRate
   :: (KnownSymbol src, KnownSymbol dst)
   => ExchangeRate src dst
-  -> ExchangeRateRep -- ^
-toExchangeRateRep = \(ExchangeRate r0 :: ExchangeRate src dst) ->
+  -> SomeExchangeRate -- ^
+toSomeExchangeRate = \(ExchangeRate r0 :: ExchangeRate src dst) ->
   let src = symbolVal (Proxy :: Proxy src)
       dst = symbolVal (Proxy :: Proxy dst)
-  in ExchangeRateRep src dst (numerator r0) (denominator r0)
-{-# INLINABLE toExchangeRateRep #-}
+  in SomeExchangeRate src dst (numerator r0) (denominator r0)
+{-# INLINABLE toSomeExchangeRate #-}
 
--- | Attempt to convert a 'ExchangeRateRep' to a 'ExchangeRate', provided you
+-- | Attempt to convert a 'SomeExchangeRate' to a 'ExchangeRate', provided you
 -- know the target @src@ and @dst@ types.
-fromExchangeRateRep
+fromSomeExchangeRate
   :: forall src dst
   .  (KnownSymbol src, KnownSymbol dst)
-  => ExchangeRateRep
+  => SomeExchangeRate
   -> Maybe (ExchangeRate src dst)  -- ^
-fromExchangeRateRep = \x ->
-   if (exchangeRateRepSrcCurrency x == symbolVal (Proxy :: Proxy src)) &&
-      (exchangeRateRepDstCurrency x == symbolVal (Proxy :: Proxy dst))
-   then Just (ExchangeRate (exchangeRateRepRate x))
+fromSomeExchangeRate = \x ->
+   if (someExchangeRateSrcCurrency x == symbolVal (Proxy :: Proxy src)) &&
+      (someExchangeRateDstCurrency x == symbolVal (Proxy :: Proxy dst))
+   then Just (ExchangeRate (someExchangeRateRate x))
    else Nothing
-{-# INLINABLE fromExchangeRateRep #-}
+{-# INLINABLE fromSomeExchangeRate #-}
 
--- | Convert a 'ExchangeRateRep' to a 'ExchangeRate' without knowing the target
+-- | Convert a 'SomeExchangeRate' to a 'ExchangeRate' without knowing the target
 -- @currency@ and @unit@.
 --
 -- Notice that @src@ and @dst@ here can't leave its intended scope unless
 -- you can prove equality with some other type at the outer scope, but in that
--- case you would be better off using 'fromExchangeRateRep' directly.
-withExchangeRateRep
-  :: ExchangeRateRep
+-- case you would be better off using 'fromSomeExchangeRate' directly.
+withSomeExchangeRate
+  :: SomeExchangeRate
   -> ( forall src dst.
          ( KnownSymbol src
          , KnownSymbol dst
          ) => ExchangeRate src dst
            -> r )
   -> r  -- ^
-withExchangeRateRep x = \f ->
-  case someSymbolVal (exchangeRateRepSrcCurrency x) of
+withSomeExchangeRate x = \f ->
+  case someSymbolVal (someExchangeRateSrcCurrency x) of
     SomeSymbol (Proxy :: Proxy src) ->
-      case someSymbolVal (exchangeRateRepDstCurrency x) of
+      case someSymbolVal (someExchangeRateDstCurrency x) of
         SomeSymbol (Proxy :: Proxy dst) ->
-          f (ExchangeRate (exchangeRateRepRate x) :: ExchangeRate src dst)
-{-# INLINABLE withExchangeRateRep #-}
+          f (ExchangeRate (someExchangeRateRate x) :: ExchangeRate src dst)
+{-# INLINABLE withSomeExchangeRate #-}
 
 --------------------------------------------------------------------------------
 -- Miscellaneous
@@ -989,195 +994,234 @@ type family Snd (ab :: (ka, kb)) :: ka where Snd '(a,b) = b
 -- Extra instances: hashable
 #ifdef VERSION_hashable
 instance Hashable (Dense currency)
-instance Hashable DenseRep
+instance Hashable SomeDense
 instance GoodScale scale => Hashable (Discrete' currency scale)
-instance Hashable DiscreteRep
+instance Hashable SomeDiscrete
 instance Hashable (ExchangeRate src dst)
-instance Hashable ExchangeRateRep
+instance Hashable SomeExchangeRate
 #endif
 
 --------------------------------------------------------------------------------
 -- Extra instances: deepseq
 #ifdef VERSION_deepseq
 instance NFData (Dense currency)
-instance NFData DenseRep
+instance NFData SomeDense
 instance GoodScale scale => NFData (Discrete' currency scale)
-instance NFData DiscreteRep
+instance NFData SomeDiscrete
 instance NFData (ExchangeRate src dst)
-instance NFData ExchangeRateRep
+instance NFData SomeExchangeRate
 #endif
 
 --------------------------------------------------------------------------------
 -- Extra instances: cereal
 #ifdef VERSION_cereal
--- | Compatible with 'DenseRep'.
+-- | Compatible with 'SomeDense'.
 instance (KnownSymbol currency) => Cereal.Serialize (Dense currency) where
-  put = Cereal.put . toDenseRep
-  get = maybe empty pure =<< fmap fromDenseRep Cereal.get
--- | Compatible with 'DiscreteRep'.
+  put = Cereal.put . toSomeDense
+  get = maybe empty pure =<< fmap fromSomeDense Cereal.get
+-- | Compatible with 'SomeDiscrete'.
 instance
   ( KnownSymbol currency, GoodScale scale
   ) => Cereal.Serialize (Discrete' currency scale) where
-  put = Cereal.put . toDiscreteRep
-  get = maybe empty pure =<< fmap fromDiscreteRep Cereal.get
--- | Compatible with 'ExchangeRateRep'.
+  put = Cereal.put . toSomeDiscrete
+  get = maybe empty pure =<< fmap fromSomeDiscrete Cereal.get
+-- | Compatible with 'SomeExchangeRate'.
 instance
   ( KnownSymbol src, KnownSymbol dst
   ) => Cereal.Serialize (ExchangeRate src dst) where
-  put = Cereal.put . toExchangeRateRep
-  get = maybe empty pure =<< fmap fromExchangeRateRep Cereal.get
+  put = Cereal.put . toSomeExchangeRate
+  get = maybe empty pure =<< fmap fromSomeExchangeRate Cereal.get
 -- | Compatible with 'Dense'.
-instance Cereal.Serialize DenseRep where
-  put = \(DenseRep c n d) -> Cereal.put c >> Cereal.put n >> Cereal.put d
-  get = maybe empty pure =<< mkDenseRep
+instance Cereal.Serialize SomeDense where
+  put = \(SomeDense c n d) -> Cereal.put c >> Cereal.put n >> Cereal.put d
+  get = maybe empty pure =<< mkSomeDense
     <$> Cereal.get <*> Cereal.get <*> Cereal.get
 -- | Compatible with 'Discrete'.
-instance Cereal.Serialize DiscreteRep where
-  put = \(DiscreteRep c n d a) ->
+instance Cereal.Serialize SomeDiscrete where
+  put = \(SomeDiscrete c n d a) ->
     Cereal.put c >> Cereal.put n >> Cereal.put d >> Cereal.put a
-  get = maybe empty pure =<< mkDiscreteRep
+  get = maybe empty pure =<< mkSomeDiscrete
     <$> Cereal.get <*> Cereal.get <*> Cereal.get <*> Cereal.get
 -- | Compatible with 'ExchangeRate'.
-instance Cereal.Serialize ExchangeRateRep where
-  put = \(ExchangeRateRep src dst n d) ->
+instance Cereal.Serialize SomeExchangeRate where
+  put = \(SomeExchangeRate src dst n d) ->
     Cereal.put src >> Cereal.put dst >> Cereal.put n >> Cereal.put d
-  get = maybe empty pure =<< mkExchangeRateRep
+  get = maybe empty pure =<< mkSomeExchangeRate
     <$> Cereal.get <*> Cereal.get <*> Cereal.get <*> Cereal.get
 #endif
 
 --------------------------------------------------------------------------------
 -- Extra instances: binary
 #ifdef VERSION_binary
--- | Compatible with 'DenseRep'.
+-- | Compatible with 'SomeDense'.
 instance (KnownSymbol currency) => Binary.Binary (Dense currency) where
-  put = Binary.put . toDenseRep
-  get = maybe empty pure =<< fmap fromDenseRep Binary.get
--- | Compatible with 'DiscreteRep'.
+  put = Binary.put . toSomeDense
+  get = maybe empty pure =<< fmap fromSomeDense Binary.get
+-- | Compatible with 'SomeDiscrete'.
 instance
   ( KnownSymbol currency, GoodScale scale
   ) => Binary.Binary (Discrete' currency scale) where
-  put = Binary.put . toDiscreteRep
-  get = maybe empty pure =<< fmap fromDiscreteRep Binary.get
--- | Compatible with 'ExchangeRateRep'.
+  put = Binary.put . toSomeDiscrete
+  get = maybe empty pure =<< fmap fromSomeDiscrete Binary.get
+-- | Compatible with 'SomeExchangeRate'.
 instance
   ( KnownSymbol src, KnownSymbol dst
   ) => Binary.Binary (ExchangeRate src dst) where
-  put = Binary.put . toExchangeRateRep
-  get = maybe empty pure =<< fmap fromExchangeRateRep Binary.get
+  put = Binary.put . toSomeExchangeRate
+  get = maybe empty pure =<< fmap fromSomeExchangeRate Binary.get
 -- | Compatible with 'Dense'.
-instance Binary.Binary DenseRep where
-  put = \(DenseRep c n d) -> Binary.put c >> Binary.put n >> Binary.put d
-  get = maybe empty pure =<< mkDenseRep
+instance Binary.Binary SomeDense where
+  put = \(SomeDense c n d) -> Binary.put c >> Binary.put n >> Binary.put d
+  get = maybe empty pure =<< mkSomeDense
     <$> Binary.get <*> Binary.get <*> Binary.get
 -- | Compatible with 'Discrete'.
-instance Binary.Binary DiscreteRep where
-  put = \(DiscreteRep c n d a) ->
+instance Binary.Binary SomeDiscrete where
+  put = \(SomeDiscrete c n d a) ->
     Binary.put c >> Binary.put n >> Binary.put d >> Binary.put a
-  get = maybe empty pure =<< mkDiscreteRep
+  get = maybe empty pure =<< mkSomeDiscrete
     <$> Binary.get <*> Binary.get <*> Binary.get <*> Binary.get
 -- | Compatible with 'ExchangeRate'.
-instance Binary.Binary ExchangeRateRep where
-  put = \(ExchangeRateRep src dst n d) ->
+instance Binary.Binary SomeExchangeRate where
+  put = \(SomeExchangeRate src dst n d) ->
     Binary.put src >> Binary.put dst >> Binary.put n >> Binary.put d
-  get = maybe empty pure =<< mkExchangeRateRep
+  get = maybe empty pure =<< mkSomeExchangeRate
     <$> Binary.get <*> Binary.get <*> Binary.get <*> Binary.get
+#endif
+
+--------------------------------------------------------------------------------
+-- Extra instances: serialise
+#ifdef VERSION_serialise
+-- | Compatible with 'SomeDense'.
+instance (KnownSymbol currency) => Ser.Serialise (Dense currency) where
+  encode = Ser.encode . toSomeDense
+  decode = maybe (fail "Dense") pure =<< fmap fromSomeDense Ser.decode
+-- | Compatible with 'SomeDiscrete'.
+instance
+  ( KnownSymbol currency, GoodScale scale
+  ) => Ser.Serialise (Discrete' currency scale) where
+  encode = Ser.encode . toSomeDiscrete
+  decode = maybe (fail "Discrete'") pure =<< fmap fromSomeDiscrete Ser.decode
+-- | Compatible with 'SomeExchangeRate'.
+instance
+  ( KnownSymbol src, KnownSymbol dst
+  ) => Ser.Serialise (ExchangeRate src dst) where
+  encode = Ser.encode . toSomeExchangeRate
+  decode = maybe (fail "ExchangeRate") pure
+             =<< fmap fromSomeExchangeRate Ser.decode
+-- | Compatible with 'Dense'.
+instance Ser.Serialise SomeDense where
+  encode = \(SomeDense c n d) -> Ser.encode c <> Ser.encode n <> Ser.encode d
+  decode = maybe (fail "SomeDense") pure =<< mkSomeDense
+    <$> Ser.decode <*> Ser.decode <*> Ser.decode
+-- | Compatible with 'Discrete'.
+instance Ser.Serialise SomeDiscrete where
+  encode = \(SomeDiscrete c n d a) ->
+    Ser.encode c <> Ser.encode n <> Ser.encode d <> Ser.encode a
+  decode = maybe (fail "SomeDiscrete") pure =<< mkSomeDiscrete
+    <$> Ser.decode <*> Ser.decode <*> Ser.decode <*> Ser.decode
+-- | Compatible with 'ExchangeRate'.
+instance Ser.Serialise SomeExchangeRate where
+  encode = \(SomeExchangeRate src dst n d) ->
+    Ser.encode src <> Ser.encode dst <> Ser.encode n <> Ser.encode d
+  decode = maybe (fail "SomeExchangeRate") pure =<< mkSomeExchangeRate
+    <$> Ser.decode <*> Ser.decode <*> Ser.decode <*> Ser.decode
 #endif
 
 --------------------------------------------------------------------------------
 -- Extra instances: aeson
 #ifdef VERSION_aeson
--- | Compatible with 'DenseRep'
+-- | Compatible with 'SomeDense'
 instance KnownSymbol currency => Ae.ToJSON (Dense currency) where
-  toJSON = Ae.toJSON . toDenseRep
--- | Compatible with 'DenseRep'
+  toJSON = Ae.toJSON . toSomeDense
+-- | Compatible with 'SomeDense'
 instance KnownSymbol currency => Ae.FromJSON (Dense currency) where
-  parseJSON = maybe empty pure <=< fmap fromDenseRep . Ae.parseJSON
+  parseJSON = maybe empty pure <=< fmap fromSomeDense . Ae.parseJSON
 -- | Compatible with 'Dense'
-instance Ae.ToJSON DenseRep where
-  toJSON = \(DenseRep c n d) -> Ae.toJSON ("Dense", c, n, d)
+instance Ae.ToJSON SomeDense where
+  toJSON = \(SomeDense c n d) -> Ae.toJSON ("Dense", c, n, d)
 -- | Compatible with 'Dense'
-instance Ae.FromJSON DenseRep where
+instance Ae.FromJSON SomeDense where
   parseJSON = \v -> do
     ("Dense", c, n, d) <- Ae.parseJSON v
-    maybe empty pure (mkDenseRep c n d)
--- | Compatible with 'DiscreteRep'
+    maybe empty pure (mkSomeDense c n d)
+-- | Compatible with 'SomeDiscrete'
 instance
   ( KnownSymbol currency, GoodScale scale
   ) => Ae.ToJSON (Discrete' currency scale) where
-  toJSON = Ae.toJSON . toDiscreteRep
--- | Compatible with 'DiscreteRep'
+  toJSON = Ae.toJSON . toSomeDiscrete
+-- | Compatible with 'SomeDiscrete'
 instance
   ( KnownSymbol currency, GoodScale scale
   ) => Ae.FromJSON (Discrete' currency scale) where
-  parseJSON = maybe empty pure <=< fmap fromDiscreteRep . Ae.parseJSON
+  parseJSON = maybe empty pure <=< fmap fromSomeDiscrete . Ae.parseJSON
 -- | Compatible with 'Discrete''
-instance Ae.ToJSON DiscreteRep where
-  toJSON = \(DiscreteRep c n d a) -> Ae.toJSON ("Discrete", c, n, d, a)
+instance Ae.ToJSON SomeDiscrete where
+  toJSON = \(SomeDiscrete c n d a) -> Ae.toJSON ("Discrete", c, n, d, a)
 -- | Compatible with 'Discrete''
-instance Ae.FromJSON DiscreteRep where
+instance Ae.FromJSON SomeDiscrete where
   parseJSON = \v -> do
     ("Discrete", c, n, d, a) <- Ae.parseJSON v
-    maybe empty pure (mkDiscreteRep c n d a)
--- | Compatible with 'ExchangeRateRep'
+    maybe empty pure (mkSomeDiscrete c n d a)
+-- | Compatible with 'SomeExchangeRate'
 instance
   ( KnownSymbol src, KnownSymbol dst
   ) => Ae.ToJSON (ExchangeRate src dst) where
-  toJSON = Ae.toJSON . toExchangeRateRep
--- | Compatible with 'ExchangeRateRep'
+  toJSON = Ae.toJSON . toSomeExchangeRate
+-- | Compatible with 'SomeExchangeRate'
 instance
   ( KnownSymbol src, KnownSymbol dst
   ) => Ae.FromJSON (ExchangeRate src dst) where
-  parseJSON = maybe empty pure <=< fmap fromExchangeRateRep . Ae.parseJSON
+  parseJSON = maybe empty pure <=< fmap fromSomeExchangeRate . Ae.parseJSON
 -- | Compatible with 'ExchangeRate'
-instance Ae.ToJSON ExchangeRateRep where
-  toJSON = \(ExchangeRateRep src dst n d) ->
+instance Ae.ToJSON SomeExchangeRate where
+  toJSON = \(SomeExchangeRate src dst n d) ->
     Ae.toJSON ("ExchangeRate", src, dst, n, d)
 -- | Compatible with 'ExchangeRate'
-instance Ae.FromJSON ExchangeRateRep where
+instance Ae.FromJSON SomeExchangeRate where
   parseJSON = \v -> do
     ("ExchangeRate", src, dst, n, d) <- Ae.parseJSON v
-    maybe empty pure (mkExchangeRateRep src dst n d)
+    maybe empty pure (mkSomeExchangeRate src dst n d)
 #endif
 
 --------------------------------------------------------------------------------
 -- Extra instances: store
 #ifdef VERSION_store
--- | Compatible with 'DenseRep'.
+-- | Compatible with 'SomeDense'.
 instance (KnownSymbol currency) => Store.Store (Dense currency) where
-  size = storeContramapSize toDenseRep Store.size
-  poke = Store.poke . toDenseRep
-  peek = maybe (fail "peek") pure =<< fmap fromDenseRep Store.peek
+  size = storeContramapSize toSomeDense Store.size
+  poke = Store.poke . toSomeDense
+  peek = maybe (fail "peek") pure =<< fmap fromSomeDense Store.peek
 -- | Compatible with 'Dense'.
-instance Store.Store DenseRep where
-  poke = \(DenseRep c n d) -> Store.poke c >> Store.poke n >> Store.poke d
+instance Store.Store SomeDense where
+  poke = \(SomeDense c n d) -> Store.poke c >> Store.poke n >> Store.poke d
   peek = maybe (fail "peek") pure =<< do
-    mkDenseRep <$> Store.peek <*> Store.peek <*> Store.peek
+    mkSomeDense <$> Store.peek <*> Store.peek <*> Store.peek
 
--- | Compatible with 'DiscreteRep'.
+-- | Compatible with 'SomeDiscrete'.
 instance
   ( KnownSymbol currency, GoodScale scale
   ) => Store.Store (Discrete' currency scale) where
-  size = storeContramapSize toDiscreteRep Store.size
-  poke = Store.poke . toDiscreteRep
-  peek = maybe (fail "peek") pure =<< fmap fromDiscreteRep Store.peek
+  size = storeContramapSize toSomeDiscrete Store.size
+  poke = Store.poke . toSomeDiscrete
+  peek = maybe (fail "peek") pure =<< fmap fromSomeDiscrete Store.peek
 -- | Compatible with 'Discrete''.
-instance Store.Store DiscreteRep where
-  poke = \(DiscreteRep c n d a) ->
+instance Store.Store SomeDiscrete where
+  poke = \(SomeDiscrete c n d a) ->
     Store.poke c >> Store.poke n >> Store.poke d >> Store.poke a
   peek = maybe (fail "peek") pure =<< do
-    mkDiscreteRep <$> Store.peek <*> Store.peek <*> Store.peek <*> Store.peek
--- | Compatible with 'ExchangeRateRep'.
+    mkSomeDiscrete <$> Store.peek <*> Store.peek <*> Store.peek <*> Store.peek
+-- | Compatible with 'SomeExchangeRate'.
 instance
   ( KnownSymbol src, KnownSymbol dst
   ) => Store.Store (ExchangeRate src dst) where
-  size = storeContramapSize toExchangeRateRep Store.size
-  poke = Store.poke . toExchangeRateRep
-  peek = maybe (fail "peek") pure =<< fmap fromExchangeRateRep Store.peek
+  size = storeContramapSize toSomeExchangeRate Store.size
+  poke = Store.poke . toSomeExchangeRate
+  peek = maybe (fail "peek") pure =<< fmap fromSomeExchangeRate Store.peek
 -- | Compatible with 'ExchangeRate'.
-instance Store.Store ExchangeRateRep where
-  poke = \(ExchangeRateRep src dst n d) ->
+instance Store.Store SomeExchangeRate where
+  poke = \(SomeExchangeRate src dst n d) ->
     Store.poke src >> Store.poke dst >> Store.poke n >> Store.poke d
-  peek = maybe (fail "peek") pure =<< mkExchangeRateRep
+  peek = maybe (fail "peek") pure =<< mkSomeExchangeRate
     <$> Store.peek <*> Store.peek <*> Store.peek <*> Store.peek
 
 storeContramapSize :: (a -> b) -> Store.Size b -> Store.Size a

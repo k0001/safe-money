@@ -1,3 +1,11 @@
+# Version 0.4
+
+* BREAKING CHANGE: Changed the `Rep` suffix for a `Some` prefix Everywhere.
+  For example, `DenseRep` was renamed to `SomeDense`.
+
+* Added instances for `serialise`.
+
+
 # Version 0.3
 
 * BREAKING CHANGE: The `Data.Money` module was renamed to `Money`.

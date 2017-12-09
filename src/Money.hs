@@ -37,35 +37,35 @@ module Money
  , I.flipExchangeRate
  , I.exchange
    -- * Serializable representations
- , I.DenseRep
- , I.toDenseRep
- , I.mkDenseRep
- , I.fromDenseRep
- , I.withDenseRep
- , I.denseRepCurrency
- , I.denseRepAmount
- , I.denseRepAmountNumerator
- , I.denseRepAmountDenominator
- , I.DiscreteRep
- , I.toDiscreteRep
- , I.mkDiscreteRep
- , I.fromDiscreteRep
- , I.withDiscreteRep
- , I.discreteRepCurrency
- , I.discreteRepScale
- , I.discreteRepScaleNumerator
- , I.discreteRepScaleDenominator
- , I.discreteRepAmount
- , I.ExchangeRateRep
- , I.toExchangeRateRep
- , I.mkExchangeRateRep
- , I.fromExchangeRateRep
- , I.withExchangeRateRep
- , I.exchangeRateRepSrcCurrency
- , I.exchangeRateRepDstCurrency
- , I.exchangeRateRepRate
- , I.exchangeRateRepRateNumerator
- , I.exchangeRateRepRateDenominator
+ , I.SomeDense
+ , I.toSomeDense
+ , I.mkSomeDense
+ , I.fromSomeDense
+ , I.withSomeDense
+ , I.someDenseCurrency
+ , I.someDenseAmount
+ , I.someDenseAmountNumerator
+ , I.someDenseAmountDenominator
+ , I.SomeDiscrete
+ , I.toSomeDiscrete
+ , I.mkSomeDiscrete
+ , I.fromSomeDiscrete
+ , I.withSomeDiscrete
+ , I.someDiscreteCurrency
+ , I.someDiscreteScale
+ , I.someDiscreteScaleNumerator
+ , I.someDiscreteScaleDenominator
+ , I.someDiscreteAmount
+ , I.SomeExchangeRate
+ , I.toSomeExchangeRate
+ , I.mkSomeExchangeRate
+ , I.fromSomeExchangeRate
+ , I.withSomeExchangeRate
+ , I.someExchangeRateSrcCurrency
+ , I.someExchangeRateDstCurrency
+ , I.someExchangeRateRate
+ , I.someExchangeRateRateNumerator
+ , I.someExchangeRateRateDenominator
  ) where
 
 import qualified Money.Internal as I
