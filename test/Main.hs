@@ -124,6 +124,9 @@ testDense pc =
   [ QC.testProperty "read . show == id" $
       QC.forAll QC.arbitrary $ \(x :: Money.Dense currency) ->
          x === read (show x)
+  , QC.testProperty "read . show . Just == Just " $
+      QC.forAll QC.arbitrary $ \(x :: Money.Dense currency) ->
+         Just x === read (show (Just x))
   , QC.testProperty "fromSomeDense . someDense == Just" $
       QC.forAll QC.arbitrary $ \(x :: Money.Dense currency) ->
          Just x === Money.fromSomeDense (Money.toSomeDense x)
@@ -253,6 +256,9 @@ testDiscrete pc pu =
   , QC.testProperty "read . show == id" $
       QC.forAll QC.arbitrary $ \(x :: Money.Discrete currency unit) ->
          x === read (show x)
+  , QC.testProperty "read . show . Just == Just" $
+      QC.forAll QC.arbitrary $ \(x :: Money.Discrete currency unit) ->
+         Just x === read (show (Just x))
   , QC.testProperty "fromSomeDiscrete . someDiscrete == Just" $
       QC.forAll QC.arbitrary $ \(x :: Money.Discrete currency unit) ->
          Just x === Money.fromSomeDiscrete (Money.toSomeDiscrete x)
@@ -362,6 +368,9 @@ testExchangeRate ps pd =
   [ QC.testProperty "read . show == id" $
       QC.forAll QC.arbitrary $ \(xr :: Money.ExchangeRate src dst) ->
          xr === read (show xr)
+  , QC.testProperty "read . show . Just == Just" $
+      QC.forAll QC.arbitrary $ \(xr :: Money.ExchangeRate src dst) ->
+         Just xr === read (show (Just xr))
   , QC.testProperty "flipExchangeRate . flipExchangeRate == id" $
       QC.forAll QC.arbitrary $ \(xr :: Money.ExchangeRate src dst) ->
          let xr' = Money.flipExchangeRate xr

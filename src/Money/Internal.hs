@@ -91,7 +91,7 @@ import Prelude hiding (round, ceiling, floor, truncate)
 import qualified Prelude
 import qualified Text.ParserCombinators.ReadPrec as ReadPrec
 import qualified Text.ParserCombinators.ReadP as ReadP
-import Text.Read (readPrec)
+import qualified Text.Read as Read
 import Unsafe.Coerce (unsafeCoerce)
 
 #ifdef VERSION_aeson
@@ -155,15 +155,18 @@ newtype Dense (currency :: Symbol) = Dense Rational
   deriving (Eq, Ord, Num, Real, Fractional, GHC.Generic)
 
 instance forall currency. KnownSymbol currency => Show (Dense currency) where
-  show = \(Dense r0) ->
+  showsPrec n = \(Dense r0) ->
     let c = symbolVal (Proxy :: Proxy currency)
-    in concat [ "Dense ", show c, " (", show r0, ")" ]
+    in showParen (n > 10) $
+         showString "Dense " . showsPrec 0 c . showChar ' ' .
+         showsPrec 0 (numerator r0) . showChar '%' .
+         showsPrec 0 (denominator r0)
 
 instance forall currency. KnownSymbol currency => Read (Dense currency) where
-  readPrec = do
+  readPrec = Read.parens $ do
     let c = symbolVal (Proxy :: Proxy currency)
     _ <- ReadPrec.lift (ReadP.string ("Dense " ++ show c ++ " "))
-    maybe empty pure =<< fmap dense' readPrec
+    maybe empty pure =<< fmap dense' Read.readPrec
 
 -- | Build a 'Dense' monetary value from a 'Rational' value.
 --
@@ -235,19 +238,27 @@ deriving instance GoodScale scale => GHC.Generic (Discrete' currency scale)
 instance forall currency scale.
   ( KnownSymbol currency, GoodScale scale
   ) => Show (Discrete' currency scale) where
-  show = \d0@(Discrete i0) ->
+  showsPrec n = \d0@(Discrete i0) ->
     let c = symbolVal (Proxy :: Proxy currency)
-    in concat [ "Discrete ", show c, " (", show (scale d0), ") ", show i0 ]
+        s = scale d0
+    in showParen (n > 10) $
+         showString "Discrete " .  showsPrec 0 c . showChar ' ' .
+         showsPrec 0 (numerator s) . showChar '%' .
+         showsPrec 0 (denominator s) . showChar ' ' .
+         showsPrec 0 i0
 
 instance forall currency scale.
   ( KnownSymbol currency, GoodScale scale
   ) => Read (Discrete' currency scale) where
-  readPrec = do
+  readPrec = Read.parens $ do
     let c = symbolVal (Proxy :: Proxy currency)
         s = scale (Proxy :: Proxy scale)
-    _ <- ReadPrec.lift (ReadP.string
-           ("Discrete " ++ show c ++ " (" ++ show s ++ ") ") )
-    Discrete <$> readPrec
+    _ <- ReadPrec.lift (ReadP.string (concat
+           [ "Discrete ", show c, " "
+           , show (numerator s), "%"
+           , show (denominator s), " "
+           ]))
+    Discrete <$> Read.readPrec
 
 #if MIN_VERSION_base(4,9,0)
 instance
@@ -587,20 +598,24 @@ newtype ExchangeRate (src :: Symbol) (dst :: Symbol) = ExchangeRate Rational
 instance forall src dst.
   ( KnownSymbol src, KnownSymbol dst
   ) => Show (ExchangeRate src dst) where
-  show = \(ExchangeRate r0) ->
+  showsPrec n = \(ExchangeRate r0) ->
     let s = symbolVal (Proxy :: Proxy src)
         d = symbolVal (Proxy :: Proxy dst)
-    in concat [ "ExchangeRate ", show s, " ", show d, " (", show r0, ")" ]
+    in showParen (n > 10) $
+         showString "ExchangeRate " . showsPrec 0 s . showChar ' ' .
+         showsPrec 0 d . showChar ' ' .
+         showsPrec 0 (numerator r0) . showChar '%' .
+         showsPrec 0 (denominator r0)
 
 instance forall src dst.
   ( KnownSymbol src, KnownSymbol dst
   ) => Read (ExchangeRate (src :: Symbol) (dst :: Symbol)) where
-  readPrec = do
+  readPrec = Read.parens $ do
     let s = symbolVal (Proxy :: Proxy src)
         d = symbolVal (Proxy :: Proxy dst)
     _ <- ReadPrec.lift (ReadP.string
             ("ExchangeRate " ++ show s ++ " " ++ show d ++ " "))
-    maybe empty pure =<< fmap exchangeRate readPrec
+    maybe empty pure =<< fmap exchangeRate Read.readPrec
 
 -- | Obtain a 'Rational' representation of the 'ExchangeRate'.
 --

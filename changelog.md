@@ -9,6 +9,9 @@
 
 * Added instances for `serialise`.
 
+* Fixed `Show` instances so that surrounding parentheses are included when
+  necessary.
+
 * New currencies: Ripple, Litecoin, Ada, Monero.
 
 
