@@ -791,3 +791,30 @@ type instance I.Scale "ETH" "szabo" = '(1000000000000, 1)
 type instance I.Scale "ETH" "finney" = '(1000000000000000, 1)
 type instance I.Scale "ETH" "milliether" = '(1000000000000000, 1)
 type instance I.Scale "ETH" "wei" = '(1000000000000000000, 1)
+
+-- | Ada
+type instance I.Scale "ADA" "ADA" = '(1000000, 1)
+type instance I.Scale "ADA" "ada" = '(1, 1)
+type instance I.Scale "ADA" "lovelace" = '(1000000, 1)
+
+-- | Litecoin
+type instance I.Scale "LTC" "LTC" = '(100000000, 1)
+type instance I.Scale "LTC" "litecoin" = '(1, 1)
+type instance I.Scale "LTC" "lite" = '(1000, 1)
+type instance I.Scale "LTC" "photon" = '(100000000, 1)
+
+-- | Ripple
+type instance I.Scale "XRP" "XRP" = '(1000000, 1)
+type instance I.Scale "XRP" "ripple" = '(1, 1)
+type instance I.Scale "XRP" "drop" = '(1000000, 1)
+
+-- | Monero
+type instance I.Scale "XMR" "XMR" = '(1000000000000, 1)
+type instance I.Scale "XMR" "monero" = '(1, 1)
+type instance I.Scale "XMR" "decinero" = '(10, 1)
+type instance I.Scale "XMR" "centinero" = '(100, 1)
+type instance I.Scale "XMR" "millinero" = '(1000, 1)
+type instance I.Scale "XMR" "micronero" = '(1000000, 1)
+type instance I.Scale "XMR" "nanonero" = '(1000000000, 1)
+type instance I.Scale "XMR" "piconero" = '(1000000000000, 1)
+
