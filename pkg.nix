@@ -5,7 +5,7 @@
 let isGhcjs = ghc.isGhcjs or false;
 in mkDerivation {
   pname = "safe-money";
-  version = "0.3";
+  version = "0.4";
   src = ./.;
   libraryHaskellDepends = [
     aeson base binary cereal constraints deepseq hashable serialise
