@@ -11,6 +11,4 @@ ghc802 = pkgs.haskell.packages.ghc802.override { inherit packageSetConfig; };
 
 ghc821 = pkgs.haskell.packages.ghc821.override { inherit packageSetConfig; };
 
-ghcjsHEAD = pkgs.haskell.packages.ghcjsHEAD.override { inherit packageSetConfig; };
-
-in { inherit ghc802 ghc821 ghcjsHEAD; }
+in { inherit ghc802 ghc821; }

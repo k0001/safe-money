@@ -7,12 +7,11 @@ let x = import ./default.nix { inherit nixpkgs pkgs; };
 in rec {
   ghc802 = { inherit (x.ghc802) safe-money; };
   ghc821 = { inherit (x.ghc821) safe-money; };
-  ghcjsHEAD = { inherit (x.ghcjsHEAD) safe-money; };
 
   everything = pkgs.releaseTools.aggregate {
     name = "everything";
     meta.description = "Every job in release.nix";
-    constituents = [ ghc802.safe-money ghc821.safe-money ghcjsHEAD.safe-money ];
+    constituents = [ ghc802.safe-money ghc821.safe-money ];
   };
 }
 
