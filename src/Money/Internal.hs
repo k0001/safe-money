@@ -24,6 +24,7 @@ module Money.Internal
  ( -- * Dense monetary values
    Dense
  , dense
+ , dense'
    -- * Discrete monetary values
  , Discrete
  , Discrete'
@@ -162,7 +163,7 @@ instance forall currency. KnownSymbol currency => Read (Dense currency) where
   readPrec = do
     let c = symbolVal (Proxy :: Proxy currency)
     _ <- ReadPrec.lift (ReadP.string ("Dense " ++ show c ++ " "))
-    maybe empty pure =<< fmap dense readPrec
+    maybe empty pure =<< fmap dense' readPrec
 
 -- | Build a 'Dense' monetary value from a 'Rational' value.
 --
@@ -172,13 +173,24 @@ instance forall currency. KnownSymbol currency => Read (Dense currency) where
 -- 'dense' (125316 % 10000)
 -- @
 --
--- This function returns 'Nothing' in case the given 'Rational' is 'infinity' or
--- 'notANumber'.
-dense :: Rational -> Maybe (Dense currency)
+-- **WARNING** This function /crashes/ in case the denominator of the given
+-- 'Rational' is zero, which is something very unlikely to happen unless you
+-- called 'GHC.Real.infinity' or 'GHC.Real.notANumber' manually at some point.
+-- If you care about that scenario (which you should, when dealing with
+-- 'Rational' values from untrusted sources), then use 'dense'' instead.
+dense :: Rational -> Dense currency
 dense = \r0 ->
-  if (infinity == r0 || notANumber == r0)
-  then Nothing else Just (Dense r0)
+  if (denominator r0 == 0) then error "dense: denominator is zero"
+  else Dense r0
 {-# INLINABLE dense #-}
+
+-- | Like 'dense', but returns 'Nothing' in case the denominator of the given
+-- 'Rational' is zero.
+dense' :: Rational -> Maybe (Dense currency)
+dense' = \r0 ->
+  if (denominator r0 == 0) then Nothing
+  else Just (Dense r0)
+{-# INLINABLE dense' #-}
 
 -- | 'Discrete' represents a discrete monetary value for a @currency@ expresed
 -- as an integer amount of a particular @unit@. For example, with @currency ~

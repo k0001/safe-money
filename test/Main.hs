@@ -47,9 +47,9 @@ instance QC.Arbitrary Money.SomeDiscrete where
 
 instance QC.Arbitrary (Money.Dense currency) where
   arbitrary = do
-    Just x <- QC.suchThat (Money.dense <$> QC.arbitrary) isJust
+    Just x <- QC.suchThat (Money.dense' <$> QC.arbitrary) isJust
     pure x
-  shrink = catMaybes . fmap Money.dense . QC.shrink . toRational
+  shrink = catMaybes . fmap Money.dense' . QC.shrink . toRational
 
 instance QC.Arbitrary Money.SomeDense where
   arbitrary = do

@@ -1,9 +1,15 @@
 # Version 0.4
 
+* BREAKING CHANGE: The `dense` function was renamed to `dense'`, and now there
+  is a new partial `dense` function that just crashes where `dense'` would
+  return `Nothing`.
+
 * BREAKING CHANGE: Changed the `Rep` suffix for a `Some` prefix Everywhere.
   For example, `DenseRep` was renamed to `SomeDense`.
 
 * Added instances for `serialise`.
+
+* New currencies: Ripple, Litecoin, Ada, Monero.
 
 
 # Version 0.3
