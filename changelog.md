@@ -10,10 +10,6 @@
   anymore. So, if you were manually relying on the `ToJSON` instance, please
   update your code.
 
-* BREAKING CHANGE. COMPILER WILL COMPLAIN. The `dense` function was renamed to
-  `dense'`, and now there is a new partial `dense` function that just crashes
-  where `dense'` would return `Nothing`.
-
 * BREAKING CHANGE. COMPILER WILL COMPLAIN: Changed the `Rep` suffix for a `Some`
   prefix Everywhere.  For example, `DenseRep` was renamed to `SomeDense`.
 

@@ -25,7 +25,6 @@ module Money.Internal
  ( -- * Dense monetary values
    Dense
  , dense
- , dense'
    -- * Discrete monetary values
  , Discrete
  , Discrete'
@@ -144,8 +143,8 @@ import qualified GHC.TypeLits as GHC
 -- 'round', 'floor', 'ceiling' or 'truncate'. Otherwise, using 'toRational' you
 -- can obtain a precise 'Rational' representation.
 --
--- Construct 'Dense' monetary values using 'dense', or
--- 'fromInteger' / 'fromIntegral' if that suffices.
+-- Construct 'Dense' monetary values using 'dense', 'fromRational',
+-- 'fromInteger' or 'fromIntegral'.
 --
 -- /WARNING/ if you want to treat a dense monetary value as a /Real/ number (for
 -- example, to take the square root of that monetary value), then you are on
@@ -167,7 +166,7 @@ instance forall currency. KnownSymbol currency => Read (Dense currency) where
   readPrec = Read.parens $ do
     let c = symbolVal (Proxy :: Proxy currency)
     _ <- ReadPrec.lift (ReadP.string ("Dense " ++ show c ++ " "))
-    maybe empty pure =<< fmap dense' Read.readPrec
+    maybe empty pure =<< fmap dense Read.readPrec
 
 -- | Build a 'Dense' monetary value from a 'Rational' value.
 --
@@ -177,24 +176,14 @@ instance forall currency. KnownSymbol currency => Read (Dense currency) where
 -- 'dense' (125316 % 10000)
 -- @
 --
--- **WARNING** This function /crashes/ in case the denominator of the given
--- 'Rational' is zero, which is something very unlikely to happen unless you
--- called 'GHC.Real.infinity' or 'GHC.Real.notANumber' manually at some point.
--- If you care about that scenario (which you should, when dealing with
--- 'Rational' values from untrusted sources), then use 'dense'' instead.
-dense :: Rational -> Dense currency
-dense = \r0 ->
-  if (denominator r0 == 0) then error "dense: denominator is zero"
-  else Dense r0
+-- Returns 'Nothing' in case the denominator of the given 'Rational' is zero,
+-- which although unlikely, is possible if the 'Rational' is constructed
+-- unsafely using 'GHC.Real.infinity' or 'GHC.Real.notANumber', for example.
+-- If you don't care about that scenario, you can use `fromRational` to build
+-- the `Dense` value.
+dense :: Rational -> Maybe (Dense currency)
+dense = \r0 -> if (denominator r0 == 0) then Nothing else Just (Dense r0)
 {-# INLINABLE dense #-}
-
--- | Like 'dense', but returns 'Nothing' in case the denominator of the given
--- 'Rational' is zero.
-dense' :: Rational -> Maybe (Dense currency)
-dense' = \r0 ->
-  if (denominator r0 == 0) then Nothing
-  else Just (Dense r0)
-{-# INLINABLE dense' #-}
 
 -- | 'Discrete' represents a discrete monetary value for a @currency@ expresed
 -- as an integer amount of a particular @unit@. For example, with @currency ~
@@ -1304,10 +1293,10 @@ instance Ae.FromJSON SomeExchangeRate where
 
 -- | Compatible with 'SomeDense'
 --
--- Example rendering @'dense' (2 % 3) :: 'Dense' "BTC"@:
+-- Example rendering @'fromRational' (2 % 3) :: 'Dense' "BTC"@:
 --
 -- @
--- <money-dense c="BTC" n="2" d="3"/>
+-- \<money-dense c="BTC" n="2" d="3"/>
 -- @
 instance KnownSymbol currency => Xmlbf.ToXml (Dense currency) where
   toXml = Xmlbf.toXml . toSomeDense
@@ -1339,7 +1328,7 @@ instance Xmlbf.FromXml SomeDense where
 -- Example rendering @43 :: 'Discrete' "BTC" "satoshi"@:
 --
 -- @
--- <money-discrete c="BTC" n="100000000" d="1" a="43"/>
+-- \<money-discrete c="BTC" n="100000000" d="1" a="43"/>
 -- @
 instance
   ( KnownSymbol currency, GoodScale scale
@@ -1374,10 +1363,11 @@ instance Xmlbf.FromXml SomeDiscrete where
 
 -- | Compatible with 'SomeExchangeRate'
 --
--- Example rendering @x@ in @let Just x = exchangeRate (5 % 7) :: Maybe (ExchangeRate "USD" "JPY")@
+-- Example rendering an 'ExchangeRate' constructed with
+-- @'exchangeRate' (5 % 7) :: 'Maybe' ('ExchangeRate' "USD" "JPY")@
 --
 -- @
--- <exchange-rate src="USD" dst="JPY" n="5" d="7"/>
+-- \<exchange-rate src="USD" dst="JPY" n="5" d="7"/>
 -- @
 instance
   ( KnownSymbol src, KnownSymbol dst

@@ -18,7 +18,6 @@ module Money
  ( -- * Dense monetary values
    I.Dense
  , I.dense
- , I.dense'
    -- * Discrete monetary values
  , I.Discrete
  , I.Discrete'
