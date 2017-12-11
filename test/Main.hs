@@ -8,23 +8,33 @@
 
 module Main where
 
+import qualified Data.ByteString.Lazy as BSL
+import Data.Maybe (catMaybes, isJust, isNothing)
+import Data.Proxy (Proxy(Proxy))
+import GHC.TypeLits (Nat, Symbol, KnownSymbol, symbolVal)
 import qualified Test.Tasty as Tasty
 import qualified Test.Tasty.Runners as Tasty
 import Test.Tasty.QuickCheck ((===), (==>))
 import qualified Test.Tasty.QuickCheck as QC
 
-import qualified Codec.Serialise as Ser
+#ifdef HAS_aeson
 import qualified Data.Aeson as Ae
+#endif
+
+#ifdef HAS_binary
 import qualified Data.Binary as Binary
-import qualified Data.ByteString.Lazy as BSL
-import Data.Maybe (catMaybes, isJust, isNothing)
-import Data.Proxy (Proxy(Proxy))
+#endif
+
+#ifdef HAS_cereal
 import qualified Data.Serialize as Cereal
-import GHC.TypeLits (Nat, Symbol, KnownSymbol, symbolVal)
+#endif
 
-
-#ifdef VERSION_store
+#ifdef HAS_store
 import qualified Data.Store as Store
+#endif
+
+#ifdef HAS_serialise
+import qualified Codec.Serialise as Ser
 #endif
 
 import qualified Money
@@ -141,6 +151,7 @@ testDense pc =
              (show x, dr, Money.toSomeDense (x + 1))
                 === (show x', Money.toSomeDense x', Money.toSomeDense (x' + 1))
 
+#ifdef HAS_aeson
   , QC.testProperty "Aeson encoding roundtrip" $
       QC.forAll QC.arbitrary $ \(x :: Money.Dense currency) ->
          Just x === Ae.decode (Ae.encode x)
@@ -154,7 +165,9 @@ testDense pc =
   , QC.testProperty "Aeson encoding roundtrip (SomeDense through Dense)" $
       QC.forAll QC.arbitrary $ \(x :: Money.Dense currency) ->
          Just (Money.toSomeDense x) === Ae.decode (Ae.encode x)
+#endif
 
+#ifdef HAS_binary
   , QC.testProperty "Binary encoding roundtrip" $
       QC.forAll QC.arbitrary $ \(x :: Money.Dense currency) ->
          let Right (_,_,y) = Binary.decodeOrFail (Binary.encode x)
@@ -174,7 +187,9 @@ testDense pc =
          let x' = Money.toSomeDense x
              bs = Binary.encode x
          in Right (mempty, BSL.length bs, x') === Binary.decodeOrFail bs
+#endif
 
+#ifdef HAS_cereal
   , QC.testProperty "Cereal encoding roundtrip" $
       QC.forAll QC.arbitrary $ \(x :: Money.Dense currency) ->
          Right x === Cereal.decode (Cereal.encode x)
@@ -188,7 +203,9 @@ testDense pc =
   , QC.testProperty "Cereal encoding roundtrip (SomeDense through Dense)" $
       QC.forAll QC.arbitrary $ \(x :: Money.Dense currency) ->
          Right (Money.toSomeDense x) === Cereal.decode (Cereal.encode x)
+#endif
 
+#ifdef HAS_serialise
   , QC.testProperty "Serialise encoding roundtrip" $
       QC.forAll QC.arbitrary $ \(x :: Money.Dense currency) ->
          Just x === hush (Ser.deserialiseOrFail (Ser.serialise x))
@@ -202,8 +219,9 @@ testDense pc =
   , QC.testProperty "Serialise encoding roundtrip (SomeDense through Dense)" $
       QC.forAll QC.arbitrary $ \(x :: Money.Dense currency) ->
          Just (Money.toSomeDense x) === hush (Ser.deserialiseOrFail (Ser.serialise x))
+#endif
 
-#ifdef VERSION_store
+#ifdef HAS_store
   , QC.testProperty "Store encoding roundtrip" $
       QC.forAll QC.arbitrary $ \(x :: Money.Dense currency) ->
          Right x === Store.decode (Store.encode x)
@@ -277,6 +295,7 @@ testDiscrete pc pu =
                    === (show x', Money.toSomeDiscrete x', Money.toSomeDiscrete (x' + 1))
            ) :: QC.Property
 
+#ifdef HAS_aeson
   , QC.testProperty "Aeson encoding roundtrip" $
       QC.forAll QC.arbitrary $ \(x :: Money.Discrete currency unit) ->
          Just x === Ae.decode (Ae.encode x)
@@ -290,7 +309,9 @@ testDiscrete pc pu =
   , QC.testProperty "Aeson encoding roundtrip (SomeDiscrete through Discrete)" $
       QC.forAll QC.arbitrary $ \(x :: Money.Discrete currency unit) ->
          Just (Money.toSomeDiscrete x) === Ae.decode (Ae.encode x)
+#endif
 
+#ifdef HAS_binary
   , QC.testProperty "Binary encoding roundtrip" $
       QC.forAll QC.arbitrary $ \(x :: Money.Discrete currency unit) ->
          let Right (_,_,y) = Binary.decodeOrFail (Binary.encode x)
@@ -310,7 +331,9 @@ testDiscrete pc pu =
          let x' = Money.toSomeDiscrete x
              bs = Binary.encode x
          in Right (mempty, BSL.length bs, x') === Binary.decodeOrFail bs
+#endif
 
+#ifdef HAS_cereal
   , QC.testProperty "Cereal encoding roundtrip" $
       QC.forAll QC.arbitrary $ \(x :: Money.Discrete currency unit) ->
          Right x === Cereal.decode (Cereal.encode x)
@@ -324,7 +347,9 @@ testDiscrete pc pu =
   , QC.testProperty "Cereal encoding roundtrip (SomeDiscrete through Discrete)" $
       QC.forAll QC.arbitrary $ \(x :: Money.Discrete currency unit) ->
          Right (Money.toSomeDiscrete x) === Cereal.decode (Cereal.encode x)
+#endif
 
+#ifdef HAS_serialise
   , QC.testProperty "Serialise encoding roundtrip" $
       QC.forAll QC.arbitrary $ \(x :: Money.Discrete currency unit) ->
          Just x === hush (Ser.deserialiseOrFail (Ser.serialise x))
@@ -338,8 +363,9 @@ testDiscrete pc pu =
   , QC.testProperty "Serialise encoding roundtrip (SomeDiscrete through Discrete)" $
       QC.forAll QC.arbitrary $ \(x :: Money.Discrete currency unit) ->
          Just (Money.toSomeDiscrete x) === hush (Ser.deserialiseOrFail (Ser.serialise x))
+#endif
 
-#ifdef VERSION_store
+#ifdef HAS_store
   , QC.testProperty "Store encoding roundtrip" $
       QC.forAll QC.arbitrary $ \(x :: Money.Discrete currency unit) ->
          Right x === Store.decode (Store.encode x)
@@ -408,6 +434,7 @@ testExchangeRate ps pd =
         in Money.withSomeExchangeRate dr $ \x' ->
              (show x, dr) === (show x', Money.toSomeExchangeRate x')
 
+#ifdef HAS_aeson
   , QC.testProperty "Aeson encoding roundtrip" $
       QC.forAll QC.arbitrary $ \(x :: Money.ExchangeRate src dst) ->
          Just x === Ae.decode (Ae.encode x)
@@ -421,7 +448,9 @@ testExchangeRate ps pd =
   , QC.testProperty "Aeson encoding roundtrip (SomeExchangeRate through ExchangeRate)" $
       QC.forAll QC.arbitrary $ \(x :: Money.ExchangeRate src dst) ->
          Just (Money.toSomeExchangeRate x) === Ae.decode (Ae.encode x)
+#endif
 
+#ifdef HAS_binary
   , QC.testProperty "Binary encoding roundtrip" $
       QC.forAll QC.arbitrary $ \(x :: Money.ExchangeRate src dst) ->
          let Right (_,_,y) = Binary.decodeOrFail (Binary.encode x)
@@ -441,7 +470,9 @@ testExchangeRate ps pd =
          let x' = Money.toSomeExchangeRate x
              bs = Binary.encode x
          in Right (mempty, BSL.length bs, x') === Binary.decodeOrFail bs
+#endif
 
+#ifdef HAS_cereal
   , QC.testProperty "Cereal encoding roundtrip" $
       QC.forAll QC.arbitrary $ \(x :: Money.ExchangeRate src dst) ->
          Right x === Cereal.decode (Cereal.encode x)
@@ -455,7 +486,9 @@ testExchangeRate ps pd =
   , QC.testProperty "Cereal encoding roundtrip (SomeExchangeRate through ExchangeRate)" $
       QC.forAll QC.arbitrary $ \(x :: Money.ExchangeRate src dst) ->
          Right (Money.toSomeExchangeRate x) === Cereal.decode (Cereal.encode x)
+#endif
 
+#ifdef HAS_serialise
   , QC.testProperty "Serialise encoding roundtrip" $
       QC.forAll QC.arbitrary $ \(x :: Money.ExchangeRate src dst) ->
          Just x === hush (Ser.deserialiseOrFail (Ser.serialise x))
@@ -469,8 +502,9 @@ testExchangeRate ps pd =
   , QC.testProperty "Serialise encoding roundtrip (SomeExchangeRate through ExchangeRate)" $
       QC.forAll QC.arbitrary $ \(x :: Money.ExchangeRate src dst) ->
          Just (Money.toSomeExchangeRate x) === hush (Ser.deserialiseOrFail (Ser.serialise x))
+#endif
 
-#ifdef VERSION_store
+#ifdef HAS_store
   , QC.testProperty "Store encoding roundtrip" $
       QC.forAll QC.arbitrary $ \(x :: Money.ExchangeRate src dst) ->
          Right x === Store.decode (Store.encode x)

@@ -5,10 +5,20 @@
 let
 packageSetConfig = self: super: {
   safe-money = super.callPackage ./pkg.nix {};
+  # Mostly here just to test whether the thing builds with flags turned off.
+  safe-money_no-extras = self.safe-money.override {
+    aeson = null;
+    binary = null;
+    cereal = null;
+    deepseq = null;
+    hashable = null;
+    serialise = null;
+    store = null;
+  };
 };
 
 ghc802 = pkgs.haskell.packages.ghc802.override { inherit packageSetConfig; };
 
-ghc821 = pkgs.haskell.packages.ghc821.override { inherit packageSetConfig; };
+ghc822 = pkgs.haskell.packages.ghc822.override { inherit packageSetConfig; };
 
-in { inherit ghc802 ghc821; }
+in { inherit ghc802 ghc822; }

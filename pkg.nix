@@ -1,21 +1,42 @@
-{ mkDerivation, ghc, aeson, base, binary, bytestring, cereal
-, constraints, deepseq, hashable, serialise, stdenv, tasty, tasty-hunit
-, tasty-quickcheck, store ? null
+{ mkDerivation, stdenv, ghc
+, base, bytestring, constraints, tasty, tasty-hunit, tasty-quickcheck
+
+# Optional dependencies
+, aeson ? null
+, binary ? null
+, cereal ? null
+, deepseq ? null
+, hashable ? null
+, serialise ? null
+, store ? null
 }:
-let isGhcjs = ghc.isGhcjs or false;
-in mkDerivation {
+
+let
+extraDeps =
+  stdenv.lib.optionals (!(isNull aeson)) [ aeson ] ++
+  stdenv.lib.optionals (!(isNull binary)) [ binary ] ++
+  stdenv.lib.optionals (!(isNull cereal)) [ cereal ] ++
+  stdenv.lib.optionals (!(isNull deepseq)) [ deepseq ] ++
+  stdenv.lib.optionals (!(isNull hashable)) [ hashable ] ++
+  stdenv.lib.optionals (!(isNull serialise)) [ serialise ] ++
+  stdenv.lib.optionals (!(isNull store)) [ store ];
+
+in mkDerivation rec {
   pname = "safe-money";
   version = "0.4";
-  src = ./.;
-  libraryHaskellDepends = [
-    aeson base binary cereal constraints deepseq hashable serialise
-  ] ++ (stdenv.lib.optionals (!isGhcjs) [ store ]);
-  testHaskellDepends = [
-    aeson base binary bytestring cereal constraints deepseq hashable serialise
-    tasty tasty-hunit tasty-quickcheck
-  ] ++ (stdenv.lib.optionals (!isGhcjs) [ store ]);
-  configureFlags = stdenv.lib.optionals isGhcjs [ "-f-store" ];
   homepage = "https://github.com/k0001/safe-money";
   description = "Type-safe and lossless encoding and manipulation of money, currencies and precious metals";
   license = stdenv.lib.licenses.bsd3;
+  src = ./.;
+  libraryHaskellDepends = [ base constraints ] ++ extraDeps;
+  testHaskellDepends = libraryHaskellDepends ++
+    [ bytestring tasty tasty-hunit tasty-quickcheck ];
+  configureFlags =
+    stdenv.lib.optionals (isNull aeson) [ "-f-aeson" ] ++
+    stdenv.lib.optionals (isNull binary) [ "-f-binary" ] ++
+    stdenv.lib.optionals (isNull cereal) [ "-f-cereal" ] ++
+    stdenv.lib.optionals (isNull deepseq) [ "-f-deepseq" ] ++
+    stdenv.lib.optionals (isNull hashable) [ "-f-hashable" ] ++
+    stdenv.lib.optionals (isNull serialise) [ "-f-serialise" ] ++
+    stdenv.lib.optionals (isNull store) [ "-f-store" ];
 }

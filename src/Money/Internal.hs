@@ -94,31 +94,31 @@ import qualified Text.ParserCombinators.ReadP as ReadP
 import qualified Text.Read as Read
 import Unsafe.Coerce (unsafeCoerce)
 
-#ifdef VERSION_aeson
+#ifdef HAS_aeson
 import qualified Data.Aeson as Ae
 #endif
 
-#ifdef VERSION_binary
+#ifdef HAS_binary
 import qualified Data.Binary as Binary
 #endif
 
-#ifdef VERSION_cereal
+#ifdef HAS_cereal
 import qualified Data.Serialize as Cereal
 #endif
 
-#ifdef VERSION_deepseq
+#ifdef HAS_deepseq
 import Control.DeepSeq (NFData)
 #endif
 
-#ifdef VERSION_hashable
+#ifdef HAS_hashable
 import Data.Hashable (Hashable)
 #endif
 
-#ifdef VERSION_serialise
+#ifdef HAS_serialise
 import qualified Codec.Serialise as Ser
 #endif
 
-#ifdef VERSION_store
+#ifdef HAS_store
 import qualified Data.Store as Store
 #endif
 
@@ -1019,7 +1019,7 @@ type family Snd (ab :: (ka, kb)) :: ka where Snd '(a,b) = b
 
 --------------------------------------------------------------------------------
 -- Extra instances: hashable
-#ifdef VERSION_hashable
+#ifdef HAS_hashable
 instance Hashable (Dense currency)
 instance Hashable SomeDense
 instance GoodScale scale => Hashable (Discrete' currency scale)
@@ -1030,7 +1030,7 @@ instance Hashable SomeExchangeRate
 
 --------------------------------------------------------------------------------
 -- Extra instances: deepseq
-#ifdef VERSION_deepseq
+#ifdef HAS_deepseq
 instance NFData (Dense currency)
 instance NFData SomeDense
 instance GoodScale scale => NFData (Discrete' currency scale)
@@ -1041,7 +1041,7 @@ instance NFData SomeExchangeRate
 
 --------------------------------------------------------------------------------
 -- Extra instances: cereal
-#ifdef VERSION_cereal
+#ifdef HAS_cereal
 -- | Compatible with 'SomeDense'.
 instance (KnownSymbol currency) => Cereal.Serialize (Dense currency) where
   put = Cereal.put . toSomeDense
@@ -1079,7 +1079,7 @@ instance Cereal.Serialize SomeExchangeRate where
 
 --------------------------------------------------------------------------------
 -- Extra instances: binary
-#ifdef VERSION_binary
+#ifdef HAS_binary
 -- | Compatible with 'SomeDense'.
 instance (KnownSymbol currency) => Binary.Binary (Dense currency) where
   put = Binary.put . toSomeDense
@@ -1117,7 +1117,7 @@ instance Binary.Binary SomeExchangeRate where
 
 --------------------------------------------------------------------------------
 -- Extra instances: serialise
-#ifdef VERSION_serialise
+#ifdef HAS_serialise
 -- | Compatible with 'SomeDense'.
 instance (KnownSymbol currency) => Ser.Serialise (Dense currency) where
   encode = Ser.encode . toSomeDense
@@ -1156,7 +1156,7 @@ instance Ser.Serialise SomeExchangeRate where
 
 --------------------------------------------------------------------------------
 -- Extra instances: aeson
-#ifdef VERSION_aeson
+#ifdef HAS_aeson
 -- | Compatible with 'SomeDense'
 instance KnownSymbol currency => Ae.ToJSON (Dense currency) where
   toJSON = Ae.toJSON . toSomeDense
@@ -1212,7 +1212,7 @@ instance Ae.FromJSON SomeExchangeRate where
 
 --------------------------------------------------------------------------------
 -- Extra instances: store
-#ifdef VERSION_store
+#ifdef HAS_store
 -- | Compatible with 'SomeDense'.
 instance (KnownSymbol currency) => Store.Store (Dense currency) where
   size = storeContramapSize toSomeDense Store.size
