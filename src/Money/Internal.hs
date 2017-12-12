@@ -7,6 +7,7 @@
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
 {-# LANGUAGE KindSignatures #-}
 {-# LANGUAGE LambdaCase #-}
+{-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE PolyKinds #-}
 {-# LANGUAGE RankNTypes #-}
 {-# LANGUAGE ScopedTypeVariables #-}
@@ -82,6 +83,7 @@ import Data.Constraint (Dict(Dict))
 import Data.Monoid ((<>))
 import Data.Proxy (Proxy(..))
 import Data.Ratio ((%), numerator, denominator)
+import GHC.Exts (fromList)
 import qualified GHC.Generics as GHC
 import GHC.Real (infinity, notANumber)
 import GHC.TypeLits
@@ -120,6 +122,11 @@ import qualified Codec.Serialise as Ser
 
 #ifdef HAS_store
 import qualified Data.Store as Store
+#endif
+
+#ifdef HAS_xmlbf
+import qualified Xmlbf
+import qualified Data.Text as Text
 #endif
 
 #if MIN_VERSION_base(4,9,0)
@@ -1183,7 +1190,7 @@ instance Ae.FromJSON SomeDense where
   parseJSON = \v -> do
     (c, n, d) <- Ae.parseJSON v <|> do
        -- Pre 0.4 format.
-       ("Dense", c, n, d) <- Ae.parseJSON v
+       ("Dense" :: String, c, n, d) <- Ae.parseJSON v
        pure (c, n, d)
     maybe empty pure (mkSomeDense c n d)
 -- | Compatible with 'SomeDiscrete'
@@ -1216,7 +1223,7 @@ instance Ae.FromJSON SomeDiscrete where
   parseJSON = \v -> do
     (c, n, d, a) <- Ae.parseJSON v <|> do
        -- Pre 0.4 format.
-       ("Discrete", c, n, d, a) <- Ae.parseJSON v
+       ("Discrete" :: String, c, n, d, a) <- Ae.parseJSON v
        pure (c, n, d, a)
     maybe empty pure (mkSomeDiscrete c n d a)
 -- | Compatible with 'SomeExchangeRate'
@@ -1249,8 +1256,118 @@ instance Ae.FromJSON SomeExchangeRate where
   parseJSON = \v -> do
     (src, dst, n, d) <- Ae.parseJSON v <|> do
        -- Pre 0.4 format.
-       ("ExchangeRate", src, dst, n, d) <- Ae.parseJSON v
+       ("ExchangeRate" :: String, src, dst, n, d) <- Ae.parseJSON v
        pure (src, dst, n, d)
+    maybe empty pure (mkSomeExchangeRate src dst n d)
+#endif
+
+--------------------------------------------------------------------------------
+-- Extra instances: xmlbf
+#ifdef HAS_xmlbf
+
+-- | Compatible with 'SomeDense'
+--
+-- Example rendering @'dense' (2 % 3) :: 'Dense' "BTC"@:
+--
+-- @
+-- <money-dense c="BTC" n="2" d="3"/>
+-- @
+instance KnownSymbol currency => Xmlbf.ToXml (Dense currency) where
+  toXml = Xmlbf.toXml . toSomeDense
+
+-- | Compatible with 'SomeDense'
+instance KnownSymbol currency => Xmlbf.FromXml (Dense currency) where
+  fromXml = maybe empty pure =<< fmap fromSomeDense Xmlbf.fromXml
+
+-- | Compatible with 'Dense'
+instance Xmlbf.ToXml SomeDense where
+  toXml = \(SomeDense c n d) ->
+    let as = [ (Text.pack "c", Text.pack c)
+             , (Text.pack "n", Text.pack (show n))
+             , (Text.pack "d", Text.pack (show d)) ]
+        Right e = Xmlbf.element (Text.pack "money-dense") (fromList as) []
+    in [e]
+
+-- | Compatible with 'Dense'.
+instance Xmlbf.FromXml SomeDense where
+  fromXml = Xmlbf.pElement (Text.pack "money-dense") $ do
+    c <- Text.unpack <$> Xmlbf.pAttr "c"
+    n <- Xmlbf.pRead =<< Xmlbf.pAttr "n"
+    d <- Xmlbf.pRead =<< Xmlbf.pAttr "d"
+    maybe empty pure (mkSomeDense c n d)
+
+-- | Compatible with 'SomeDiscrete'
+--
+-- Example rendering @43 :: 'Discrete' "BTC" "satoshi"@:
+--
+-- @
+-- <money-discrete c="BTC" n="100000000" d="1" a="43"/>
+-- @
+instance
+  ( KnownSymbol currency, GoodScale scale
+  ) => Xmlbf.ToXml (Discrete' currency scale) where
+  toXml = Xmlbf.toXml . toSomeDiscrete
+
+-- | Compatible with 'SomeDiscrete'
+instance
+  ( KnownSymbol currency, GoodScale scale
+  ) => Xmlbf.FromXml (Discrete' currency scale) where
+  fromXml = maybe empty pure =<< fmap fromSomeDiscrete Xmlbf.fromXml
+
+-- | Compatible with 'Discrete''
+instance Xmlbf.ToXml SomeDiscrete where
+  toXml = \(SomeDiscrete c n d a) ->
+    let as = [ (Text.pack "c", Text.pack c)
+             , (Text.pack "n", Text.pack (show n))
+             , (Text.pack "d", Text.pack (show d))
+             , (Text.pack "a", Text.pack (show a)) ]
+        Right e = Xmlbf.element (Text.pack "money-discrete") (fromList as) []
+    in [e]
+
+-- | Compatible with 'Discrete''
+instance Xmlbf.FromXml SomeDiscrete where
+  fromXml = Xmlbf.pElement (Text.pack "money-discrete") $ do
+    c <- Text.unpack <$> Xmlbf.pAttr "c"
+    n <- Xmlbf.pRead =<< Xmlbf.pAttr "n"
+    d <- Xmlbf.pRead =<< Xmlbf.pAttr "d"
+    a <- Xmlbf.pRead =<< Xmlbf.pAttr "a"
+    maybe empty pure (mkSomeDiscrete c n d a)
+
+-- | Compatible with 'SomeExchangeRate'
+--
+-- Example rendering @x@ in @let Just x = exchangeRate (5 % 7) :: Maybe (ExchangeRate "USD" "JPY")@
+--
+-- @
+-- <exchange-rate src="USD" dst="JPY" n="5" d="7"/>
+-- @
+instance
+  ( KnownSymbol src, KnownSymbol dst
+  ) => Xmlbf.ToXml (ExchangeRate src dst) where
+  toXml = Xmlbf.toXml . toSomeExchangeRate
+
+-- | Compatible with 'SomeExchangeRate'
+instance
+  ( KnownSymbol src, KnownSymbol dst
+  ) => Xmlbf.FromXml (ExchangeRate src dst) where
+  fromXml = maybe empty pure =<< fmap fromSomeExchangeRate Xmlbf.fromXml
+
+-- | Compatible with 'ExchangeRate'
+instance Xmlbf.ToXml SomeExchangeRate where
+  toXml = \(SomeExchangeRate src dst n d) ->
+    let as = [ (Text.pack "src", Text.pack src)
+             , (Text.pack "dst", Text.pack dst)
+             , (Text.pack "n", Text.pack (show n))
+             , (Text.pack "d", Text.pack (show d)) ]
+        Right e = Xmlbf.element (Text.pack "exchange-rate") (fromList as) []
+    in [e]
+
+-- | Compatible with 'ExchangeRate'
+instance Xmlbf.FromXml SomeExchangeRate where
+  fromXml = Xmlbf.pElement (Text.pack "exchange-rate") $ do
+    src <- Text.unpack <$> Xmlbf.pAttr "src"
+    dst <- Text.unpack <$> Xmlbf.pAttr "dst"
+    n <- Xmlbf.pRead =<< Xmlbf.pAttr "n"
+    d <- Xmlbf.pRead =<< Xmlbf.pAttr "d"
     maybe empty pure (mkSomeExchangeRate src dst n d)
 #endif
 
@@ -1301,3 +1418,4 @@ storeContramapSize f = \case
   Store.ConstSize x -> Store.ConstSize x
 {-# INLINABLE storeContramapSize #-}
 #endif
+

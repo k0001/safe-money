@@ -19,6 +19,8 @@
 
 * Added instances for `serialise`.
 
+* Added instances for `xmlbf`.
+
 * Fixed `Show` instances so that surrounding parentheses are included when
   necessary.
 

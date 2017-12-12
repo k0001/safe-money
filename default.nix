@@ -3,6 +3,13 @@
 }:
 
 let
+
+src_xmlbf = "${pkgs.fetchgit {
+  url = "https://gitlab.com/k0001/xmlbf.git";
+  rev = "xmlbf-0.2";
+  sha256 = "00llajlr7w102xlwnp09yfmxf7mjx5x2g9f219q28wy423r5vsar";
+}}/xmlbf";
+
 packageSetConfig = self: super: {
   safe-money = super.callPackage ./pkg.nix {};
   # Mostly here just to test whether the thing builds with flags turned off.
@@ -18,6 +25,8 @@ packageSetConfig = self: super: {
 
   # The default version doesn't compile.
   weigh = self.weigh_0_0_7;
+  # Not in upstream nixpkgs yet.
+  xmlbf = super.callPackage "${src_xmlbf}/pkg.nix" {};
 };
 
 ghc802 = pkgs.haskell.packages.ghc802.override { inherit packageSetConfig; };

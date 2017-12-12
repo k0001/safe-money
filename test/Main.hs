@@ -29,12 +29,17 @@ import qualified Data.Binary as Binary
 import qualified Data.Serialize as Cereal
 #endif
 
+#ifdef HAS_serialise
+import qualified Codec.Serialise as Ser
+#endif
+
 #ifdef HAS_store
 import qualified Data.Store as Store
 #endif
 
-#ifdef HAS_serialise
-import qualified Codec.Serialise as Ser
+#ifdef HAS_xmlbf
+import qualified Xmlbf
+import qualified Data.Text as Text
 #endif
 
 import qualified Money
@@ -245,6 +250,22 @@ testDense pc =
       QC.forAll QC.arbitrary $ \(x :: Money.Dense currency) ->
          Right (Money.toSomeDense x) === Store.decode (Store.encode x)
 #endif
+
+#ifdef HAS_xmlbf
+  , QC.testProperty "Xmlbf encoding roundtrip" $
+      QC.forAll QC.arbitrary $ \(x :: Money.Dense currency) ->
+         Right x === Xmlbf.runParser Xmlbf.fromXml (Xmlbf.toXml x)
+  , QC.testProperty "Xmlbf encoding roundtrip (SomeDense)" $
+      QC.forAll QC.arbitrary $ \(x :: Money.Dense currency) ->
+         let x' = Money.toSomeDense x
+         in Right x' === Xmlbf.runParser Xmlbf.fromXml (Xmlbf.toXml x')
+  , QC.testProperty "Xmlbf encoding roundtrip (Dense through SomeDense)" $
+      QC.forAll QC.arbitrary $ \(x :: Money.Dense currency) ->
+         Right x === Xmlbf.runParser Xmlbf.fromXml (Xmlbf.toXml (Money.toSomeDense x))
+  , QC.testProperty "Xmlbf encoding roundtrip (SomeDense through Dense)" $
+      QC.forAll QC.arbitrary $ \(x :: Money.Dense currency) ->
+         Right (Money.toSomeDense x) === Xmlbf.runParser Xmlbf.fromXml (Xmlbf.toXml x)
+#endif
   ]
 
 testExchange :: Tasty.TestTree
@@ -399,6 +420,22 @@ testDiscrete pc pu =
       QC.forAll QC.arbitrary $ \(x :: Money.Discrete currency unit) ->
          Right (Money.toSomeDiscrete x) === Store.decode (Store.encode x)
 #endif
+
+#ifdef HAS_xmlbf
+  , QC.testProperty "Xmlbf encoding roundtrip" $
+      QC.forAll QC.arbitrary $ \(x :: Money.Discrete currency unit) ->
+         Right x === Xmlbf.runParser Xmlbf.fromXml (Xmlbf.toXml x)
+  , QC.testProperty "Xmlbf encoding roundtrip (SomeDiscrete)" $
+      QC.forAll QC.arbitrary $ \(x :: Money.Discrete currency unit) ->
+         let x' = Money.toSomeDiscrete x
+         in Right x' === Xmlbf.runParser Xmlbf.fromXml (Xmlbf.toXml x')
+  , QC.testProperty "Xmlbf encoding roundtrip (Discrete through SomeDiscrete)" $
+      QC.forAll QC.arbitrary $ \(x :: Money.Discrete currency unit) ->
+         Right x === Xmlbf.runParser Xmlbf.fromXml (Xmlbf.toXml (Money.toSomeDiscrete x))
+  , QC.testProperty "Xmlbf encoding roundtrip (SomeDiscrete through Discrete)" $
+      QC.forAll QC.arbitrary $ \(x :: Money.Discrete currency unit) ->
+         Right (Money.toSomeDiscrete x) === Xmlbf.runParser Xmlbf.fromXml (Xmlbf.toXml x)
+#endif
   ]
 
 testExchangeRate
@@ -547,6 +584,22 @@ testExchangeRate ps pd =
   , QC.testProperty "Store encoding roundtrip (SomeExchangeRate through ExchangeRate)" $
       QC.forAll QC.arbitrary $ \(x :: Money.ExchangeRate src dst) ->
          Right (Money.toSomeExchangeRate x) === Store.decode (Store.encode x)
+#endif
+
+#ifdef HAS_xmlbf
+  , QC.testProperty "Xmlbf encoding roundtrip" $
+      QC.forAll QC.arbitrary $ \(x :: Money.ExchangeRate src dst) ->
+         Right x === Xmlbf.runParser Xmlbf.fromXml (Xmlbf.toXml x)
+  , QC.testProperty "Xmlbf encoding roundtrip (SomeExchangeRate)" $
+      QC.forAll QC.arbitrary $ \(x :: Money.ExchangeRate src dst) ->
+         let x' = Money.toSomeExchangeRate x
+         in Right x' === Xmlbf.runParser Xmlbf.fromXml (Xmlbf.toXml x')
+  , QC.testProperty "Xmlbf encoding roundtrip (ExchangeRate through SomeExchangeRate)" $
+      QC.forAll QC.arbitrary $ \(x :: Money.ExchangeRate src dst) ->
+         Right x === Xmlbf.runParser Xmlbf.fromXml (Xmlbf.toXml (Money.toSomeExchangeRate x))
+  , QC.testProperty "Xmlbf encoding roundtrip (SomeExchangeRate through ExchangeRate)" $
+      QC.forAll QC.arbitrary $ \(x :: Money.ExchangeRate src dst) ->
+         Right (Money.toSomeExchangeRate x) === Xmlbf.runParser Xmlbf.fromXml (Xmlbf.toXml x)
 #endif
   ]
 

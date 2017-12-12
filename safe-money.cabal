@@ -58,6 +58,9 @@ library
   if (flag(store) && !impl(ghcjs))
     build-depends: store (>=0.2)
     cpp-options: -DHAS_store
+  if flag(xmlbf)
+    build-depends: xmlbf (>=0.2), text
+    cpp-options: -DHAS_xmlbf
 
 test-suite test
   default-language: Haskell2010
@@ -94,6 +97,9 @@ test-suite test
   if (flag(store) && !impl(ghcjs))
     build-depends: store
     cpp-options: -DHAS_store
+  if flag(xmlbf)
+    build-depends: xmlbf, text
+    cpp-options: -DHAS_xmlbf
 
 flag aeson
   description: Provide instances for @aeson@
@@ -121,6 +127,10 @@ flag hashable
   manual: True
 flag serialise
   description: Provide instances for @serialise@
+  default: True
+  manual: True
+flag xmlbf
+  description: Provide instances for @xmlbf@
   default: True
   manual: True
 
