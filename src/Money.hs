@@ -45,8 +45,6 @@ module Money
  , I.withSomeDense
  , I.someDenseCurrency
  , I.someDenseAmount
- , I.someDenseAmountNumerator
- , I.someDenseAmountDenominator
  , I.SomeDiscrete
  , I.toSomeDiscrete
  , I.mkSomeDiscrete
@@ -54,8 +52,6 @@ module Money
  , I.withSomeDiscrete
  , I.someDiscreteCurrency
  , I.someDiscreteScale
- , I.someDiscreteScaleNumerator
- , I.someDiscreteScaleDenominator
  , I.someDiscreteAmount
  , I.SomeExchangeRate
  , I.toSomeExchangeRate
@@ -65,8 +61,6 @@ module Money
  , I.someExchangeRateSrcCurrency
  , I.someExchangeRateDstCurrency
  , I.someExchangeRateRate
- , I.someExchangeRateRateNumerator
- , I.someExchangeRateRateDenominator
  ) where
 
 import qualified Money.Internal as I

@@ -11,6 +11,7 @@ module Main where
 import qualified Data.ByteString.Lazy as BSL
 import Data.Maybe (catMaybes, isJust, isNothing)
 import Data.Proxy (Proxy(Proxy))
+import Data.Ratio (numerator, denominator)
 import GHC.TypeLits (Nat, Symbol, KnownSymbol, symbolVal)
 import qualified Test.Tasty as Tasty
 import qualified Test.Tasty.Runners as Tasty
@@ -54,8 +55,8 @@ instance
 
 instance QC.Arbitrary Money.SomeDiscrete where
   arbitrary = do
-    let md = Money.mkSomeDiscrete <$> QC.arbitrary <*> QC.arbitrary
-                                  <*> QC.arbitrary <*> QC.arbitrary
+    let md = Money.mkSomeDiscrete
+               <$> QC.arbitrary <*> QC.arbitrary <*> QC.arbitrary
     Just x <- QC.suchThat md isJust
     pure x
   shrink = \x -> Money.withSomeDiscrete x (map Money.toSomeDiscrete . QC.shrink)
@@ -68,7 +69,7 @@ instance QC.Arbitrary (Money.Dense currency) where
 
 instance QC.Arbitrary Money.SomeDense where
   arbitrary = do
-    let md = Money.mkSomeDense <$> QC.arbitrary <*> QC.arbitrary <*> QC.arbitrary
+    let md = Money.mkSomeDense <$> QC.arbitrary <*> QC.arbitrary
     Just x <- QC.suchThat md isJust
     pure x
   shrink = \x -> Money.withSomeDense x (map Money.toSomeDense . QC.shrink)
@@ -82,8 +83,8 @@ instance QC.Arbitrary (Money.ExchangeRate src dst) where
 
 instance QC.Arbitrary Money.SomeExchangeRate where
   arbitrary = do
-    let md = Money.mkSomeExchangeRate <$> QC.arbitrary <*> QC.arbitrary
-                                      <*> QC.arbitrary <*> QC.arbitrary
+    let md = Money.mkSomeExchangeRate
+               <$> QC.arbitrary <*> QC.arbitrary <*> QC.arbitrary
     Just x <- QC.suchThat md isJust
     pure x
   shrink = \x ->
@@ -174,9 +175,8 @@ testDense pc =
       QC.forAll QC.arbitrary $ \(x :: Money.Dense currency) ->
         let sx = Money.toSomeDense x
             c = Money.someDenseCurrency sx
-            n = Money.someDenseAmountNumerator sx
-            d = Money.someDenseAmountDenominator sx
-            bs = Ae.encode ("Dense", c, n, d)
+            r = Money.someDenseAmount sx
+            bs = Ae.encode ("Dense", c, numerator r, denominator r)
         in (Just  x === Ae.decode bs) .&&.
            (Just sx === Ae.decode bs)
 #endif
@@ -343,10 +343,9 @@ testDiscrete pc pu =
       QC.forAll QC.arbitrary $ \(x :: Money.Discrete currency unit) ->
         let sx = Money.toSomeDiscrete x
             c = Money.someDiscreteCurrency sx
-            n = Money.someDiscreteScaleNumerator sx
-            d = Money.someDiscreteScaleDenominator sx
+            r = Money.someDiscreteScale sx
             a = Money.someDiscreteAmount sx
-            bs = Ae.encode ("Discrete", c, n, d, a)
+            bs = Ae.encode ("Discrete", c, numerator r, denominator r, a)
         in (Just  x === Ae.decode bs) .&&.
            (Just sx === Ae.decode bs)
 #endif
@@ -509,9 +508,8 @@ testExchangeRate ps pd =
         let sx = Money.toSomeExchangeRate x
             src = Money.someExchangeRateSrcCurrency sx
             dst = Money.someExchangeRateDstCurrency sx
-            n = Money.someExchangeRateRateNumerator sx
-            d = Money.someExchangeRateRateDenominator sx
-            bs = Ae.encode ("ExchangeRate", src, dst, n, d)
+            r = Money.someExchangeRateRate sx
+            bs = Ae.encode ("ExchangeRate", src, dst, numerator r, denominator r)
         in (Just  x === Ae.decode bs) .&&.
            (Just sx === Ae.decode bs)
 #endif

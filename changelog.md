@@ -17,6 +17,12 @@
 * BREAKING CHANGE. COMPILER WILL COMPLAIN: Changed the `Rep` suffix for a `Some`
   prefix Everywhere.  For example, `DenseRep` was renamed to `SomeDense`.
 
+* BREAKING CHANGE. COMPILER WILL COMPLAIN: Replaced the
+  `someDenseAmountNumerator` and `someDenseAmountDenominator` `Integers` with a
+  single `someDenseAmount` `Rational` number. Similarly for `someDiscreteScale`
+  and `someExchangeRateRate`. The `mkSomeDense`, `someDiscreteScale` and
+  `mkSomeDense` also take a `Rational` now.
+
 * Added instances for `serialise`.
 
 * Added instances for `xmlbf`.
