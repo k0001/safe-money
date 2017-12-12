@@ -21,6 +21,7 @@ packageSetConfig = self: super: {
     hashable = null;
     serialise = null;
     store = null;
+    xmlbf = null;
   };
 
   # The default version doesn't compile.
