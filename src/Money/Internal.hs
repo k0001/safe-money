@@ -76,7 +76,7 @@ module Money.Internal
  , someExchangeRateRateDenominator
  ) where
 
-import Control.Applicative (empty)
+import Control.Applicative ((<|>), empty)
 import Control.Monad ((<=<))
 import Data.Constraint (Dict(Dict))
 import Data.Monoid ((<>))
@@ -1158,55 +1158,99 @@ instance Ser.Serialise SomeExchangeRate where
 -- Extra instances: aeson
 #ifdef HAS_aeson
 -- | Compatible with 'SomeDense'
+--
+-- Note: The JSON serialization changed in version 0.4 (the leading @"Dense"@
+-- string was dropped from the rendered 'Ae.Array').
 instance KnownSymbol currency => Ae.ToJSON (Dense currency) where
   toJSON = Ae.toJSON . toSomeDense
 -- | Compatible with 'SomeDense'
+--
+-- Note: The JSON serialization changed in version 0.4. However, this instance
+-- is still able to cope with the previous format.
 instance KnownSymbol currency => Ae.FromJSON (Dense currency) where
   parseJSON = maybe empty pure <=< fmap fromSomeDense . Ae.parseJSON
 -- | Compatible with 'Dense'
+--
+-- Note: The JSON serialization changed in version 0.4 (the leading @"Dense"@
+-- string was dropped from the rendered 'Ae.Array').
 instance Ae.ToJSON SomeDense where
-  toJSON = \(SomeDense c n d) -> Ae.toJSON ("Dense", c, n, d)
--- | Compatible with 'Dense'
+  toJSON = \(SomeDense c n d) -> Ae.toJSON (c, n, d)
+-- | Compatible with 'Dense'.
+--
+-- Note: The JSON serialization changed in version 0.4. However, this instance
+-- is still able to cope with the previous format.
 instance Ae.FromJSON SomeDense where
   parseJSON = \v -> do
-    ("Dense", c, n, d) <- Ae.parseJSON v
+    (c, n, d) <- Ae.parseJSON v <|> do
+       -- Pre 0.4 format.
+       ("Dense", c, n, d) <- Ae.parseJSON v
+       pure (c, n, d)
     maybe empty pure (mkSomeDense c n d)
 -- | Compatible with 'SomeDiscrete'
+--
+-- Note: The JSON serialization changed in version 0.4 (the leading @"Discrete"@
+-- string was dropped from the rendered 'Ae.Array').
 instance
   ( KnownSymbol currency, GoodScale scale
   ) => Ae.ToJSON (Discrete' currency scale) where
   toJSON = Ae.toJSON . toSomeDiscrete
 -- | Compatible with 'SomeDiscrete'
+--
+-- Note: The JSON serialization changed in version 0.4. However, this instance
+-- is still able to cope with the previous format.
 instance
   ( KnownSymbol currency, GoodScale scale
   ) => Ae.FromJSON (Discrete' currency scale) where
   parseJSON = maybe empty pure <=< fmap fromSomeDiscrete . Ae.parseJSON
 -- | Compatible with 'Discrete''
+--
+-- Note: The JSON serialization changed in version 0.4 (the leading @"Discrete"@
+-- string was dropped from the rendered 'Ae.Array').
 instance Ae.ToJSON SomeDiscrete where
-  toJSON = \(SomeDiscrete c n d a) -> Ae.toJSON ("Discrete", c, n, d, a)
+  toJSON = \(SomeDiscrete c n d a) -> Ae.toJSON (c, n, d, a)
 -- | Compatible with 'Discrete''
+--
+-- Note: The JSON serialization changed in version 0.4. However, this instance
+-- is still able to cope with the previous format.
 instance Ae.FromJSON SomeDiscrete where
   parseJSON = \v -> do
-    ("Discrete", c, n, d, a) <- Ae.parseJSON v
+    (c, n, d, a) <- Ae.parseJSON v <|> do
+       -- Pre 0.4 format.
+       ("Discrete", c, n, d, a) <- Ae.parseJSON v
+       pure (c, n, d, a)
     maybe empty pure (mkSomeDiscrete c n d a)
 -- | Compatible with 'SomeExchangeRate'
+--
+-- Note: The JSON serialization changed in version 0.4 (the leading
+-- @"ExchangeRate"@ string was dropped from the rendered 'Ae.Array').
 instance
   ( KnownSymbol src, KnownSymbol dst
   ) => Ae.ToJSON (ExchangeRate src dst) where
   toJSON = Ae.toJSON . toSomeExchangeRate
 -- | Compatible with 'SomeExchangeRate'
+--
+-- Note: The JSON serialization changed in version 0.4. However, this instance
+-- is still able to cope with the previous format.
 instance
   ( KnownSymbol src, KnownSymbol dst
   ) => Ae.FromJSON (ExchangeRate src dst) where
   parseJSON = maybe empty pure <=< fmap fromSomeExchangeRate . Ae.parseJSON
 -- | Compatible with 'ExchangeRate'
+--
+-- Note: The JSON serialization changed in version 0.4 (the leading
+-- @"ExchangeRate"@ string was dropped from the rendered 'Ae.Array').
 instance Ae.ToJSON SomeExchangeRate where
-  toJSON = \(SomeExchangeRate src dst n d) ->
-    Ae.toJSON ("ExchangeRate", src, dst, n, d)
+  toJSON = \(SomeExchangeRate src dst n d) -> Ae.toJSON (src, dst, n, d)
 -- | Compatible with 'ExchangeRate'
+--
+-- Note: The JSON serialization changed in version 0.4. However, this instance
+-- is still able to cope with the previous format.
 instance Ae.FromJSON SomeExchangeRate where
   parseJSON = \v -> do
-    ("ExchangeRate", src, dst, n, d) <- Ae.parseJSON v
+    (src, dst, n, d) <- Ae.parseJSON v <|> do
+       -- Pre 0.4 format.
+       ("ExchangeRate", src, dst, n, d) <- Ae.parseJSON v
+       pure (src, dst, n, d)
     maybe empty pure (mkSomeExchangeRate src dst n d)
 #endif
 

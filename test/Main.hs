@@ -14,7 +14,7 @@ import Data.Proxy (Proxy(Proxy))
 import GHC.TypeLits (Nat, Symbol, KnownSymbol, symbolVal)
 import qualified Test.Tasty as Tasty
 import qualified Test.Tasty.Runners as Tasty
-import Test.Tasty.QuickCheck ((===), (==>))
+import Test.Tasty.QuickCheck ((===), (==>), (.&&.))
 import qualified Test.Tasty.QuickCheck as QC
 
 #ifdef HAS_aeson
@@ -50,7 +50,7 @@ instance
 instance QC.Arbitrary Money.SomeDiscrete where
   arbitrary = do
     let md = Money.mkSomeDiscrete <$> QC.arbitrary <*> QC.arbitrary
-                                 <*> QC.arbitrary <*> QC.arbitrary
+                                  <*> QC.arbitrary <*> QC.arbitrary
     Just x <- QC.suchThat md isJust
     pure x
   shrink = \x -> Money.withSomeDiscrete x (map Money.toSomeDiscrete . QC.shrink)
@@ -78,7 +78,7 @@ instance QC.Arbitrary (Money.ExchangeRate src dst) where
 instance QC.Arbitrary Money.SomeExchangeRate where
   arbitrary = do
     let md = Money.mkSomeExchangeRate <$> QC.arbitrary <*> QC.arbitrary
-                                     <*> QC.arbitrary <*> QC.arbitrary
+                                      <*> QC.arbitrary <*> QC.arbitrary
     Just x <- QC.suchThat md isJust
     pure x
   shrink = \x ->
@@ -165,6 +165,15 @@ testDense pc =
   , QC.testProperty "Aeson encoding roundtrip (SomeDense through Dense)" $
       QC.forAll QC.arbitrary $ \(x :: Money.Dense currency) ->
          Just (Money.toSomeDense x) === Ae.decode (Ae.encode x)
+  , QC.testProperty "Aeson decoding of pre-0.4 format (Dense, SomeDense)" $
+      QC.forAll QC.arbitrary $ \(x :: Money.Dense currency) ->
+        let sx = Money.toSomeDense x
+            c = Money.someDenseCurrency sx
+            n = Money.someDenseAmountNumerator sx
+            d = Money.someDenseAmountDenominator sx
+            bs = Ae.encode ("Dense", c, n, d)
+        in (Just  x === Ae.decode bs) .&&.
+           (Just sx === Ae.decode bs)
 #endif
 
 #ifdef HAS_binary
@@ -309,6 +318,16 @@ testDiscrete pc pu =
   , QC.testProperty "Aeson encoding roundtrip (SomeDiscrete through Discrete)" $
       QC.forAll QC.arbitrary $ \(x :: Money.Discrete currency unit) ->
          Just (Money.toSomeDiscrete x) === Ae.decode (Ae.encode x)
+  , QC.testProperty "Aeson decoding of pre-0.4 format (Discrete, SomeDiscrete)" $
+      QC.forAll QC.arbitrary $ \(x :: Money.Discrete currency unit) ->
+        let sx = Money.toSomeDiscrete x
+            c = Money.someDiscreteCurrency sx
+            n = Money.someDiscreteScaleNumerator sx
+            d = Money.someDiscreteScaleDenominator sx
+            a = Money.someDiscreteAmount sx
+            bs = Ae.encode ("Discrete", c, n, d, a)
+        in (Just  x === Ae.decode bs) .&&.
+           (Just sx === Ae.decode bs)
 #endif
 
 #ifdef HAS_binary
@@ -448,6 +467,16 @@ testExchangeRate ps pd =
   , QC.testProperty "Aeson encoding roundtrip (SomeExchangeRate through ExchangeRate)" $
       QC.forAll QC.arbitrary $ \(x :: Money.ExchangeRate src dst) ->
          Just (Money.toSomeExchangeRate x) === Ae.decode (Ae.encode x)
+  , QC.testProperty "Aeson decoding of pre-0.4 format (ExchangeRate, SomeExchangeRate)" $
+      QC.forAll QC.arbitrary $ \(x :: Money.ExchangeRate src dst) ->
+        let sx = Money.toSomeExchangeRate x
+            src = Money.someExchangeRateSrcCurrency sx
+            dst = Money.someExchangeRateDstCurrency sx
+            n = Money.someExchangeRateRateNumerator sx
+            d = Money.someExchangeRateRateDenominator sx
+            bs = Ae.encode ("ExchangeRate", src, dst, n, d)
+        in (Just  x === Ae.decode bs) .&&.
+           (Just sx === Ae.decode bs)
 #endif
 
 #ifdef HAS_binary

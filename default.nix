@@ -15,6 +15,9 @@ packageSetConfig = self: super: {
     serialise = null;
     store = null;
   };
+
+  # The default version doesn't compile.
+  weigh = self.weigh_0_0_7;
 };
 
 ghc802 = pkgs.haskell.packages.ghc802.override { inherit packageSetConfig; };

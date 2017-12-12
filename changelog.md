@@ -1,11 +1,21 @@
 # Version 0.4
 
-* BREAKING CHANGE: The `dense` function was renamed to `dense'`, and now there
-  is a new partial `dense` function that just crashes where `dense'` would
-  return `Nothing`.
+* BREAKING CHANGE. COMPILER WON'T COMPLAIN. HUMAN INTERVENTION POTENTIALLY
+  REQUIRED. The JSON serializations for all of `Dense`, `SomeDense`, `Discrete`,
+  `SomeDiscrete`, `ExchangeRate` and `SomeExchangeRate` changed. The `FromJSON`
+  instances are backwards compatible with the old serializations, but the
+  `ToJSON` instances will only generate the new format, which is the same as the
+  old format except the leading strings `"Dense"`, `"Discrete"` and
+  `"ExchangeRate"`, respectively, are not present in the rendered JSON array
+  anymore. So, if you were manually relying on the `ToJSON` instance, please
+  update your code.
 
-* BREAKING CHANGE: Changed the `Rep` suffix for a `Some` prefix Everywhere.
-  For example, `DenseRep` was renamed to `SomeDense`.
+* BREAKING CHANGE. COMPILER WILL COMPLAIN. The `dense` function was renamed to
+  `dense'`, and now there is a new partial `dense` function that just crashes
+  where `dense'` would return `Nothing`.
+
+* BREAKING CHANGE. COMPILER WILL COMPLAIN: Changed the `Rep` suffix for a `Some`
+  prefix Everywhere.  For example, `DenseRep` was renamed to `SomeDense`.
 
 * Added instances for `serialise`.
 
