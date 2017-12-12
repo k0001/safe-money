@@ -39,25 +39,25 @@ library
 
   if flag(aeson)
     build-depends: aeson (>=0.9)
-    ghc-options: -DHAS_aeson
+    cpp-options: -DHAS_aeson
   if flag(binary)
     build-depends: binary (>=0.7)
-    ghc-options: -DHAS_binary
+    cpp-options: -DHAS_binary
   if flag(cereal)
     build-depends: cereal (>=0.5)
-    ghc-options: -DHAS_cereal
+    cpp-options: -DHAS_cereal
   if flag(deepseq)
     build-depends: deepseq (>=1.4)
-    ghc-options: -DHAS_deepseq
+    cpp-options: -DHAS_deepseq
   if flag(hashable)
     build-depends: hashable (>=1.2)
-    ghc-options: -DHAS_hashable
+    cpp-options: -DHAS_hashable
   if flag(serialise)
     build-depends: serialise (>=0.2)
-    ghc-options: -DHAS_serialise
+    cpp-options: -DHAS_serialise
   if (flag(store) && !impl(ghcjs))
     build-depends: store (>=0.2)
-    ghc-options: -DHAS_store
+    cpp-options: -DHAS_store
 
 test-suite test
   default-language: Haskell2010
@@ -75,25 +75,25 @@ test-suite test
 
   if flag(aeson)
     build-depends: aeson
-    ghc-options: -DHAS_aeson
+    cpp-options: -DHAS_aeson
   if flag(binary)
     build-depends: binary
-    ghc-options: -DHAS_binary
+    cpp-options: -DHAS_binary
   if flag(cereal)
     build-depends: cereal
-    ghc-options: -DHAS_cereal
+    cpp-options: -DHAS_cereal
   if flag(deepseq)
     build-depends: deepseq
-    ghc-options: -DHAS_deepseq
+    cpp-options: -DHAS_deepseq
   if flag(hashable)
     build-depends: hashable
-    ghc-options: -DHAS_hashable
+    cpp-options: -DHAS_hashable
   if flag(serialise)
     build-depends: serialise
-    ghc-options: -DHAS_serialise
+    cpp-options: -DHAS_serialise
   if (flag(store) && !impl(ghcjs))
     build-depends: store
-    ghc-options: -DHAS_store
+    cpp-options: -DHAS_store
 
 flag aeson
   description: Provide instances for @aeson@
