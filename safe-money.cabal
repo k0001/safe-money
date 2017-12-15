@@ -6,7 +6,7 @@ copyright: Copyright (c) Renzo Carbonara 2016-2017
 author: Renzo Carbonara
 maintainer: renλren!zone
 stability: Experimental
-tested-with: GHC==8.2.1, GHC==8.0.2, GHCJS
+tested-with: GHC==8.2.2, GHC==8.0.2, GHCJS
 homepage: https://github.com/k0001/safe-money
 bug-reports: https://github.com/k0001/safe-money/issues
 category: Money
