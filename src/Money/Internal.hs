@@ -152,7 +152,13 @@ import qualified GHC.TypeLits as GHC
 -- you will need to convert back and forth betwen the 'Rational' representation
 -- for 'Dense' and your (likely lossy) representation for /Real/ numbers.
 newtype Dense (currency :: Symbol) = Dense Rational
-  deriving (Eq, Ord, Num, Real, Fractional, GHC.Generic)
+  deriving (Eq, Ord, Num, Real, GHC.Generic)
+
+-- | /WARNING/ if there exists the possibility that the given 'Rational' has a
+-- zero as a denominator, which although unlikely, is possible if the 'Rational'
+-- is constructed unsafely using 'GHC.Real.infinity' or 'GHC.Real.notANumber'
+-- for example, then use 'dense' instead of 'fromRational'.
+deriving instance Fractional (Dense (currency :: Symbol))
 
 instance forall currency. KnownSymbol currency => Show (Dense currency) where
   showsPrec n = \(Dense r0) ->
