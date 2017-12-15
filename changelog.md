@@ -1,3 +1,8 @@
+# Version HEAD
+
+* `ExchangeRate` is now a `Category`.
+
+
 # Version 0.4
 
 * BREAKING CHANGE. COMPILER WON'T COMPLAIN. HUMAN INTERVENTION POTENTIALLY

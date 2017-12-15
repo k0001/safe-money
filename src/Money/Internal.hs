@@ -71,6 +71,7 @@ module Money.Internal
  ) where
 
 import Control.Applicative ((<|>), empty)
+import Control.Category (Category((.), id))
 import Control.Monad ((<=<), guard, when)
 import Data.Constraint (Dict(Dict))
 import Data.Monoid ((<>))
@@ -82,7 +83,7 @@ import GHC.Real (infinity, notANumber)
 import GHC.TypeLits
   (Symbol, SomeSymbol(..), Nat, SomeNat(..), CmpNat, KnownSymbol, KnownNat,
    natVal, someNatVal, symbolVal, someSymbolVal)
-import Prelude hiding (round, ceiling, floor, truncate)
+import Prelude hiding ((.), round, ceiling, floor, truncate)
 import qualified Prelude
 import qualified Text.ParserCombinators.ReadPrec as ReadPrec
 import qualified Text.ParserCombinators.ReadP as ReadP
@@ -582,6 +583,42 @@ scale = \_ ->
 newtype ExchangeRate (src :: Symbol) (dst :: Symbol) = ExchangeRate Rational
   deriving (Eq, Ord, GHC.Generic)
 
+
+-- | Composition of 'ExchangeRate's multiplies exchange rates together:
+--
+-- @
+-- 'fromExchangeRate' x * 'fromExchangeRate' y  ==  'fromExchangeRate' (x . y)
+-- @
+--
+-- Identity:
+--
+-- @
+-- x  ==  x . id  ==  id . x
+-- @
+--
+-- Associativity:
+--
+-- @
+-- x . y . z  ==  x . (y . z)  ==  (x . y) . z
+-- @
+--
+-- Conmutativity (provided the types allow for composition):
+--
+-- @
+-- x . y  ==  y . x
+-- @
+--
+-- Multiplicative inverse:
+--
+-- @
+-- 1  ==  'fromExchangeRate' (x . 'flipExchangeRate' x)
+-- @
+instance Category ExchangeRate where
+  id = ExchangeRate 1
+  {-# INLINE id #-}
+  ExchangeRate a . ExchangeRate b = ExchangeRate (a * b)
+  {-# INLINE (.) #-}
+
 instance forall src dst.
   ( KnownSymbol src, KnownSymbol dst
   ) => Show (ExchangeRate src dst) where
@@ -624,7 +661,8 @@ exchangeRate = \r0 ->
 
 -- | Flip the direction of an 'ExchangeRate'.
 --
--- Identity law:
+-- This function retuns the multiplicative inverse of the given 'ExchangeRate',
+-- leading to the following identity law:
 --
 -- @
 -- 'flipExchangeRate' . 'flipExchangeRate'   ==  'id'

@@ -8,11 +8,13 @@
 
 module Main where
 
+import Control.Category (Category((.), id))
 import qualified Data.ByteString.Lazy as BSL
 import Data.Maybe (catMaybes, isJust, isNothing)
 import Data.Proxy (Proxy(Proxy))
 import Data.Ratio (numerator, denominator)
 import GHC.TypeLits (Nat, Symbol, KnownSymbol, symbolVal)
+import Prelude hiding ((.), id)
 import qualified Test.Tasty as Tasty
 import qualified Test.Tasty.Runners as Tasty
 import Test.Tasty.QuickCheck ((===), (==>), (.&&.))
@@ -446,7 +448,24 @@ testExchangeRate
 testExchangeRate ps pd =
   Tasty.testGroup ("ExchangeRate " ++ show (symbolVal ps) ++ " "
                                    ++ show (symbolVal pd))
-  [ QC.testProperty "read . show == id" $
+  [ QC.testProperty "Category: left identity" $
+      QC.forAll QC.arbitrary $ \(xr :: Money.ExchangeRate src dst) ->
+         xr === id . xr
+  , QC.testProperty "Category: right identity" $
+      QC.forAll QC.arbitrary $ \(xr :: Money.ExchangeRate src dst) ->
+         xr === xr . id
+  , QC.testProperty "Category: composition with inverse" $
+      QC.forAll QC.arbitrary $ \(xr1 :: Money.ExchangeRate src dst) ->
+         (1 === Money.fromExchangeRate (xr1 . Money.flipExchangeRate xr1)) .&&.
+         (1 === Money.fromExchangeRate (Money.flipExchangeRate xr1 . xr1))
+  , QC.testProperty "Category: composition with other" $
+      QC.forAll QC.arbitrary $ \(xr1 :: Money.ExchangeRate src dst,
+                                 xr2 :: Money.ExchangeRate dst src) ->
+         let a = Money.fromExchangeRate xr1 * Money.fromExchangeRate xr2
+         in (a === Money.fromExchangeRate (xr1 . xr2)) .&&.
+            (a === Money.fromExchangeRate (xr2 . xr1))
+
+  , QC.testProperty "read . show == id" $
       QC.forAll QC.arbitrary $ \(xr :: Money.ExchangeRate src dst) ->
          xr === read (show xr)
   , QC.testProperty "read . show . Just == Just" $
