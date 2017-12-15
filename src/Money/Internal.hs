@@ -285,16 +285,15 @@ roundf
   .  GoodScale scale
   => (Rational -> Integer) -- ^ 'Prelude.round', 'Prelude.ceiling' or similar.
   -> Dense currency
-  -> (Discrete' currency scale, Maybe (Dense currency))
+  -> (Discrete' currency scale, Dense currency)
 roundf f = \c0 ->
   let !r0 = toRational c0 :: Rational
       !r1 = scale (Proxy :: Proxy scale)
       !i2 = f (r0 * r1) :: Integer
       !r2 = fromInteger i2 / r1 :: Rational
-      !ycrest | r0 == r2  = Nothing
-              | otherwise = Just (Dense (r0 - r2))
       !d2 = Discrete i2
-  in (d2, ycrest)
+      !rest = Dense (r0 - r2)
+  in (d2, rest)
 {-# INLINABLE roundf #-}
 
 -- | Round a 'Dense' value @x@ to the nearest value fully representable in
@@ -304,7 +303,7 @@ roundf f = \c0 ->
 -- then the following holds:
 --
 -- @
--- 'round' x == (x, 'Nothing')
+-- 'round' x == ('fromDiscrete' x, 0)
 -- @
 --
 -- Otherwise, if the nearest value to @x@ that is fully representable in its
@@ -324,14 +323,12 @@ roundf f = \c0 ->
 -- Proof that 'round' doesn't lose money:
 --
 -- @
--- x == case 'round' x of
---        (y, 'Nothing') -> y
---        (y, 'Just' z)  -> y + z
+-- x == case 'round' x of (y, z) -> 'fromDiscrete' y + z
 -- @
 round
   :: GoodScale scale
   => Dense currency
-  -> (Discrete' currency scale, Maybe (Dense currency)) -- ^
+  -> (Discrete' currency scale, Dense currency) -- ^
 round = roundf Prelude.round
 {-# INLINABLE round #-}
 
@@ -343,7 +340,7 @@ round = roundf Prelude.round
 -- then the following holds:
 --
 -- @
--- 'ceiling' x == (x, 'Nothing')
+-- 'ceiling' x == ('fromDiscrete' x, 0)
 -- @
 --
 -- Otherwise, if @x@ is not representable in its @currency@'s @unit@ 'Scale',
@@ -364,14 +361,12 @@ round = roundf Prelude.round
 -- Proof that 'ceiling' doesn't lose money:
 --
 -- @
--- x == case 'ceiling' x of
---        (y, 'Nothing') -> y
---        (y, 'Just' z)  -> y + z
+-- x == case 'ceiling' x of (y, z) -> 'fromDiscrete' y + z
 -- @
 ceiling
   :: GoodScale scale
   => Dense currency
-  -> (Discrete' currency scale, Maybe (Dense currency)) -- ^
+  -> (Discrete' currency scale, Dense currency) -- ^
 ceiling = roundf Prelude.ceiling
 {-# INLINABLE ceiling #-}
 
@@ -383,7 +378,7 @@ ceiling = roundf Prelude.ceiling
 -- then the following holds:
 --
 -- @
--- 'floor' x == (x, 'Nothing')
+-- 'floor' x == ('fromDiscrete' x, 0)
 -- @
 --
 -- Otherwise, if @x@ is not representable in its @currency@'s @unit@ 'Scale',
@@ -404,14 +399,12 @@ ceiling = roundf Prelude.ceiling
 -- Proof that 'floor' doesn't lose money:
 --
 -- @
--- x == case 'floor' x of
---        (y, 'Nothing') -> y
---        (y, 'Just' z)  -> y + z
+-- x == case 'floor' x of (y, z) -> 'fromDiscrete' y + z
 -- @
 floor
   :: GoodScale scale
   => Dense currency
-  -> (Discrete' currency scale, Maybe (Dense currency)) -- ^
+  -> (Discrete' currency scale, Dense currency) -- ^
 floor = roundf Prelude.floor
 {-# INLINABLE floor #-}
 
@@ -423,7 +416,7 @@ floor = roundf Prelude.floor
 -- then the following holds:
 --
 -- @
--- 'truncate' x == (x, 'Nothing')
+-- 'truncate' x == ('fromDiscrete' x, 0)
 -- @
 --
 -- Otherwise, if @x@ is positive, then the following holds:
@@ -441,14 +434,12 @@ floor = roundf Prelude.floor
 -- Proof that 'truncate' doesn't lose money:
 --
 -- @
--- x == case 'truncate' x of
---        (y, 'Nothing') -> y
---        (y, 'Just' z)  -> y + z
+-- x == case 'truncate' x of (y, z) -> 'fromDiscrete' y + z
 -- @
 truncate
   :: GoodScale scale
   => Dense currency
-  -> (Discrete' currency scale, Maybe (Dense currency)) -- ^
+  -> (Discrete' currency scale, Dense currency) -- ^
 truncate = roundf Prelude.truncate
 {-# INLINABLE truncate #-}
 

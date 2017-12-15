@@ -19,6 +19,10 @@
   and `someExchangeRateRate`. The `mkSomeDense`, `someDiscreteScale` and
   `mkSomeDense` also take a `Rational` now.
 
+* BREAKING CHANGE. COMPILER WILL COMPLAIN: The `truncate`, `floor`, `celing` and
+  `round` functions now return just `0` as a reminder if there's no significant
+  reminder, instead of `Nothing`.
+
 * Added instances for `serialise`.
 
 * Added instances for `xmlbf`.

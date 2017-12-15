@@ -613,11 +613,24 @@ testRounding _ _ =
     , QC.testProperty "ceiling"  $ QC.forAll QC.arbitrary (g Money.ceiling)
     , QC.testProperty "round"    $ QC.forAll QC.arbitrary (g Money.round)
     , QC.testProperty "truncate" $ QC.forAll QC.arbitrary (g Money.truncate)
+    , QC.testProperty "floor no reminder"    $ QC.forAll QC.arbitrary (h Money.floor)
+    , QC.testProperty "ceiling no reminder"  $ QC.forAll QC.arbitrary (h Money.ceiling)
+    , QC.testProperty "round no reminder"    $ QC.forAll QC.arbitrary (h Money.round)
+    , QC.testProperty "truncate no reminder" $ QC.forAll QC.arbitrary (h Money.truncate)
     ]
   where
-    g f = \(x :: Money.Dense currency) -> x === case f x of
-      (y, Nothing) -> Money.fromDiscrete (y :: Money.Discrete currency unit)
-      (y, Just z)  -> Money.fromDiscrete y + z
+    g :: (Money.Dense currency -> (Money.Discrete' currency (Money.Scale currency unit), Money.Dense currency))
+      -> Money.Dense currency
+      -> QC.Property
+    g f = \x -> x === case f x of (y, z) -> Money.fromDiscrete y + z
+
+    h :: (Money.Dense currency -> (Money.Discrete' currency (Money.Scale currency unit), Money.Dense currency))
+      -> Money.Discrete currency unit
+      -> QC.Property
+    h f = \x -> (Money.fromDiscrete x) === case f (Money.fromDiscrete x) of
+      -- This first pattern match overlaps with the one below. I'm just making a point here.
+      (y, 0) -> Money.fromDiscrete y
+      (y, z) -> Money.fromDiscrete y + z
 
 hush :: Either a b -> Maybe b
 hush (Left _ ) = Nothing
