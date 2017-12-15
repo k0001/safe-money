@@ -353,7 +353,7 @@ round = roundf Prelude.round
 -- then the following holds:
 --
 -- @
--- 'ceiling' x == (y, 'Just' z)
+-- 'ceiling' x == (y, z)
 -- @
 --
 -- @
@@ -361,7 +361,7 @@ round = roundf Prelude.round
 -- @
 --
 -- @
--- z < 'zero'
+-- z < 0
 -- @
 --
 -- Proof that 'ceiling' doesn't lose money:
@@ -391,7 +391,7 @@ ceiling = roundf Prelude.ceiling
 -- then the following holds:
 --
 -- @
--- 'floor' x == (y, 'Just' z)
+-- 'floor' x == (y, z)
 -- @
 --
 -- @
@@ -399,7 +399,7 @@ ceiling = roundf Prelude.ceiling
 -- @
 --
 -- @
--- z > 'zero'
+-- z > 0
 -- @
 --
 -- Proof that 'floor' doesn't lose money:
