@@ -1293,10 +1293,10 @@ instance Ae.FromJSON SomeExchangeRate where
 
 -- | Compatible with 'SomeDense'
 --
--- Example rendering @'fromRational' (2 % 3) :: 'Dense' "BTC"@:
+-- Example rendering @'fromRational' (2 % 3) :: 'Dense' \"BTC\"@:
 --
 -- @
--- \<money-dense c="BTC" n="2" d="3"/>
+-- \<money-dense c=\"BTC\" n=\"2\" d=\"3\"/>
 -- @
 instance KnownSymbol currency => Xmlbf.ToXml (Dense currency) where
   toXml = Xmlbf.toXml . toSomeDense
@@ -1325,10 +1325,10 @@ instance Xmlbf.FromXml SomeDense where
 
 -- | Compatible with 'SomeDiscrete'
 --
--- Example rendering @43 :: 'Discrete' "BTC" "satoshi"@:
+-- Example rendering @43 :: 'Discrete' \"BTC\" \"satoshi\"@:
 --
 -- @
--- \<money-discrete c="BTC" n="100000000" d="1" a="43"/>
+-- \<money-discrete c=\"BTC\" n=\"100000000\" d=\"1\" a=\"43\"/>
 -- @
 instance
   ( KnownSymbol currency, GoodScale scale
@@ -1364,10 +1364,10 @@ instance Xmlbf.FromXml SomeDiscrete where
 -- | Compatible with 'SomeExchangeRate'
 --
 -- Example rendering an 'ExchangeRate' constructed with
--- @'exchangeRate' (5 % 7) :: 'Maybe' ('ExchangeRate' "USD" "JPY")@
+-- @'exchangeRate' (5 % 7) :: 'Maybe' ('ExchangeRate' \"USD\" \"JPY\")@
 --
 -- @
--- \<exchange-rate src="USD" dst="JPY" n="5" d="7"/>
+-- \<exchange-rate src=\"USD\" dst=\"JPY\" n=\"5\" d=\"7\"/>
 -- @
 instance
   ( KnownSymbol src, KnownSymbol dst
