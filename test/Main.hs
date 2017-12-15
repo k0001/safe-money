@@ -628,9 +628,8 @@ testRounding _ _ =
       -> Money.Discrete currency unit
       -> QC.Property
     h f = \x -> (Money.fromDiscrete x) === case f (Money.fromDiscrete x) of
-      -- This first pattern match overlaps with the one below. I'm just making a point here.
       (y, 0) -> Money.fromDiscrete y
-      (y, z) -> Money.fromDiscrete y + z
+      (_, _) -> error "testRounding.h: unexpected"
 
 hush :: Either a b -> Maybe b
 hush (Left _ ) = Nothing

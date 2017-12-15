@@ -1177,16 +1177,24 @@ instance Ser.Serialise SomeExchangeRate where
 #ifdef HAS_aeson
 -- | Compatible with 'SomeDense'
 --
+-- Example rendering @'fromRational' (2 % 3) :: 'Dense' \"BTC\"@:
+--
+-- @
+-- [\"BTC\", 2, 3]
+-- @
+--
 -- Note: The JSON serialization changed in version 0.4 (the leading @"Dense"@
 -- string was dropped from the rendered 'Ae.Array').
 instance KnownSymbol currency => Ae.ToJSON (Dense currency) where
   toJSON = Ae.toJSON . toSomeDense
+
 -- | Compatible with 'SomeDense'
 --
 -- Note: The JSON serialization changed in version 0.4. However, this instance
 -- is still able to cope with the previous format.
 instance KnownSymbol currency => Ae.FromJSON (Dense currency) where
   parseJSON = maybe empty pure <=< fmap fromSomeDense . Ae.parseJSON
+
 -- | Compatible with 'Dense'
 --
 -- Note: The JSON serialization changed in version 0.4 (the leading @"Dense"@
@@ -1194,6 +1202,7 @@ instance KnownSymbol currency => Ae.FromJSON (Dense currency) where
 instance Ae.ToJSON SomeDense where
   toJSON = \(SomeDense c r) ->
     Ae.toJSON (c, numerator r, denominator r)
+
 -- | Compatible with 'Dense'.
 --
 -- Note: The JSON serialization changed in version 0.4. However, this instance
@@ -1206,7 +1215,14 @@ instance Ae.FromJSON SomeDense where
        pure (c, n, d)
     when (d == 0) (fail "denominator is zero")
     maybe empty pure (mkSomeDense c (n % d))
+
 -- | Compatible with 'SomeDiscrete'
+--
+-- Example rendering @43 :: 'Discrete' \"BTC\" \"satoshi\"@:
+--
+-- @
+-- [\"BTC\", 100000000, 1, 43]
+-- @
 --
 -- Note: The JSON serialization changed in version 0.4 (the leading @"Discrete"@
 -- string was dropped from the rendered 'Ae.Array').
@@ -1214,6 +1230,7 @@ instance
   ( KnownSymbol currency, GoodScale scale
   ) => Ae.ToJSON (Discrete' currency scale) where
   toJSON = Ae.toJSON . toSomeDiscrete
+
 -- | Compatible with 'SomeDiscrete'
 --
 -- Note: The JSON serialization changed in version 0.4. However, this instance
@@ -1222,6 +1239,7 @@ instance
   ( KnownSymbol currency, GoodScale scale
   ) => Ae.FromJSON (Discrete' currency scale) where
   parseJSON = maybe empty pure <=< fmap fromSomeDiscrete . Ae.parseJSON
+
 -- | Compatible with 'Discrete''
 --
 -- Note: The JSON serialization changed in version 0.4 (the leading @"Discrete"@
@@ -1229,6 +1247,7 @@ instance
 instance Ae.ToJSON SomeDiscrete where
   toJSON = \(SomeDiscrete c r a) ->
     Ae.toJSON (c, numerator r, denominator r, a)
+
 -- | Compatible with 'Discrete''
 --
 -- Note: The JSON serialization changed in version 0.4. However, this instance
@@ -1241,7 +1260,15 @@ instance Ae.FromJSON SomeDiscrete where
        pure (c, n, d, a)
     when (d == 0) (fail "denominator is zero")
     maybe empty pure (mkSomeDiscrete c (n % d) a)
+
 -- | Compatible with 'SomeExchangeRate'
+--
+-- Example rendering an 'ExchangeRate' constructed with
+-- @'exchangeRate' (5 % 7) :: 'Maybe' ('ExchangeRate' \"USD\" \"JPY\")@
+--
+-- @
+-- [\"USD\", \"JPY\", 5, 7]
+-- @
 --
 -- Note: The JSON serialization changed in version 0.4 (the leading
 -- @"ExchangeRate"@ string was dropped from the rendered 'Ae.Array').
@@ -1249,6 +1276,7 @@ instance
   ( KnownSymbol src, KnownSymbol dst
   ) => Ae.ToJSON (ExchangeRate src dst) where
   toJSON = Ae.toJSON . toSomeExchangeRate
+
 -- | Compatible with 'SomeExchangeRate'
 --
 -- Note: The JSON serialization changed in version 0.4. However, this instance
@@ -1257,6 +1285,7 @@ instance
   ( KnownSymbol src, KnownSymbol dst
   ) => Ae.FromJSON (ExchangeRate src dst) where
   parseJSON = maybe empty pure <=< fmap fromSomeExchangeRate . Ae.parseJSON
+
 -- | Compatible with 'ExchangeRate'
 --
 -- Note: The JSON serialization changed in version 0.4 (the leading
@@ -1264,6 +1293,7 @@ instance
 instance Ae.ToJSON SomeExchangeRate where
   toJSON = \(SomeExchangeRate src dst r) ->
     Ae.toJSON (src, dst, numerator r, denominator r)
+
 -- | Compatible with 'ExchangeRate'
 --
 -- Note: The JSON serialization changed in version 0.4. However, this instance
