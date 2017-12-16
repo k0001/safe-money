@@ -1,4 +1,4 @@
-# Version HEAD
+# Version 0.4.1
 
 * `ExchangeRate` is now a `Category`.
 

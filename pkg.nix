@@ -29,7 +29,7 @@ extraDeps =
 
 in mkDerivation rec {
   pname = "safe-money";
-  version = "0.4";
+  version = "0.4.1";
   homepage = "https://github.com/k0001/safe-money";
   description = "Type-safe and lossless encoding and manipulation of money, currencies and precious metals";
   license = stdenv.lib.licenses.bsd3;
