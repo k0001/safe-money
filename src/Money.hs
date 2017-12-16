@@ -14,6 +14,10 @@
 -- a new 'I.Scale' instance, and /voilà/. If you want to add a new currency to the
 -- out-of-the-box offer, please request so in
 -- https://github.com/k0001/safe-money/issues and the authors will see to it.
+--
+-- This module offers plenty of documentation, but for a deep explanation of
+-- how all of the pieces fit together, please read
+-- https://ren.zone/articles/safe-money
 module Money
  ( -- * Dense monetary values
    I.Dense
