@@ -14,14 +14,14 @@ packageSetConfig = self: super: {
   safe-money = super.callPackage ./pkg.nix {};
   # Mostly here just to test whether the thing builds with flags turned off.
   safe-money_no-extras = self.safe-money.override {
-    aeson = null;
-    binary = null;
-    cereal = null;
-    deepseq = null;
-    hashable = null;
-    serialise = null;
-    store = null;
-    xmlbf = null;
+    hasAeson = false;
+    hasBinary = false;
+    hasCereal = false;
+    hasDeepseq = false;
+    hasHashable = false;
+    hasSerialise = false;
+    hasStore = false;
+    hasXmlbf = false;
   };
 
   # The default version doesn't compile.
