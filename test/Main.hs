@@ -158,6 +158,13 @@ testDense pc =
         in Money.withSomeDense dr $ \x' ->
              (show x, dr, Money.toSomeDense (x + 1))
                 === (show x', Money.toSomeDense x', Money.toSomeDense (x' + 1))
+  , QC.testProperty "denseFromDecimalString: OK" $
+      QC.forAll QC.arbitrary $ \(a :: Int, b :: Int) ->
+         let b' = abs b
+             r :: Rational = fromInteger (read (show a ++ show b'))
+                                * (10 ^^ negate (length (show b')))
+             Just d = Money.denseFromDecimalString (show a ++ "." ++ show b')
+         in r === toRational (d :: Money.Dense currency)
 
 #ifdef HAS_aeson
   , QC.testProperty "Aeson encoding roundtrip" $

@@ -22,6 +22,7 @@ module Money
  ( -- * Dense monetary values
    I.Dense
  , I.dense
+ , I.denseFromDecimalString
    -- * Discrete monetary values
  , I.Discrete
  , I.Discrete'

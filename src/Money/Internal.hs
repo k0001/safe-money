@@ -25,6 +25,8 @@ module Money.Internal
  ( -- * Dense monetary values
    Dense
  , dense
+ , denseFromDecimalString
+ , denseFromDecimalStringP
    -- * Discrete monetary values
  , Discrete
  , Discrete'
@@ -73,7 +75,9 @@ module Money.Internal
 import Control.Applicative ((<|>), empty)
 import Control.Category (Category((.), id))
 import Control.Monad ((<=<), guard, when)
+import Data.Char (isDigit)
 import Data.Constraint (Dict(Dict))
+import Data.Functor (($>))
 import Data.Monoid ((<>))
 import Data.Proxy (Proxy(..))
 import Data.Ratio ((%), numerator, denominator)
@@ -83,7 +87,7 @@ import GHC.Real (infinity, notANumber)
 import GHC.TypeLits
   (Symbol, SomeSymbol(..), Nat, SomeNat(..), CmpNat, KnownSymbol, KnownNat,
    natVal, someNatVal, symbolVal, someSymbolVal)
-import Prelude hiding ((.), round, ceiling, floor, truncate)
+import Prelude hiding ((.), id, round, ceiling, floor, truncate)
 import qualified Prelude
 import qualified Text.ParserCombinators.ReadPrec as ReadPrec
 import qualified Text.ParserCombinators.ReadP as ReadP
@@ -285,6 +289,38 @@ fromDiscrete
   -> Dense currency -- ^
 fromDiscrete = \c@(Discrete i) -> Dense (fromInteger i / scale c)
 {-# INLINABLE fromDiscrete #-}
+
+
+-- | Helper function for the rather frequent situation of wanting to convert a
+-- 'String' containing a decimal amount (e.g., @"-1.2345"@) to a 'Dense'.
+denseFromDecimalString :: String -> Maybe (Dense currency)
+denseFromDecimalString s = case ReadP.readP_to_S denseFromDecimalStringP s of
+  [(x,"")] -> Just x
+  _ -> Nothing
+
+-- | Parser used by 'denseFromDecimalString'.
+denseFromDecimalStringP :: ReadP.ReadP (Dense currency)
+denseFromDecimalStringP = do
+   f <- (ReadP.satisfy (== '-') $> negate) <|>
+        (ReadP.satisfy (== '+') $> id) <|>
+        (pure id)
+   a <- ReadP.munch1 isDigit
+   yb <- (ReadP.satisfy (== '.') *> fmap Just (ReadP.munch1 isDigit)) <|>
+         (pure Nothing)
+   ReadP.eof
+   pure $! Dense $ f $ case yb of
+      Nothing -> fromInteger (read a)
+      Just b -> fromInteger (read (a ++ b)) * (10 ^^ negate (length b))
+
+
+-- renderCurrency :: KnownSymbol currency => Dense currency -> String
+-- renderCurrency = \(_ :: Dense currency) -> symbolVal (Proxy :: Proxy currency)
+-- {-# INLINE renderCurrency #-}
+--
+-- renderDecimalAmount :: Word8 -> Dense currency -> String
+-- renderDecimalAmount n d = toRational
+-- {-# INLINE renderDecimalAmount #-}
+
 
 -- | Internal. Used to implement 'round', 'ceiling', 'floor' and 'truncate'.
 roundf
