@@ -1595,10 +1595,10 @@ renderDiscreteDecimal
   -- Notice that a leading @\'-\'@ is always added in case the amount is
   -- negative.
   -> Maybe Char
-  -- ^ Thousands separator for the integer part, if any (e.g., the @','@ in
+  -- ^ Thousands separator for the integer part, if any (e.g., the @\',\'@ in
   -- @1,234.56789@).
   -> Char
-  -- ^ Decimal separator (e.g., the @'.'@ in @1,234.56789@)
+  -- ^ Decimal separator (e.g., the @\'.\'@ in @1,234.56789@)
   -> Discrete' currency scale
   -- ^ The 'Discrete' amount to render.
   -> TL.Text
@@ -1616,12 +1616,12 @@ renderRationalDecimal
   -- ^ A rounding function to be used when necessary (i.e., one of 'P.floor',
   -- 'P.ceiling', 'P.round' or 'P.trucate' from "Prelude").
   -> Bool
-  -- ^ Whether to render a leading '+' sign in case the amount is non-negative.
+  -- ^ Whether to render a leading @\'+\'@ sign in case the amount is non-negative.
   -> Maybe Char
-  -- ^ Thousands separator for the integer part, if any (e.g., the @','@ in
+  -- ^ Thousands separator for the integer part, if any (e.g., the @\',\'@ in
   -- @1,234.56789@).
   -> Char
-  -- ^ Decimal separator (e.g., the @'.'@ in @1,234.56789@)
+  -- ^ Decimal separator (e.g., the @\'.\'@ in @1,234.56789@)
   -> Word8
   -- ^ Number of decimal numbers to render, if any.
   -> Rational
