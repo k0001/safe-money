@@ -25,8 +25,6 @@ module Money.Internal
  ( -- * Dense monetary values
    Dense
  , dense
- , denseFromDecimalString
- , denseFromDecimalStringP
    -- * Discrete monetary values
  , Discrete
  , Discrete'
@@ -70,25 +68,36 @@ module Money.Internal
  , someExchangeRateSrcCurrency
  , someExchangeRateDstCurrency
  , someExchangeRateRate
+ -- * Textual rendering
+ , renderCurrency
+ , renderDiscreteDecimal
+ , renderRationalDecimal
+ , renderThousands
  ) where
 
 import Control.Applicative ((<|>), empty)
 import Control.Category (Category((.), id))
 import Control.Monad ((<=<), guard, when)
-import Data.Char (isDigit)
 import Data.Constraint (Dict(Dict))
-import Data.Functor (($>))
+import Data.Int (Int64)
+import qualified Data.List as List
 import Data.Monoid ((<>))
 import Data.Proxy (Proxy(..))
 import Data.Ratio ((%), numerator, denominator)
+import qualified Data.Text as T
+import qualified Data.Text.Lazy as TL
+import qualified Data.Text.Lazy.Builder as TB
+import qualified Data.Text.Lazy.Builder.Int as TB
+import Data.Word (Word8)
 import GHC.Exts (fromList)
 import qualified GHC.Generics as GHC
 import GHC.Real (infinity, notANumber)
 import GHC.TypeLits
   (Symbol, SomeSymbol(..), Nat, SomeNat(..), CmpNat, KnownSymbol, KnownNat,
    natVal, someNatVal, symbolVal, someSymbolVal)
+import Numeric.Natural (Natural)
 import Prelude hiding ((.), id, round, ceiling, floor, truncate)
-import qualified Prelude
+import qualified Prelude as P
 import qualified Text.ParserCombinators.ReadPrec as ReadPrec
 import qualified Text.ParserCombinators.ReadP as ReadP
 import qualified Text.Read as Read
@@ -124,7 +133,6 @@ import qualified Data.Store as Store
 
 #ifdef HAS_xmlbf
 import qualified Xmlbf
-import qualified Data.Text as Text
 #endif
 
 #if MIN_VERSION_base(4,9,0)
@@ -290,43 +298,11 @@ fromDiscrete
 fromDiscrete = \c@(Discrete i) -> Dense (fromInteger i / scale c)
 {-# INLINABLE fromDiscrete #-}
 
-
--- | Helper function for the rather frequent situation of wanting to convert a
--- 'String' containing a decimal amount (e.g., @"-1.2345"@) to a 'Dense'.
-denseFromDecimalString :: String -> Maybe (Dense currency)
-denseFromDecimalString s = case ReadP.readP_to_S denseFromDecimalStringP s of
-  [(x,"")] -> Just x
-  _ -> Nothing
-
--- | Parser used by 'denseFromDecimalString'.
-denseFromDecimalStringP :: ReadP.ReadP (Dense currency)
-denseFromDecimalStringP = do
-   f <- (ReadP.satisfy (== '-') $> negate) <|>
-        (ReadP.satisfy (== '+') $> id) <|>
-        (pure id)
-   a <- ReadP.munch1 isDigit
-   yb <- (ReadP.satisfy (== '.') *> fmap Just (ReadP.munch1 isDigit)) <|>
-         (pure Nothing)
-   ReadP.eof
-   pure $! Dense $ f $ case yb of
-      Nothing -> fromInteger (read a)
-      Just b -> fromInteger (read (a ++ b)) * (10 ^^ negate (length b))
-
-
--- renderCurrency :: KnownSymbol currency => Dense currency -> String
--- renderCurrency = \(_ :: Dense currency) -> symbolVal (Proxy :: Proxy currency)
--- {-# INLINE renderCurrency #-}
---
--- renderDecimalAmount :: Word8 -> Dense currency -> String
--- renderDecimalAmount n d = toRational
--- {-# INLINE renderDecimalAmount #-}
-
-
 -- | Internal. Used to implement 'round', 'ceiling', 'floor' and 'truncate'.
 roundf
   :: forall currency scale
   .  GoodScale scale
-  => (Rational -> Integer) -- ^ 'Prelude.round', 'Prelude.ceiling' or similar.
+  => (Rational -> Integer) -- ^ 'P.round', 'P.ceiling' or similar.
   -> Dense currency
   -> (Discrete' currency scale, Dense currency)
 roundf f = \c0 ->
@@ -372,7 +348,7 @@ round
   :: GoodScale scale
   => Dense currency
   -> (Discrete' currency scale, Dense currency) -- ^
-round = roundf Prelude.round
+round = roundf P.round
 {-# INLINABLE round #-}
 
 -- | Round a 'Dense' value @x@ to the nearest value fully representable in
@@ -410,7 +386,7 @@ ceiling
   :: GoodScale scale
   => Dense currency
   -> (Discrete' currency scale, Dense currency) -- ^
-ceiling = roundf Prelude.ceiling
+ceiling = roundf P.ceiling
 {-# INLINABLE ceiling #-}
 
 -- | Round a 'Dense' value @x@ to the nearest value fully representable in
@@ -448,7 +424,7 @@ floor
   :: GoodScale scale
   => Dense currency
   -> (Discrete' currency scale, Dense currency) -- ^
-floor = roundf Prelude.floor
+floor = roundf P.floor
 {-# INLINABLE floor #-}
 
 -- | Round a 'Dense' value @x@ to the nearest value between zero and
@@ -483,7 +459,7 @@ truncate
   :: GoodScale scale
   => Dense currency
   -> (Discrete' currency scale, Dense currency) -- ^
-truncate = roundf Prelude.truncate
+truncate = roundf P.truncate
 {-# INLINABLE truncate #-}
 
 --------------------------------------------------------------------------------
@@ -1409,16 +1385,16 @@ instance KnownSymbol currency => Xmlbf.FromXml (Dense currency) where
 -- | Compatible with 'Dense'
 instance Xmlbf.ToXml SomeDense where
   toXml = \(SomeDense c r) ->
-    let as = [ (Text.pack "c", Text.pack c)
-             , (Text.pack "n", Text.pack (show (numerator r)))
-             , (Text.pack "d", Text.pack (show (denominator r))) ]
-        Right e = Xmlbf.element (Text.pack "money-dense") (fromList as) []
+    let as = [ (T.pack "c", T.pack c)
+             , (T.pack "n", T.pack (show (numerator r)))
+             , (T.pack "d", T.pack (show (denominator r))) ]
+        Right e = Xmlbf.element (T.pack "money-dense") (fromList as) []
     in [e]
 
 -- | Compatible with 'Dense'.
 instance Xmlbf.FromXml SomeDense where
-  fromXml = Xmlbf.pElement (Text.pack "money-dense") $ do
-    c <- Text.unpack <$> Xmlbf.pAttr "c"
+  fromXml = Xmlbf.pElement (T.pack "money-dense") $ do
+    c <- T.unpack <$> Xmlbf.pAttr "c"
     n <- Xmlbf.pRead =<< Xmlbf.pAttr "n"
     d <- Xmlbf.pRead =<< Xmlbf.pAttr "d"
     when (d == 0) (fail "denominator is zero")
@@ -1445,17 +1421,17 @@ instance
 -- | Compatible with 'Discrete''
 instance Xmlbf.ToXml SomeDiscrete where
   toXml = \(SomeDiscrete c r a) ->
-    let as = [ (Text.pack "c", Text.pack c)
-             , (Text.pack "n", Text.pack (show (numerator r)))
-             , (Text.pack "d", Text.pack (show (denominator r)))
-             , (Text.pack "a", Text.pack (show a)) ]
-        Right e = Xmlbf.element (Text.pack "money-discrete") (fromList as) []
+    let as = [ (T.pack "c", T.pack c)
+             , (T.pack "n", T.pack (show (numerator r)))
+             , (T.pack "d", T.pack (show (denominator r)))
+             , (T.pack "a", T.pack (show a)) ]
+        Right e = Xmlbf.element (T.pack "money-discrete") (fromList as) []
     in [e]
 
 -- | Compatible with 'Discrete''
 instance Xmlbf.FromXml SomeDiscrete where
-  fromXml = Xmlbf.pElement (Text.pack "money-discrete") $ do
-    c <- Text.unpack <$> Xmlbf.pAttr "c"
+  fromXml = Xmlbf.pElement (T.pack "money-discrete") $ do
+    c <- T.unpack <$> Xmlbf.pAttr "c"
     n <- Xmlbf.pRead =<< Xmlbf.pAttr "n"
     d <- Xmlbf.pRead =<< Xmlbf.pAttr "d"
     when (d == 0) (fail "denominator is zero")
@@ -1484,18 +1460,18 @@ instance
 -- | Compatible with 'ExchangeRate'
 instance Xmlbf.ToXml SomeExchangeRate where
   toXml = \(SomeExchangeRate src dst r) ->
-    let as = [ (Text.pack "src", Text.pack src)
-             , (Text.pack "dst", Text.pack dst)
-             , (Text.pack "n", Text.pack (show (numerator r)))
-             , (Text.pack "d", Text.pack (show (denominator r))) ]
-        Right e = Xmlbf.element (Text.pack "exchange-rate") (fromList as) []
+    let as = [ (T.pack "src", T.pack src)
+             , (T.pack "dst", T.pack dst)
+             , (T.pack "n", T.pack (show (numerator r)))
+             , (T.pack "d", T.pack (show (denominator r))) ]
+        Right e = Xmlbf.element (T.pack "exchange-rate") (fromList as) []
     in [e]
 
 -- | Compatible with 'ExchangeRate'
 instance Xmlbf.FromXml SomeExchangeRate where
-  fromXml = Xmlbf.pElement (Text.pack "exchange-rate") $ do
-    src <- Text.unpack <$> Xmlbf.pAttr "src"
-    dst <- Text.unpack <$> Xmlbf.pAttr "dst"
+  fromXml = Xmlbf.pElement (T.pack "exchange-rate") $ do
+    src <- T.unpack <$> Xmlbf.pAttr "src"
+    dst <- T.unpack <$> Xmlbf.pAttr "dst"
     n <- Xmlbf.pRead =<< Xmlbf.pAttr "n"
     d <- Xmlbf.pRead =<< Xmlbf.pAttr "d"
     when (d == 0) (fail "denominator is zero")
@@ -1572,4 +1548,98 @@ storeContramapSize f = \case
   Store.ConstSize x -> Store.ConstSize x
 {-# INLINABLE storeContramapSize #-}
 #endif
+
+--------------------------------------------------------------------------------
+-- Rendering
+
+-- | Render a currency.
+--
+-- @
+-- > 'renderCurrency' ('Dense' \"USD\" \"cent\")
+-- \"USD\"
+-- @
+renderCurrency :: KnownSymbol currency => proxy currency -> TL.Text
+renderCurrency = TL.pack . symbolVal
+{-# INLINE renderCurrency #-}
+
+-- | Render a 'Natural' number with thousand markers.
+--
+-- @
+-- > 'renderThousands' \',\' 12345
+-- \"12,345\"
+-- @
+renderThousands :: Char -> Natural -> TL.Text
+renderThousands sep n
+  | n < 1000 = TB.toLazyText (TB.decimal n)
+  | otherwise =
+      TB.toLazyText $
+      List.foldl' (flip mappend) mempty $
+      List.intersperse (TB.singleton sep) $
+      List.unfoldr (\x -> case divMod x 1000 of
+                            (0, 0) -> Nothing
+                            (y, z) -> Just (TB.decimal z, y)) $ n
+
+-- | Render a 'Discrete' amount as a decimal string, using as many fractional
+-- digits as necessary to precisely represent the amount.
+--
+-- @
+-- > 'renderDiscreteDecimal' 'True' ('Just' \',\') \'.\' (123456 :: 'Discrete' \"EUR\" \"cent\")
+-- \"+1,234.56\"
+-- @
+renderDiscreteDecimal
+  :: GoodScale scale
+  => Bool
+  -- ^ Whether to render a leading @\'+\'@ sign in case the amount is
+  -- non-negative.
+  --
+  -- Notice that a leading @\'-\'@ is always added in case the amount is
+  -- negative.
+  -> Maybe Char
+  -- ^ Thousands separator for the integer part, if any (e.g., the @','@ in
+  -- @1,234.56789@).
+  -> Char
+  -- ^ Decimal separator (e.g., the @'.'@ in @1,234.56789@)
+  -> Discrete' currency scale
+  -- ^ The 'Discrete' amount to render.
+  -> TL.Text
+renderDiscreteDecimal plus yitsep dsep dis =
+  renderRationalDecimal P.round plus yitsep dsep
+     (P.ceiling (logBase 10 (fromRational (scale dis) :: Double)))
+     (toRational (fromDiscrete dis))
+
+-- | Render a 'Rational' number using its approximate decimal representation.
+--
+-- Prefer to use 'renderDiscreteDecimal' if you are rendering a 'Discrete'
+-- value.
+renderRationalDecimal
+  :: (Rational -> Integer)
+  -- ^ A rounding function to be used when necessary (i.e., one of 'P.floor',
+  -- 'P.ceiling', 'P.round' or 'P.trucate' from "Prelude").
+  -> Bool
+  -- ^ Whether to render a leading '+' sign in case the amount is non-negative.
+  -> Maybe Char
+  -- ^ Thousands separator for the integer part, if any (e.g., the @','@ in
+  -- @1,234.56789@).
+  -> Char
+  -- ^ Decimal separator (e.g., the @'.'@ in @1,234.56789@)
+  -> Word8
+  -- ^ Number of decimal numbers to render, if any.
+  -> Rational
+  -- ^ The rational number to render.
+  -> TL.Text
+renderRationalDecimal rnd plus yitsep dsep fdigs0 r0 =
+  let -- integer part
+      ipart :: Integer = (if fdigs0 < 1 then rnd else P.floor) (abs r0)
+      -- fractional part
+      fpart :: Integer = rnd ((abs r0 - fromInteger ipart + 1) * (10 ^ fdigs0))
+      ftext :: TL.Text = TL.drop 1 (TB.toLazyText (TB.decimal fpart))
+      fdigs :: Int64 = TL.length ftext
+      fpad :: TL.Text = TL.replicate (fromIntegral fdigs0 - fdigs) "0"
+  in mconcat
+       [ if r0 < 0 then "-" else if plus then "+" else ""
+       , maybe (TB.toLazyText (TB.decimal ipart))
+               (flip renderThousands (fromInteger ipart))
+               yitsep
+       , if fdigs0 > 0 then TL.singleton dsep <> ftext <> fpad else ""
+       ]
 

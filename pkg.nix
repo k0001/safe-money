@@ -1,6 +1,6 @@
 { mkDerivation, stdenv, ghc
-, base, bytestring, constraints, tasty, tasty-hunit, tasty-quickcheck
-, binary, aeson, cereal, deepseq, hashable, serialise, store, xmlbf, text
+, attoparsec, base, bytestring, constraints, tasty-hunit, tasty-quickcheck
+, tasty, binary, aeson, cereal, deepseq, hashable, serialise, store, xmlbf, text
 
 , hasAeson ? true
 , hasBinary ? true
@@ -21,7 +21,7 @@ extraDeps =
   stdenv.lib.optionals (hasHashable) [ hashable ] ++
   stdenv.lib.optionals (hasSerialise) [ serialise ] ++
   stdenv.lib.optionals (hasStore) [ store ] ++
-  stdenv.lib.optionals (hasXmlbf) [ xmlbf text ];
+  stdenv.lib.optionals (hasXmlbf) [ xmlbf ];
 
 in mkDerivation rec {
   pname = "safe-money";
@@ -31,7 +31,7 @@ in mkDerivation rec {
   license = stdenv.lib.licenses.bsd3;
   src = ./.;
   libraryHaskellDepends =
-    [ base constraints ] ++ extraDeps;
+    [ attoparsec base constraints text ] ++ extraDeps;
   testHaskellDepends = libraryHaskellDepends ++
     [ bytestring tasty tasty-hunit tasty-quickcheck ];
   configureFlags =
