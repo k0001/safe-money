@@ -82,15 +82,11 @@ import Control.Applicative ((<|>), empty)
 import Control.Category (Category((.), id))
 import Control.Monad ((<=<), guard, when)
 import Data.Constraint (Dict(Dict))
-import Data.Int (Int64)
 import qualified Data.List as List
 import Data.Monoid ((<>))
 import Data.Proxy (Proxy(..))
 import Data.Ratio ((%), numerator, denominator)
 import qualified Data.Text as T
-import qualified Data.Text.Lazy as TL
-import qualified Data.Text.Lazy.Builder as TB
-import qualified Data.Text.Lazy.Builder.Int as TB
 import Data.Word (Word8)
 import GHC.Exts (fromList)
 import qualified GHC.Generics as GHC
@@ -213,8 +209,8 @@ dense = \r0 -> if (denominator r0 == 0) then Nothing else Just (Dense r0)
 -- > 'denseCurrency' (4 :: 'Dense' \"USD\")
 -- \"USD\"
 -- @
-denseCurrency :: KnownSymbol currency => Dense currency -> T.Text
-denseCurrency = T.pack . symbolVal
+denseCurrency :: KnownSymbol currency => Dense currency -> String
+denseCurrency = symbolVal
 {-# INLINABLE denseCurrency #-}
 
 -- | 'Discrete' represents a discrete monetary value for a @currency@ expresed
@@ -321,8 +317,8 @@ discreteCurrency
   :: forall currency scale
   .  (KnownSymbol currency, GoodScale scale)
   => Discrete' currency scale
-  -> T.Text -- ^
-discreteCurrency = \_ -> T.pack (symbolVal (Proxy :: Proxy currency))
+  -> String -- ^
+discreteCurrency = \_ -> symbolVal (Proxy :: Proxy currency)
 {-# INLINABLE discreteCurrency #-}
 
 -- | Internal. Used to implement 'round', 'ceiling', 'floor' and 'truncate'.
@@ -1584,16 +1580,15 @@ storeContramapSize f = \case
 -- > 'renderThousands' \',\' 12345
 -- \"12,345\"
 -- @
-renderThousands :: Char -> Natural -> TL.Text
+renderThousands :: Char -> Natural -> String
 renderThousands sep n
-  | n < 1000 = TB.toLazyText (TB.decimal n)
+  | n < 1000 = show n
   | otherwise =
-      TB.toLazyText $
       List.foldl' (flip mappend) mempty $
-      List.intersperse (TB.singleton sep) $
+      List.intersperse [sep] $
       List.unfoldr (\x -> case divMod x 1000 of
                             (0, 0) -> Nothing
-                            (y, z) -> Just (TB.decimal z, y)) $ n
+                            (y, z) -> Just (show z, y)) $ n
 
 -- | Render a 'Discrete' amount as a decimal string, using as many fractional
 -- digits as necessary to precisely represent the amount.
@@ -1617,7 +1612,7 @@ discreteDecimal
   -- ^ Decimal separator (e.g., the @\'.\'@ in @1,234.56789@)
   -> Discrete' currency scale
   -- ^ The 'Discrete' amount to render.
-  -> T.Text
+  -> String
 discreteDecimal plus yitsep dsep dis =
   rationalDecimal P.round plus yitsep dsep
      (P.ceiling (logBase 10 (fromRational (scale dis) :: Double)))
@@ -1642,20 +1637,19 @@ rationalDecimal
   -- ^ Number of decimal numbers to render, if any.
   -> Rational
   -- ^ The rational number to render.
-  -> T.Text
+  -> String
 rationalDecimal rnd plus yitsep dsep fdigs0 r0 =
   let -- integer part
       ipart :: Integer = (if fdigs0 < 1 then rnd else P.floor) (abs r0)
       -- fractional part
       fpart :: Integer = rnd ((abs r0 - fromInteger ipart + 1) * (10 ^ fdigs0))
-      ftext :: TL.Text = TL.drop 1 (TB.toLazyText (TB.decimal fpart))
-      fdigs :: Int64 = TL.length ftext
-      fpad :: TL.Text = TL.replicate (fromIntegral fdigs0 - fdigs) "0"
-  in TL.toStrict $ mconcat
+      ftext :: String = List.drop 1 (show fpart)
+      fpad :: String = List.replicate (fromIntegral fdigs0 - length ftext) '0'
+  in mconcat
        [ if r0 < 0 then "-" else if plus then "+" else ""
-       , maybe (TB.toLazyText (TB.decimal ipart))
+       , maybe (show ipart)
                (flip renderThousands (fromInteger ipart))
                yitsep
-       , if fdigs0 > 0 then TL.singleton dsep <> ftext <> fpad else ""
+       , if fdigs0 > 0 then dsep : ftext <> fpad else ""
        ]
 

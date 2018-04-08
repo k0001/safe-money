@@ -35,7 +35,7 @@ library
   ghc-options: -Wall -O2
   exposed-modules: Money
   other-modules: Money.Internal
-  build-depends: base (>=4.8 && <5.0), constraints, text, attoparsec
+  build-depends: base (>=4.8 && <5.0), constraints
 
   if flag(aeson)
     build-depends: aeson (>=0.9)
@@ -59,7 +59,7 @@ library
     build-depends: store (>=0.2)
     cpp-options: -DHAS_store
   if flag(xmlbf)
-    build-depends: xmlbf (>=0.2)
+    build-depends: xmlbf (>=0.2), text
     cpp-options: -DHAS_xmlbf
 
 test-suite test
@@ -98,7 +98,7 @@ test-suite test
     build-depends: store
     cpp-options: -DHAS_store
   if flag(xmlbf)
-    build-depends: xmlbf
+    build-depends: xmlbf, text
     cpp-options: -DHAS_xmlbf
 
 flag aeson
