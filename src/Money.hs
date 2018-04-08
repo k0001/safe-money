@@ -22,6 +22,7 @@ module Money
  ( -- * Dense monetary values
    I.Dense
  , I.dense
+ , I.denseCurrency
    -- * Discrete monetary values
  , I.Discrete
  , I.Discrete'
@@ -30,6 +31,8 @@ module Money
  , I.ceiling
  , I.floor
  , I.truncate
+ , I.discreteCurrency
+ , I.discreteDecimal
    -- * Currency scales
  , I.Scale
  , I.GoodScale
@@ -64,11 +67,6 @@ module Money
  , I.someExchangeRateSrcCurrency
  , I.someExchangeRateDstCurrency
  , I.someExchangeRateRate
- -- * Textual rendering
- , I.renderCurrency
- , I.renderDiscreteDecimal
- , I.renderRationalDecimal
- , I.renderThousands
  ) where
 
 import qualified Money.Internal as I

@@ -4,6 +4,7 @@
 {-# LANGUAGE DataKinds #-}
 {-# LANGUAGE DeriveGeneric #-}
 {-# LANGUAGE FlexibleContexts #-}
+{-# LANGUAGE FlexibleInstances #-}
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
 {-# LANGUAGE KindSignatures #-}
 {-# LANGUAGE LambdaCase #-}
@@ -15,6 +16,7 @@
 {-# LANGUAGE TypeFamilies #-}
 {-# LANGUAGE TypeOperators #-}
 {-# LANGUAGE UndecidableInstances #-}
+{-# OPTIONS_HADDOCK hide #-}
 
 #if MIN_VERSION_base(4,9,0)
 {-# OPTIONS_GHC -Wno-redundant-constraints #-}
@@ -25,6 +27,7 @@ module Money.Internal
  ( -- * Dense monetary values
    Dense
  , dense
+ , denseCurrency
    -- * Discrete monetary values
  , Discrete
  , Discrete'
@@ -33,6 +36,8 @@ module Money.Internal
  , ceiling
  , floor
  , truncate
+ , discreteCurrency
+ , discreteDecimal
    -- * Currency scales
  , Scale
  , GoodScale
@@ -68,10 +73,8 @@ module Money.Internal
  , someExchangeRateSrcCurrency
  , someExchangeRateDstCurrency
  , someExchangeRateRate
- -- * Textual rendering
- , renderCurrency
- , renderDiscreteDecimal
- , renderRationalDecimal
+ -- * Msic Textual rendering
+ , rationalDecimal
  , renderThousands
  ) where
 
@@ -204,6 +207,16 @@ dense :: Rational -> Maybe (Dense currency)
 dense = \r0 -> if (denominator r0 == 0) then Nothing else Just (Dense r0)
 {-# INLINABLE dense #-}
 
+-- | 'Dense' currency identifier.
+--
+-- @
+-- > 'denseCurrency' (4 :: 'Dense' \"USD\")
+-- \"USD\"
+-- @
+denseCurrency :: KnownSymbol currency => Dense currency -> T.Text
+denseCurrency = T.pack . symbolVal
+{-# INLINABLE denseCurrency #-}
+
 -- | 'Discrete' represents a discrete monetary value for a @currency@ expresed
 -- as an integer amount of a particular @unit@. For example, with @currency ~
 -- \"USD\"@ and @unit ~ \"cent\"@ you can represent United States Dollars to
@@ -297,6 +310,20 @@ fromDiscrete
   -> Dense currency -- ^
 fromDiscrete = \c@(Discrete i) -> Dense (fromInteger i / scale c)
 {-# INLINABLE fromDiscrete #-}
+
+-- | 'Discrete' currency identifier.
+--
+-- @
+-- > 'discreteCurrency' (4 :: 'Discrete' \"USD\" \"cent\")
+-- \"USD\"
+-- @
+discreteCurrency
+  :: forall currency scale
+  .  (KnownSymbol currency, GoodScale scale)
+  => Discrete' currency scale
+  -> T.Text -- ^
+discreteCurrency = \_ -> T.pack (symbolVal (Proxy :: Proxy currency))
+{-# INLINABLE discreteCurrency #-}
 
 -- | Internal. Used to implement 'round', 'ceiling', 'floor' and 'truncate'.
 roundf
@@ -1550,17 +1577,6 @@ storeContramapSize f = \case
 #endif
 
 --------------------------------------------------------------------------------
--- Rendering
-
--- | Render a currency.
---
--- @
--- > 'renderCurrency' ('Dense' \"USD\" \"cent\")
--- \"USD\"
--- @
-renderCurrency :: KnownSymbol currency => proxy currency -> TL.Text
-renderCurrency = TL.pack . symbolVal
-{-# INLINE renderCurrency #-}
 
 -- | Render a 'Natural' number with thousand markers.
 --
@@ -1583,10 +1599,10 @@ renderThousands sep n
 -- digits as necessary to precisely represent the amount.
 --
 -- @
--- > 'renderDiscreteDecimal' 'True' ('Just' \',\') \'.\' (123456 :: 'Discrete' \"EUR\" \"cent\")
+-- > 'discreteDecimal' 'True' ('Just' \',\') \'.\' (123456 :: 'Discrete' \"EUR\" \"cent\")
 -- \"+1,234.56\"
 -- @
-renderDiscreteDecimal
+discreteDecimal
   :: GoodScale scale
   => Bool
   -- ^ Whether to render a leading @\'+\'@ sign in case the amount is
@@ -1601,19 +1617,19 @@ renderDiscreteDecimal
   -- ^ Decimal separator (e.g., the @\'.\'@ in @1,234.56789@)
   -> Discrete' currency scale
   -- ^ The 'Discrete' amount to render.
-  -> TL.Text
-renderDiscreteDecimal plus yitsep dsep dis =
-  renderRationalDecimal P.round plus yitsep dsep
+  -> T.Text
+discreteDecimal plus yitsep dsep dis =
+  rationalDecimal P.round plus yitsep dsep
      (P.ceiling (logBase 10 (fromRational (scale dis) :: Double)))
      (toRational (fromDiscrete dis))
 
 -- | Render a 'Rational' number using its approximate decimal representation.
 --
--- Prefer to use 'renderDiscreteDecimal' if you are rendering a 'Discrete'
+-- Prefer to use 'discreteDecimal' if you are rendering a 'Discrete'
 -- value.
-renderRationalDecimal
+rationalDecimal
   :: (Rational -> Integer)
-  -- ^ A rounding function to be used when necessary (i.e., one of 'P.floor',
+  -- ^ A rounding function to be used if necessary (i.e., one of 'P.floor',
   -- 'P.ceiling', 'P.round' or 'P.trucate' from "Prelude").
   -> Bool
   -- ^ Whether to render a leading @\'+\'@ sign in case the amount is non-negative.
@@ -1626,8 +1642,8 @@ renderRationalDecimal
   -- ^ Number of decimal numbers to render, if any.
   -> Rational
   -- ^ The rational number to render.
-  -> TL.Text
-renderRationalDecimal rnd plus yitsep dsep fdigs0 r0 =
+  -> T.Text
+rationalDecimal rnd plus yitsep dsep fdigs0 r0 =
   let -- integer part
       ipart :: Integer = (if fdigs0 < 1 then rnd else P.floor) (abs r0)
       -- fractional part
@@ -1635,7 +1651,7 @@ renderRationalDecimal rnd plus yitsep dsep fdigs0 r0 =
       ftext :: TL.Text = TL.drop 1 (TB.toLazyText (TB.decimal fpart))
       fdigs :: Int64 = TL.length ftext
       fpad :: TL.Text = TL.replicate (fromIntegral fdigs0 - fdigs) "0"
-  in mconcat
+  in TL.toStrict $ mconcat
        [ if r0 < 0 then "-" else if plus then "+" else ""
        , maybe (TB.toLazyText (TB.decimal ipart))
                (flip renderThousands (fromInteger ipart))

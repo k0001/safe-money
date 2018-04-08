@@ -1,3 +1,18 @@
+# Version 0.5
+
+* BREAKING CHANGE. `Text` is used througout, rather than `String`.
+
+* Added `denseCurrency`, `discreteCurrency`, `discreteDecimal`.
+
+* Dependency on `text` is now mandatory.
+
+* Dependency on `attoparsec` is now mandatory.
+
+* TODO fix flags (check how exinst does it).
+
+* TODO consider disabling `store` by default because of its many dependencies.
+
+
 # Version 0.4.1
 
 * `ExchangeRate` is now a `Category`.
