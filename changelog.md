@@ -2,8 +2,6 @@
 
 * Added `denseCurrency`, `discreteCurrency`, `discreteDecimal`.
 
-* TODO fix flags (check how exinst does it).
-
 * TODO consider disabling `store` by default because of its many dependencies.
 
 
