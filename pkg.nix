@@ -1,27 +1,30 @@
 { mkDerivation, stdenv, ghc
 , base, bytestring, constraints, tasty, tasty-hunit, tasty-quickcheck
 , binary, aeson, cereal, deepseq, hashable, serialise, store, xmlbf, text
-
-, hasAeson ? true
-, hasBinary ? true
-, hasCereal ? true
-, hasDeepseq ? true
-, hasHashable ? true
-, hasSerialise ? true
-, hasStore ? true
-, hasXmlbf ? true
+, flags ? {}
 }:
 
 let
+flags' =
+  { aeson = true;
+    binary = true;
+    cereal = true;
+    deepseq = true;
+    hashable = true;
+    serialise = true;
+    store = true;
+    xmlbf = true;
+  } // flags;
+lib = stdenv.lib;
 extraDeps =
-  stdenv.lib.optionals (hasAeson) [ aeson ] ++
-  stdenv.lib.optionals (hasBinary) [ binary ] ++
-  stdenv.lib.optionals (hasCereal) [ cereal ] ++
-  stdenv.lib.optionals (hasDeepseq) [ deepseq ] ++
-  stdenv.lib.optionals (hasHashable) [ hashable ] ++
-  stdenv.lib.optionals (hasSerialise) [ serialise ] ++
-  stdenv.lib.optionals (hasStore) [ store ] ++
-  stdenv.lib.optionals (hasXmlbf) [ xmlbf text ];
+  lib.optionals (flags'.aeson) [ aeson ] ++
+  lib.optionals (flags'.binary) [ binary ] ++
+  lib.optionals (flags'.cereal) [ cereal ] ++
+  lib.optionals (flags'.deepseq) [ deepseq ] ++
+  lib.optionals (flags'.hashable) [ hashable ] ++
+  lib.optionals (flags'.serialise) [ serialise ] ++
+  lib.optionals (flags'.store) [ store ] ++
+  lib.optionals (flags'.xmlbf) [ xmlbf text ];
 
 in mkDerivation rec {
   pname = "safe-money";
@@ -35,12 +38,5 @@ in mkDerivation rec {
   testHaskellDepends = libraryHaskellDepends ++
     [ bytestring tasty tasty-hunit tasty-quickcheck ];
   configureFlags =
-    stdenv.lib.optionals (!hasAeson) [ "-f-aeson" ] ++
-    stdenv.lib.optionals (!hasBinary) [ "-f-binary" ] ++
-    stdenv.lib.optionals (!hasCereal) [ "-f-cereal" ] ++
-    stdenv.lib.optionals (!hasDeepseq) [ "-f-deepseq" ] ++
-    stdenv.lib.optionals (!hasHashable) [ "-f-hashable" ] ++
-    stdenv.lib.optionals (!hasSerialise) [ "-f-serialise" ] ++
-    stdenv.lib.optionals (!hasStore) [ "-f-store" ] ++
-    stdenv.lib.optionals (!hasXmlbf) [ "-f-xmlbf" ];
+    lib.mapAttrs (k: v: "-f" + lib.optionalString (!v) "-" + k) flags';
 }

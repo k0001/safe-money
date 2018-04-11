@@ -86,7 +86,6 @@ import qualified Data.List as List
 import Data.Monoid ((<>))
 import Data.Proxy (Proxy(..))
 import Data.Ratio ((%), numerator, denominator)
-import qualified Data.Text as T
 import Data.Word (Word8)
 import GHC.Exts (fromList)
 import qualified GHC.Generics as GHC
@@ -104,6 +103,7 @@ import Unsafe.Coerce (unsafeCoerce)
 
 #ifdef HAS_aeson
 import qualified Data.Aeson as Ae
+import qualified Data.Text as T
 #endif
 
 #ifdef HAS_binary

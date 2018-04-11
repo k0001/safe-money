@@ -5,6 +5,7 @@
 {-# LANGUAGE ScopedTypeVariables #-}
 {-# LANGUAGE UndecidableInstances #-}
 {-# LANGUAGE TypeFamilies #-}
+{-# LANGUAGE TypeApplications #-}
 
 module Main where
 
@@ -16,6 +17,8 @@ import Data.Ratio (numerator, denominator)
 import GHC.TypeLits (Nat, Symbol, KnownSymbol, symbolVal)
 import Prelude hiding ((.), id)
 import qualified Test.Tasty as Tasty
+import Test.Tasty.HUnit ((@?=))
+import qualified Test.Tasty.HUnit as HU
 import qualified Test.Tasty.Runners as Tasty
 import Test.Tasty.QuickCheck ((===), (==>), (.&&.))
 import qualified Test.Tasty.QuickCheck as QC
@@ -158,13 +161,9 @@ testDense pc =
         in Money.withSomeDense dr $ \x' ->
              (show x, dr, Money.toSomeDense (x + 1))
                 === (show x', Money.toSomeDense x', Money.toSomeDense (x' + 1))
-  , QC.testProperty "denseFromDecimalString: OK" $
-      QC.forAll QC.arbitrary $ \(a :: Int, b :: Int) ->
-         let b' = abs b
-             r :: Rational = fromInteger (read (show a ++ show b'))
-                                * (10 ^^ negate (length (show b')))
-             Just d = Money.denseFromDecimalString (show a ++ "." ++ show b')
-         in r === toRational (d :: Money.Dense currency)
+  , QC.testProperty "denseCurrency" $
+      QC.forAll QC.arbitrary $ \(x :: Money.Dense currency) ->
+        Money.denseCurrency x === symbolVal pc
 
 #ifdef HAS_aeson
   , QC.testProperty "Aeson encoding roundtrip" $
@@ -333,6 +332,56 @@ testDiscrete pc pu =
                 (show x, dr, Money.toSomeDiscrete (x + 1))
                    === (show x', Money.toSomeDiscrete x', Money.toSomeDiscrete (x' + 1))
            ) :: QC.Property
+
+  , QC.testProperty "discreteCurrency" $
+      QC.forAll QC.arbitrary $ \(x :: Money.Discrete currency unit) ->
+        Money.discreteCurrency x === symbolVal pc
+
+  , HU.testCase "discreteDecimal: EUR cent" $ do
+       let u = fromInteger :: Integer -> Money.Discrete "EUR" "cent"
+           f = Money.discreteDecimal
+       f False Nothing '.' (u 123) @?= "1.23"
+       f True Nothing '.' (u 123) @?= "+1.23"
+       f True Nothing '.' (negate (u 123)) @?= "-1.23"
+       f False Nothing '.' (negate (u 123)) @?= "-1.23"
+
+       f False (Just ',') '.' (u 123) @?= "1.23"
+       f True (Just ',') '.' (u 123) @?= "+1.23"
+       f True (Just ',') '.' (negate (u 123)) @?= "-1.23"
+       f False (Just ',') '.' (negate (u 123)) @?= "-1.23"
+
+       f False Nothing '.' (u 123456789) @?= "1234567.89"
+       f True Nothing '.' (u 123456789) @?= "+1234567.89"
+       f True Nothing '.' (negate (u 123456789)) @?= "-1234567.89"
+       f False Nothing '.' (negate (u 123456789)) @?= "-1234567.89"
+
+       f False (Just ',') '.' (u 123456789) @?= "1,234,567.89"
+       f True (Just ',') '.' (u 123456789) @?= "+1,234,567.89"
+       f True (Just ',') '.' (negate (u 123456789)) @?= "-1,234,567.89"
+       f False (Just ',') '.' (negate (u 123456789)) @?= "-1,234,567.89"
+
+  , HU.testCase "discreteDecimal: XAU milligram" $ do
+       let u = fromInteger :: Integer -> Money.Discrete "XAU" "milligram"
+           f = Money.discreteDecimal
+       f False Nothing '.' (u 123) @?= "0.00395"
+       f True Nothing '.' (u 123) @?= "+0.00395"
+       f True Nothing '.' (negate (u 123)) @?= "-0.00395"
+       f False Nothing '.' (negate (u 123)) @?= "-0.00395"
+
+       f False (Just ',') '.' (u 123) @?= "0.00395"
+       f True (Just ',') '.' (u 123) @?= "+0.00395"
+       f True (Just ',') '.' (negate (u 123)) @?= "-0.00395"
+       f False (Just ',') '.' (negate (u 123)) @?= "-0.00395"
+
+       f False Nothing '.' (u 123456789) @?= "3969.22791"
+       f True Nothing '.' (u 123456789) @?= "+3969.22791"
+       f True Nothing '.' (negate (u 123456789)) @?= "-3969.22791"
+       f False Nothing '.' (negate (u 123456789)) @?= "-3969.22791"
+
+       f False (Just ',') '.' (u 123456789) @?= "3,969.22791"
+       f True (Just ',') '.' (u 123456789) @?= "+3,969.22791"
+       f True (Just ',') '.' (negate (u 123456789)) @?= "-3,969.22791"
+       f False (Just ',') '.' (negate (u 123456789)) @?= "-3,969.22791"
 
 #ifdef HAS_aeson
   , QC.testProperty "Aeson encoding roundtrip" $

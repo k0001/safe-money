@@ -6,22 +6,24 @@ let
 
 src_xmlbf = "${pkgs.fetchgit {
   url = "https://gitlab.com/k0001/xmlbf.git";
-  rev = "xmlbf-0.2";
-  sha256 = "00llajlr7w102xlwnp09yfmxf7mjx5x2g9f219q28wy423r5vsar";
+  rev = "xmlbf-0.4";
+  sha256 = "03mx261blsbjnp5b83157c36h5z7i4d5cvb7wklzzanm82j4w5vj";
 }}/xmlbf";
 
 packageSetConfig = self: super: {
   safe-money = super.callPackage ./pkg.nix {};
   # Mostly here just to test whether the thing builds with flags turned off.
   safe-money_no-extras = self.safe-money.override {
-    hasAeson = false;
-    hasBinary = false;
-    hasCereal = false;
-    hasDeepseq = false;
-    hasHashable = false;
-    hasSerialise = false;
-    hasStore = false;
-    hasXmlbf = false;
+    flags = {
+      aeson = false;
+      binary = false;
+      cereal = false;
+      deepseq = false;
+      hashable = false;
+      serialise = false;
+      store = false;
+      xmlbf = false;
+    };
   };
 
   # The default version doesn't compile.
