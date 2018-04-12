@@ -8,6 +8,7 @@
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
 {-# LANGUAGE KindSignatures #-}
 {-# LANGUAGE LambdaCase #-}
+{-# LANGUAGE MultiWayIf #-}
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE PolyKinds #-}
 {-# LANGUAGE RankNTypes #-}
@@ -28,16 +29,17 @@ module Money.Internal
    Dense
  , dense
  , denseCurrency
+ , denseFromDecimal
    -- * Discrete monetary values
  , Discrete
  , Discrete'
  , fromDiscrete
+ , discreteCurrency
  , round
  , ceiling
  , floor
  , truncate
- , discreteCurrency
- , discreteDecimal
+ , discreteFromDecimal
    -- * Currency scales
  , Scale
  , GoodScale
@@ -73,21 +75,28 @@ module Money.Internal
  , someExchangeRateSrcCurrency
  , someExchangeRateDstCurrency
  , someExchangeRateRate
- -- * Msic Textual rendering
- , rationalDecimal
- , renderThousands
+ -- * Rendering rational numbers
+ , rationalRoundToDecimal
+ , rationalFloorToDecimal
+ , rationalCeilingToDecimal
+ , rationalTruncateToDecimal
+ -- * Misc parsing
+ , rationalFromDecimal
+ , rationalFromDecimalP
  ) where
 
 import Control.Applicative ((<|>), empty)
 import Control.Category (Category((.), id))
 import Control.Monad ((<=<), guard, when)
+import qualified Data.Char as Char
 import Data.Constraint (Dict(Dict))
+import Data.Functor (($>))
 import qualified Data.List as List
 import Data.Monoid ((<>))
 import Data.Proxy (Proxy(..))
 import Data.Ratio ((%), numerator, denominator)
 import Data.Word (Word8)
-import GHC.Exts (fromList)
+import GHC.Exts (Constraint, fromList)
 import qualified GHC.Generics as GHC
 import GHC.Real (infinity, notANumber)
 import GHC.TypeLits
@@ -487,8 +496,9 @@ truncate = roundf P.truncate
 
 --------------------------------------------------------------------------------
 
--- | @'Scale' currency unit@ is a rational number (expressed as @'(numerator,
--- denominator)@) indicating how many pieces of @unit@ fit in @currency@.
+-- | @'Scale' currency unit@ is an irreducible rational number (expressed as
+-- @'(numerator, denominator)@) indicating how many pieces of @unit@ fit in
+-- @currency@.
 --
 -- @currency@ is usually a ISO-4217 currency code, but not necessarily.
 --
@@ -1573,61 +1583,19 @@ storeContramapSize f = \case
 #endif
 
 --------------------------------------------------------------------------------
+-- Decimal rendering
 
--- | Render a 'Natural' number with thousand markers.
+-- | Render a 'Rational' number as a decimal value in a lossy manner,
+-- approximating it as necesary using 'P.round' in order for it to fit in as
+-- many decimal numbers as requested.
 --
 -- @
--- > 'renderThousands' \',\' 12345
--- \"12,345\"
--- @
-renderThousands :: Char -> Natural -> String
-renderThousands sep n
-  | n < 1000 = show n
-  | otherwise =
-      List.foldl' (flip mappend) mempty $
-      List.intersperse [sep] $
-      List.unfoldr (\x -> case divMod x 1000 of
-                            (0, 0) -> Nothing
-                            (y, z) -> Just (show z, y)) $ n
-
--- | Render a 'Discrete' amount as a decimal string, using as many fractional
--- digits as necessary to precisely represent the amount.
---
--- @
--- > 'discreteDecimal' 'True' ('Just' \',\') \'.\' (123456 :: 'Discrete' \"EUR\" \"cent\")
+-- > 'rationalRoundToDecimal' 'True' ('Just' \',\') \'.\' 2 (123456 % 100)
 -- \"+1,234.56\"
 -- @
-discreteDecimal
-  :: GoodScale scale
-  => Bool
-  -- ^ Whether to render a leading @\'+\'@ sign in case the amount is
-  -- non-negative.
-  --
-  -- Notice that a leading @\'-\'@ is always added in case the amount is
-  -- negative.
-  -> Maybe Char
-  -- ^ Thousands separator for the integer part, if any (e.g., the @\',\'@ in
-  -- @1,234.56789@).
-  -> Char
-  -- ^ Decimal separator (e.g., the @\'.\'@ in @1,234.56789@)
-  -> Discrete' currency scale
-  -- ^ The 'Discrete' amount to render.
-  -> String
-discreteDecimal plus yitsep dsep dis =
-  rationalDecimal P.round plus yitsep dsep
-     (P.ceiling (logBase 10 (fromRational (scale dis) :: Double)))
-     (toRational (fromDiscrete dis))
-
--- | Render a 'Rational' number using its approximate decimal representation.
---
--- Prefer to use 'discreteDecimal' if you are rendering a 'Discrete'
--- value.
-rationalDecimal
-  :: (Rational -> Integer)
-  -- ^ A rounding function to be used if necessary (i.e., one of 'P.floor',
-  -- 'P.ceiling', 'P.round' or 'P.trucate' from "Prelude").
-  -> Bool
-  -- ^ Whether to render a leading @\'+\'@ sign in case the amount is non-negative.
+rationalRoundToDecimal
+  :: Bool
+  -- ^ Whether to render a leading @\'+\'@ sign in case the amount is positive.
   -> Maybe Char
   -- ^ Thousands separator for the integer part, if any (e.g., the @\',\'@ in
   -- @1,234.56789@).
@@ -1638,18 +1606,169 @@ rationalDecimal
   -> Rational
   -- ^ The rational number to render.
   -> String
-rationalDecimal rnd plus yitsep dsep fdigs0 r0 =
-  let -- integer part
-      ipart :: Integer = (if fdigs0 < 1 then rnd else P.floor) (abs r0)
-      -- fractional part
-      fpart :: Integer = rnd ((abs r0 - fromInteger ipart + 1) * (10 ^ fdigs0))
-      ftext :: String = List.drop 1 (show fpart)
-      fpad :: String = List.replicate (fromIntegral fdigs0 - length ftext) '0'
+rationalRoundToDecimal = rationalToDecimal P.round
+
+-- | Like 'rationalRoundToDecimal', but uses 'P.floor' as the approximating
+-- function.
+rationalFloorToDecimal
+  :: Bool -> Maybe Char -> Char -> Word8 -> Rational -> String
+rationalFloorToDecimal = rationalToDecimal P.floor
+
+-- | Like 'rationalRoundToDecimal', but uses 'P.ceiling' as the approximating
+-- function.
+rationalCeilingToDecimal
+  :: Bool -> Maybe Char -> Char -> Word8 -> Rational -> String
+rationalCeilingToDecimal = rationalToDecimal P.ceiling
+
+-- | Like 'rationalRoundToDecimal', but uses 'P.truncate' as the approximating
+-- function.
+rationalTruncateToDecimal
+  :: Bool -> Maybe Char -> Char -> Word8 -> Rational -> String
+rationalTruncateToDecimal = rationalToDecimal P.truncate
+
+-- | Render a 'Rational' number using its approximate decimal representation.
+rationalToDecimal
+  :: (Rational -> Integer)
+  -- ^ A rounding function to be used if necessary (i.e., one of 'P.floor',
+  -- 'P.ceiling', 'P.round' or 'P.trucate' from "Prelude").
+  -> Bool
+  -- ^ Whether to render a leading @\'+\'@ sign in case the amount is positive.
+  -> Maybe Char
+  -- ^ Thousands separator for the integer part, if any (e.g., the @\',\'@ in
+  -- @1,234.56789@).
+  -> Char
+  -- ^ Decimal separator (e.g., the @\'.\'@ in @1,234.56789@)
+  -> Word8
+  -- ^ Number of decimal numbers to render, if any.
+  -> Rational
+  -- ^ The rational number to render.
+  -> String
+rationalToDecimal rnd plus ytsep dsep fdigs0 r0 =
+  let parts   :: Integer = rnd (r0 * (10 ^ fdigs0))
+      ipart   :: Natural = fromInteger (abs parts) `div` (10 ^ fdigs0)
+      ftext   :: String  = drop (length (show ipart)) (show (abs parts))
+      itext   :: String  = maybe (show ipart) (renderThousands ipart) ytsep
+      fpad0   :: String  = List.replicate (fromIntegral fdigs0 - length ftext) '0'
   in mconcat
-       [ if r0 < 0 then "-" else if plus then "+" else ""
-       , maybe (show ipart)
-               (flip renderThousands (fromInteger ipart))
-               yitsep
-       , if fdigs0 > 0 then dsep : ftext <> fpad else ""
+       [ if | parts < 0 -> "-"
+            | plus && parts > 0 -> "+"
+            | otherwise -> ""
+       , itext
+       , if | fdigs0 > 0 -> dsep : ftext <> fpad0
+            | otherwise -> ""
        ]
 
+
+-- | Render a 'Natural' number with thousand markers.
+--
+-- @
+-- > 'renderThousands' 12045 \',\'
+-- \"12,045\"
+-- @
+renderThousands :: Natural -> Char -> String
+renderThousands n sep
+  | n < 1000 = show n
+  | otherwise
+      = List.foldl' (flip mappend) mempty
+      $ List.intersperse [sep]
+      $ List.unfoldr (\x ->
+          case divMod x 1000 of
+             (0, 0) -> Nothing
+             (0, z) -> Just (show z, 0)
+             (y, z) | z <  10   -> Just ('0':'0':show z, y)
+                    | z < 100   -> Just (    '0':show z, y)
+                    | otherwise -> Just (        show z, y))
+      $ n
+
+--------------------------------------------------------------------------------
+-- Decimal parsing
+
+-- | Parses a decimal representation of a 'Dense'.
+--
+-- Leading @\'-\'@ and @\'+\'@ characters are considered.
+denseFromDecimal
+  :: Maybe Char
+  -- ^ Thousands separator for the integer part, if any (e.g., the @\',\'@ in
+  -- @-1,234.56789@).
+  -> Char
+  -- ^ Decimal separator (e.g., the @\'.\'@ in @-1,234.56789@)
+  -> String
+  -- ^ The raw string containing the decimal representation (e.g.,
+  -- @"-1,234.56789"@).
+  -> Maybe (Dense currency)
+denseFromDecimal yst sf = fmap Dense . rationalFromDecimal yst sf
+
+-- | Parses a decimal representation of a 'Discrete'.
+--
+-- Leading @\'-\'@ and @\'+\'@ characters are considered.
+--
+-- Notice that parsing will fail unless the entire precision of the decimal
+-- number can be represented in the desired @scale@.
+discreteFromDecimal
+  :: GoodScale scale
+  => Maybe Char
+  -- ^ Thousands separator for the integer part, if any (e.g., the @\',\'@ in
+  -- @-1,234.56789@).
+  -> Char
+  -- ^ Decimal separator (e.g., the @\'.\'@ in @-1,234.56789@)
+  -> String
+  -- ^ The raw string containing the decimal representation (e.g.,
+  -- @"-1,234.56789"@).
+  -> Maybe (Discrete' currency scale)
+discreteFromDecimal yst sf = \s -> do
+  dns <- denseFromDecimal yst sf s
+  case round dns of
+    (x, 0) -> Just x
+    _ -> Nothing -- We fail for decimals that don't fit exactly in our scale.
+
+rationalFromDecimal
+  :: Maybe Char
+  -- ^ Thousands separator for the integer part, if any (e.g., the @\',\'@ in
+  -- @-1,234.56789@).
+  -> Char
+  -- ^ Decimal separator (e.g., the @\'.\'@ in @-1,234.56789@)
+  -> String
+  -- ^ The raw string containing the decimal representation (e.g.,
+  -- @"-1,234.56789"@).
+  -> Maybe Rational
+rationalFromDecimal yst sf = \s ->
+  case ReadP.readP_to_S (rationalFromDecimalP yst sf) s of
+    [(x,"")] -> Just x
+    _ -> Nothing
+
+-- TODO limit number of digits parsed to prevent DoS
+rationalFromDecimalP
+  :: Maybe Char
+  -- ^ Thousands separator for the integer part, if any (e.g., the @\',\'@ in
+  -- @-1,234.56789@).
+  --
+  -- The separator can't be a digit or control character. If it is, then parsing
+  -- will always fail.
+  -> Char
+  -- ^ Decimal separator (e.g., the @\'.\'@ in @-1,234.56789@).
+  --
+  -- The separator can't be a digit or control character. If it is, then parsing
+  -- will always fail.
+  -> ReadP.ReadP Rational
+rationalFromDecimalP yst sf = do
+   guard (not (Char.isDigit sf || maybe False Char.isDigit yst))
+   sig :: Rational -> Rational <-
+     (ReadP.char '-' $> negate) <|>
+     (ReadP.char '+' $> id) <|>
+     (pure id)
+   ipart :: String <- case yst of
+     Nothing -> ReadP.munch1 Char.isDigit
+     Just st -> do
+       ihead <- (ReadP.count 3 (ReadP.satisfy Char.isDigit) <|>
+                 ReadP.count 2 (ReadP.satisfy Char.isDigit) <|>
+                 ReadP.count 1 (ReadP.satisfy Char.isDigit))
+       itail <- concat <$> ReadP.sepBy
+                   (ReadP.count 3 (ReadP.satisfy Char.isDigit))
+                   (ReadP.char st)
+       pure (ihead <> itail)
+   yfpart :: Maybe String <-
+     (ReadP.char sf *> fmap Just (ReadP.munch1 Char.isDigit) <* ReadP.eof) <|>
+     (ReadP.eof $> Nothing)
+   pure $! sig $ case yfpart of
+     Nothing -> fromInteger (read ipart)
+     Just fpart -> read (ipart <> fpart) % (10 ^ length fpart)

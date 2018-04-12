@@ -13,7 +13,7 @@ import Control.Category (Category((.), id))
 import qualified Data.ByteString.Lazy as BSL
 import Data.Maybe (catMaybes, isJust, isNothing)
 import Data.Proxy (Proxy(Proxy))
-import Data.Ratio (numerator, denominator)
+import Data.Ratio ((%), numerator, denominator)
 import GHC.TypeLits (Nat, Symbol, KnownSymbol, symbolVal)
 import Prelude hiding ((.), id)
 import qualified Test.Tasty as Tasty
@@ -49,6 +49,7 @@ import qualified Data.Text as Text
 #endif
 
 import qualified Money
+import qualified Money.Internal
 
 --------------------------------------------------------------------------------
 
@@ -109,6 +110,7 @@ tests =
   [ testCurrencies
   , testCurrencyUnits
   , testExchange
+  , testRationalDecimal
   ]
 
 testCurrencies :: Tasty.TestTree
@@ -130,9 +132,130 @@ testCurrencyUnits =
   , testDiscrete (Proxy :: Proxy "USD") (Proxy :: Proxy "cent")
   , testDiscrete (Proxy :: Proxy "USD") (Proxy :: Proxy "dollar")
   , testDiscrete (Proxy :: Proxy "VUV") (Proxy :: Proxy "vatu")
-  , testDiscrete (Proxy :: Proxy "XAU") (Proxy :: Proxy "micrograin")
-  , testDiscrete (Proxy :: Proxy "XAU") (Proxy :: Proxy "milligrain")
+  , testDiscrete (Proxy :: Proxy "XAU") (Proxy :: Proxy "gram")
   , testDiscrete (Proxy :: Proxy "XAU") (Proxy :: Proxy "grain")
+
+  , testDecimal (Proxy :: Proxy "BTC") (Proxy :: Proxy "BTC")
+  , testDecimal (Proxy :: Proxy "BTC") (Proxy :: Proxy "satoshi")
+  , testDecimal (Proxy :: Proxy "BTC") (Proxy :: Proxy "bitcoin")
+  , testDecimal (Proxy :: Proxy "USD") (Proxy :: Proxy "USD")
+  , testDecimal (Proxy :: Proxy "USD") (Proxy :: Proxy "cent")
+  , testDecimal (Proxy :: Proxy "USD") (Proxy :: Proxy "dollar")
+  , testDecimal (Proxy :: Proxy "VUV") (Proxy :: Proxy "vatu")
+  , testDecimal (Proxy :: Proxy "XAU") (Proxy :: Proxy "grain")
+  ]
+
+testRationalDecimal :: Tasty.TestTree
+testRationalDecimal =
+  Tasty.testGroup "Rational/Decimal"
+  [ HU.testCase "rationalRoundToDecimal" $ do
+       let f = Money.rationalRoundToDecimal
+       f False Nothing '.' 2 (1235%1000) @?= "1.24"
+       f True Nothing '.' 2 (1235%1000) @?= "+1.24"
+       f True Nothing '.' 2 (negate (1235%1000)) @?= "-1.24"
+       f False Nothing '.' 2 (negate (1235%1000)) @?= "-1.24"
+
+       f False (Just ',') '.' 2 (1235%1000) @?= "1.24"
+       f True (Just ',') '.' 2 (1235%1000) @?= "+1.24"
+       f True (Just ',') '.' 2 (negate (1235%1000)) @?= "-1.24"
+       f False (Just ',') '.' 2 (negate (1235%1000)) @?= "-1.24"
+
+       f False Nothing '.' 2 (1234567895%1000) @?= "1234567.90"
+       f True Nothing '.' 2 (1234567895%1000) @?= "+1234567.90"
+       f True Nothing '.' 2 (negate (1234567895%1000)) @?= "-1234567.90"
+       f False Nothing '.' 2 (negate (1234567895%1000)) @?= "-1234567.90"
+
+       f False (Just ',') '.' 2 (1234567895%1000) @?= "1,234,567.90"
+       f True (Just ',') '.' 2 (1234567895%1000) @?= "+1,234,567.90"
+       f True (Just ',') '.' 2 (negate (1234567895%1000)) @?= "-1,234,567.90"
+       f False (Just ',') '.' 2 (negate (1234567895%1000)) @?= "-1,234,567.90"
+
+       f False Nothing '.' 0 (345%1000) @?= "0"
+       f True Nothing '.' 0 (345%1000) @?= "0"
+       f True Nothing '.' 0 (negate (345%1000)) @?= "0"
+       f False Nothing '.' 0 (negate (345%1000)) @?= "0"
+
+  , HU.testCase "rationalFloorToDecimal" $ do
+       let f = Money.rationalFloorToDecimal
+       f False Nothing '.' 2 (1235%1000) @?= "1.23"
+       f True Nothing '.' 2 (1235%1000) @?= "+1.23"
+       f True Nothing '.' 2 (negate (1235%1000)) @?= "-1.24"
+       f False Nothing '.' 2 (negate (1235%1000)) @?= "-1.24"
+
+       f False (Just ',') '.' 2 (1235%1000) @?= "1.23"
+       f True (Just ',') '.' 2 (1235%1000) @?= "+1.23"
+       f True (Just ',') '.' 2 (negate (1235%1000)) @?= "-1.24"
+       f False (Just ',') '.' 2 (negate (1235%1000)) @?= "-1.24"
+
+       f False Nothing '.' 2 (1234567895%1000) @?= "1234567.89"
+       f True Nothing '.' 2 (1234567895%1000) @?= "+1234567.89"
+       f True Nothing '.' 2 (negate (1234567895%1000)) @?= "-1234567.90"
+       f False Nothing '.' 2 (negate (1234567895%1000)) @?= "-1234567.90"
+
+       f False (Just ',') '.' 2 (1234567895%1000) @?= "1,234,567.89"
+       f True (Just ',') '.' 2 (1234567895%1000) @?= "+1,234,567.89"
+       f True (Just ',') '.' 2 (negate (1234567895%1000)) @?= "-1,234,567.90"
+       f False (Just ',') '.' 2 (negate (1234567895%1000)) @?= "-1,234,567.90"
+
+       f False Nothing '.' 0 (345%1000) @?= "0"
+       f True Nothing '.' 0 (345%1000) @?= "0"
+       f True Nothing '.' 0 (negate (345%1000)) @?= "-1"
+       f False Nothing '.' 0 (negate (345%1000)) @?= "-1"
+
+  , HU.testCase "rationalCeilingToDecimal" $ do
+       let f = Money.rationalCeilingToDecimal
+       f False Nothing '.' 2 (1235%1000) @?= "1.24"
+       f True Nothing '.' 2 (1235%1000) @?= "+1.24"
+       f True Nothing '.' 2 (negate (1235%1000)) @?= "-1.23"
+       f False Nothing '.' 2 (negate (1235%1000)) @?= "-1.23"
+
+       f False (Just ',') '.' 2 (1235%1000) @?= "1.24"
+       f True (Just ',') '.' 2 (1235%1000) @?= "+1.24"
+       f True (Just ',') '.' 2 (negate (1235%1000)) @?= "-1.23"
+       f False (Just ',') '.' 2 (negate (1235%1000)) @?= "-1.23"
+
+       f False Nothing '.' 2 (1234567895%1000) @?= "1234567.90"
+       f True Nothing '.' 2 (1234567895%1000) @?= "+1234567.90"
+       f True Nothing '.' 2 (negate (1234567895%1000)) @?= "-1234567.89"
+       f False Nothing '.' 2 (negate (1234567895%1000)) @?= "-1234567.89"
+
+       f False (Just ',') '.' 2 (1234567895%1000) @?= "1,234,567.90"
+       f True (Just ',') '.' 2 (1234567895%1000) @?= "+1,234,567.90"
+       f True (Just ',') '.' 2 (negate (1234567895%1000)) @?= "-1,234,567.89"
+       f False (Just ',') '.' 2 (negate (1234567895%1000)) @?= "-1,234,567.89"
+
+       f False Nothing '.' 0 (345%1000) @?= "1"
+       f True Nothing '.' 0 (345%1000) @?= "+1"
+       f True Nothing '.' 0 (negate (345%1000)) @?= "0"
+       f False Nothing '.' 0 (negate (345%1000)) @?= "0"
+
+  , HU.testCase "rationalTruncateToDecimal" $ do
+       let f = Money.rationalTruncateToDecimal
+       f False Nothing '.' 2 (1235%1000) @?= "1.23"
+       f True Nothing '.' 2 (1235%1000) @?= "+1.23"
+       f True Nothing '.' 2 (negate (1235%1000)) @?= "-1.23"
+       f False Nothing '.' 2 (negate (1235%1000)) @?= "-1.23"
+
+       f False (Just ',') '.' 2 (1235%1000) @?= "1.23"
+       f True (Just ',') '.' 2 (1235%1000) @?= "+1.23"
+       f True (Just ',') '.' 2 (negate (1235%1000)) @?= "-1.23"
+       f False (Just ',') '.' 2 (negate (1235%1000)) @?= "-1.23"
+
+       f False Nothing '.' 2 (1234567895%1000) @?= "1234567.89"
+       f True Nothing '.' 2 (1234567895%1000) @?= "+1234567.89"
+       f True Nothing '.' 2 (negate (1234567895%1000)) @?= "-1234567.89"
+       f False Nothing '.' 2 (negate (1234567895%1000)) @?= "-1234567.89"
+
+       f False (Just ',') '.' 2 (1234567895%1000) @?= "1,234,567.89"
+       f True (Just ',') '.' 2 (1234567895%1000) @?= "+1,234,567.89"
+       f True (Just ',') '.' 2 (negate (1234567895%1000)) @?= "-1,234,567.89"
+       f False (Just ',') '.' 2 (negate (1234567895%1000)) @?= "-1,234,567.89"
+
+       f False Nothing '.' 0 (345%1000) @?= "0"
+       f True Nothing '.' 0 (345%1000) @?= "0"
+       f True Nothing '.' 0 (negate (345%1000)) @?= "0"
+       f False Nothing '.' 0 (negate (345%1000)) @?= "0"
+
   ]
 
 testDense
@@ -336,52 +459,6 @@ testDiscrete pc pu =
   , QC.testProperty "discreteCurrency" $
       QC.forAll QC.arbitrary $ \(x :: Money.Discrete currency unit) ->
         Money.discreteCurrency x === symbolVal pc
-
-  , HU.testCase "discreteDecimal: EUR cent" $ do
-       let u = fromInteger :: Integer -> Money.Discrete "EUR" "cent"
-           f = Money.discreteDecimal
-       f False Nothing '.' (u 123) @?= "1.23"
-       f True Nothing '.' (u 123) @?= "+1.23"
-       f True Nothing '.' (negate (u 123)) @?= "-1.23"
-       f False Nothing '.' (negate (u 123)) @?= "-1.23"
-
-       f False (Just ',') '.' (u 123) @?= "1.23"
-       f True (Just ',') '.' (u 123) @?= "+1.23"
-       f True (Just ',') '.' (negate (u 123)) @?= "-1.23"
-       f False (Just ',') '.' (negate (u 123)) @?= "-1.23"
-
-       f False Nothing '.' (u 123456789) @?= "1234567.89"
-       f True Nothing '.' (u 123456789) @?= "+1234567.89"
-       f True Nothing '.' (negate (u 123456789)) @?= "-1234567.89"
-       f False Nothing '.' (negate (u 123456789)) @?= "-1234567.89"
-
-       f False (Just ',') '.' (u 123456789) @?= "1,234,567.89"
-       f True (Just ',') '.' (u 123456789) @?= "+1,234,567.89"
-       f True (Just ',') '.' (negate (u 123456789)) @?= "-1,234,567.89"
-       f False (Just ',') '.' (negate (u 123456789)) @?= "-1,234,567.89"
-
-  , HU.testCase "discreteDecimal: XAU milligram" $ do
-       let u = fromInteger :: Integer -> Money.Discrete "XAU" "milligram"
-           f = Money.discreteDecimal
-       f False Nothing '.' (u 123) @?= "0.00395"
-       f True Nothing '.' (u 123) @?= "+0.00395"
-       f True Nothing '.' (negate (u 123)) @?= "-0.00395"
-       f False Nothing '.' (negate (u 123)) @?= "-0.00395"
-
-       f False (Just ',') '.' (u 123) @?= "0.00395"
-       f True (Just ',') '.' (u 123) @?= "+0.00395"
-       f True (Just ',') '.' (negate (u 123)) @?= "-0.00395"
-       f False (Just ',') '.' (negate (u 123)) @?= "-0.00395"
-
-       f False Nothing '.' (u 123456789) @?= "3969.22791"
-       f True Nothing '.' (u 123456789) @?= "+3969.22791"
-       f True Nothing '.' (negate (u 123456789)) @?= "-3969.22791"
-       f False Nothing '.' (negate (u 123456789)) @?= "-3969.22791"
-
-       f False (Just ',') '.' (u 123456789) @?= "3,969.22791"
-       f True (Just ',') '.' (u 123456789) @?= "+3,969.22791"
-       f True (Just ',') '.' (negate (u 123456789)) @?= "-3,969.22791"
-       f False (Just ',') '.' (negate (u 123456789)) @?= "-3,969.22791"
 
 #ifdef HAS_aeson
   , QC.testProperty "Aeson encoding roundtrip" $
@@ -674,6 +751,37 @@ testExchangeRate ps pd =
       QC.forAll QC.arbitrary $ \(x :: Money.ExchangeRate src dst) ->
          Right (Money.toSomeExchangeRate x) === Xmlbf.runParser Xmlbf.fromXml (Xmlbf.toXml x)
 #endif
+  ]
+
+testDecimal
+  :: forall (currency :: Symbol) (unit :: Symbol) (snum :: Nat)
+  .  ( Money.Scale currency unit ~ '(snum, 1)
+     , Money.GoodScale '(snum, 1)
+     , KnownSymbol currency)
+  => Proxy currency
+  -> Proxy unit
+  -> Tasty.TestTree
+testDecimal _ _ =
+  Tasty.testGroup "Decimal"
+  [ {- TODO:
+    QC.testProperty "discreteToDecimal/discreteFromDecimal: roundtrip" $ do
+      QC.forAll QC.arbitrary $ \(dis :: Money.Discrete currency unit,
+                                 plus :: Bool, yst :: Maybe Char, sf :: Char) ->
+        (not (Char.isDigit sf || maybe False Char.isDigit yst)
+        ) ==> let dec = Money.discreteToDecimal plus yst sf dis
+              in Money.discreteFromDecimal yst sf dec === Just dis
+
+  , QC.testProperty "discreteToDecimal/denseFromDecimal: roundtrip " $ do
+      QC.forAll QC.arbitrary $ \(dis :: Money.Discrete currency unit,
+                                 plus :: Bool, yst :: Maybe Char, sf :: Char) ->
+        (not (Char.isDigit sf || maybe False Char.isDigit yst)
+        ) ==> let dec = Money.discreteToDecimal plus yst sf dis
+                  Just dns = Money.denseFromDecimal yst sf dec
+              in ((dis, 0) === Money.round dns) .&&.
+                 ((dis, 0) === Money.floor dns) .&&.
+                 ((dis, 0) === Money.ceiling dns) .&&.
+                 ((dis, 0) === Money.truncate dns)
+                 -}
   ]
 
 testRounding
