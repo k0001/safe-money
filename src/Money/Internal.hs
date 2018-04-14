@@ -1645,14 +1645,12 @@ rationalFromDecimalP yst sf = do
      (pure id)
    ipart :: String <- case yst of
      Nothing -> ReadP.munch1 Char.isDigit
-     Just st -> do
-       ihead <- (ReadP.count 3 (ReadP.satisfy Char.isDigit) <|>
-                 ReadP.count 2 (ReadP.satisfy Char.isDigit) <|>
-                 ReadP.count 1 (ReadP.satisfy Char.isDigit))
-       itail <- concat <$> ReadP.sepBy
-                   (ReadP.count 3 (ReadP.satisfy Char.isDigit))
-                   (ReadP.char st)
-       pure (ihead <> itail)
+     Just st -> mappend
+       <$> (ReadP.count 3 (ReadP.satisfy Char.isDigit) <|>
+            ReadP.count 2 (ReadP.satisfy Char.isDigit) <|>
+            ReadP.count 1 (ReadP.satisfy Char.isDigit))
+       <*> (fmap concat $ ReadP.many
+              (ReadP.char st *> ReadP.count 3 (ReadP.satisfy Char.isDigit)))
    yfpart :: Maybe String <-
      (ReadP.char sf *> fmap Just (ReadP.munch1 Char.isDigit) <* ReadP.eof) <|>
      (ReadP.eof $> Nothing)

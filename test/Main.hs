@@ -11,9 +11,11 @@ module Main where
 
 import Control.Category (Category((.), id))
 import qualified Data.ByteString.Lazy as BSL
+import qualified Data.Char as Char
 import Data.Maybe (catMaybes, isJust, isNothing)
 import Data.Proxy (Proxy(Proxy))
 import Data.Ratio ((%), numerator, denominator)
+import Data.Word (Word8)
 import GHC.TypeLits (Nat, Symbol, KnownSymbol, symbolVal)
 import Prelude hiding ((.), id)
 import qualified Test.Tasty as Tasty
@@ -96,6 +98,12 @@ instance QC.Arbitrary Money.SomeExchangeRate where
   shrink = \x ->
     Money.withSomeExchangeRate x (map Money.toSomeExchangeRate . QC.shrink)
 
+instance QC.Arbitrary Money.Approximation where
+  arbitrary = QC.oneof [ pure Money.Round
+                       , pure Money.Floor
+                       , pure Money.Ceiling
+                       , pure Money.Truncate ]
+
 --------------------------------------------------------------------------------
 
 main :: IO ()
@@ -111,6 +119,8 @@ tests =
   , testCurrencyUnits
   , testExchange
   , testDenseToDecimal
+  , testDenseFromDecimal
+  , testDiscreteFromDecimal
   ]
 
 testCurrencies :: Tasty.TestTree
@@ -134,15 +144,6 @@ testCurrencyUnits =
   , testDiscrete (Proxy :: Proxy "VUV") (Proxy :: Proxy "vatu")
   , testDiscrete (Proxy :: Proxy "XAU") (Proxy :: Proxy "gram")
   , testDiscrete (Proxy :: Proxy "XAU") (Proxy :: Proxy "grain")
-
-  , testDecimal (Proxy :: Proxy "BTC") (Proxy :: Proxy "BTC")
-  , testDecimal (Proxy :: Proxy "BTC") (Proxy :: Proxy "satoshi")
-  , testDecimal (Proxy :: Proxy "BTC") (Proxy :: Proxy "bitcoin")
-  , testDecimal (Proxy :: Proxy "USD") (Proxy :: Proxy "USD")
-  , testDecimal (Proxy :: Proxy "USD") (Proxy :: Proxy "cent")
-  , testDecimal (Proxy :: Proxy "USD") (Proxy :: Proxy "dollar")
-  , testDecimal (Proxy :: Proxy "VUV") (Proxy :: Proxy "vatu")
-  , testDecimal (Proxy :: Proxy "XAU") (Proxy :: Proxy "grain")
   ]
 
 testDenseToDecimal :: Tasty.TestTree
@@ -1031,35 +1032,132 @@ testExchangeRate ps pd =
 #endif
   ]
 
-testDecimal
-  :: forall (currency :: Symbol) (unit :: Symbol) (snum :: Nat)
-  .  ( Money.Scale currency unit ~ '(snum, 1)
-     , Money.GoodScale '(snum, 1)
-     , KnownSymbol currency)
-  => Proxy currency
-  -> Proxy unit
-  -> Tasty.TestTree
-testDecimal _ _ =
-  Tasty.testGroup "Decimal"
-  [ {- TODO:
-    QC.testProperty "discreteToDecimal/discreteFromDecimal: roundtrip" $ do
-      QC.forAll QC.arbitrary $ \(dis :: Money.Discrete currency unit,
-                                 plus :: Bool, yst :: Maybe Char, sf :: Char) ->
-        (not (Char.isDigit sf || maybe False Char.isDigit yst)
-        ) ==> let dec = Money.discreteToDecimal plus yst sf dis
-              in Money.discreteFromDecimal yst sf dec === Just dis
+testDenseFromDecimal :: Tasty.TestTree
+testDenseFromDecimal =
+  Tasty.testGroup "denseFromDecimal"
+  [ HU.testCase "Unsupported decimal separator" $ do
+      Money.denseFromDecimal Nothing '2' "1225"
+        @?= (Nothing :: Maybe (Money.Dense "USD"))
+      Money.denseFromDecimal (Just ',') '2' "1225"
+        @?= (Nothing :: Maybe (Money.Dense "USD"))
 
-  , QC.testProperty "discreteToDecimal/denseFromDecimal: roundtrip " $ do
-      QC.forAll QC.arbitrary $ \(dis :: Money.Discrete currency unit,
-                                 plus :: Bool, yst :: Maybe Char, sf :: Char) ->
-        (not (Char.isDigit sf || maybe False Char.isDigit yst)
-        ) ==> let dec = Money.discreteToDecimal plus yst sf dis
-                  Just dns = Money.denseFromDecimal yst sf dec
-              in ((dis, 0) === Money.discreteFromDense Money.Round dns) .&&.
-                 ((dis, 0) === Money.discreteFromDense Money.Floor dns) .&&.
-                 ((dis, 0) === Money.discreteFromDense Money.Ceiling dns) .&&.
-                 ((dis, 0) === Money.discreteFromDense Money.Truncate dns)
-                 -}
+  , QC.testProperty "Lossy roundtrip" $
+      -- We check that the roundtrip results in a close amount with a fractional
+      -- difference of up to one.
+      QC.forAll QC.arbitrary $ \(dns :: Money.Dense "USD", sd :: Char,
+                                 yst :: Maybe Char, plus :: Bool, digs :: Word8,
+                                 aprox :: Money.Approximation) ->
+      ( not (Char.isDigit sd || maybe False Char.isDigit yst)
+      ) ==> let dec = Money.denseToDecimal aprox plus yst sd digs
+                        (Proxy @ '(1,1)) dns
+                Just dns' = Money.denseFromDecimal yst sd dec
+            in abs (abs dns - abs dns') < 1
+
+  , HU.testCase "Too large" $ do
+      Money.discreteFromDecimal Nothing '.' "0.053"
+        @?= (Nothing :: Maybe (Money.Discrete "USD" "cent"))
+      Money.discreteFromDecimal (Just ',') '.' "0.253"
+        @?= (Nothing :: Maybe (Money.Discrete "USD" "cent"))
+
+  , HU.testCase "USD cent, small, zero" $ do
+      let dis = 0 :: Money.Discrete "USD" "cent"
+          f = Money.discreteFromDecimal
+      f Nothing '.' "0" @?= Just dis
+      f Nothing '.' "+0" @?= Just dis
+      f Nothing '.' "-0" @?= Just dis
+      f (Just ',') '.' "0" @?= Just dis
+      f (Just ',') '.' "+0" @?= Just dis
+      f (Just ',') '.' "-0" @?= Just dis
+
+  , HU.testCase "USD cent, small, positive" $ do
+      let dis = 25 :: Money.Discrete "USD" "cent"
+          f = Money.discreteFromDecimal
+      f Nothing '.' "0.25" @?= Just dis
+      f Nothing '.' "+0.25" @?= Just dis
+      f (Just ',') '.' "0.25" @?= Just dis
+      f (Just ',') '.' "+0.25" @?= Just dis
+
+  , HU.testCase "USD cent, small, negative" $ do
+      let dis = -25 :: Money.Discrete "USD" "cent"
+          f = Money.discreteFromDecimal
+      f Nothing '.' "-0.25" @?= Just dis
+      f Nothing '.' "-0.25" @?= Just dis
+      f (Just ',') '.' "-0.25" @?= Just dis
+      f (Just ',') '.' "-0.25" @?= Just dis
+
+  , HU.testCase "USD cent, big, positive" $ do
+      let dis = 102300456789 :: Money.Discrete "USD" "cent"
+          f = Money.discreteFromDecimal
+      f Nothing '.' "1023004567.89" @?= Just dis
+      f Nothing '.' "+1023004567.89" @?= Just dis
+      f (Just ',') '.' "1,023,004,567.89" @?= Just dis
+      f (Just ',') '.' "+1,023,004,567.89" @?= Just dis
+
+  , HU.testCase "USD cent, big, negative" $ do
+      let dis = -102300456789 :: Money.Discrete "USD" "cent"
+          f = Money.discreteFromDecimal
+      f Nothing '.' "-1023004567.89" @?= Just dis
+      f Nothing '.' "-1023004567.89" @?= Just dis
+      f (Just ',') '.' "-1,023,004,567.89" @?= Just dis
+      f (Just ',') '.' "-1,023,004,567.89" @?= Just dis
+  ]
+
+testDiscreteFromDecimal :: Tasty.TestTree
+testDiscreteFromDecimal =
+  Tasty.testGroup "discreteFromDecimal"
+  [ HU.testCase "Unsupported decimal separator" $ do
+      Money.discreteFromDecimal Nothing '2' "1225"
+        @?= (Nothing :: Maybe (Money.Discrete "USD" "cent"))
+      Money.discreteFromDecimal (Just ',') '2' "1225"
+        @?= (Nothing :: Maybe (Money.Discrete "USD" "cent"))
+
+  , HU.testCase "Too large" $ do
+      Money.discreteFromDecimal Nothing '.' "0.053"
+        @?= (Nothing :: Maybe (Money.Discrete "USD" "cent"))
+      Money.discreteFromDecimal (Just ',') '.' "0.253"
+        @?= (Nothing :: Maybe (Money.Discrete "USD" "cent"))
+
+  , HU.testCase "USD cent, small, zero" $ do
+      let dis = 0 :: Money.Discrete "USD" "cent"
+          f = Money.discreteFromDecimal
+      f Nothing '.' "0" @?= Just dis
+      f Nothing '.' "+0" @?= Just dis
+      f Nothing '.' "-0" @?= Just dis
+      f (Just ',') '.' "0" @?= Just dis
+      f (Just ',') '.' "+0" @?= Just dis
+      f (Just ',') '.' "-0" @?= Just dis
+
+  , HU.testCase "USD cent, small, positive" $ do
+      let dis = 25 :: Money.Discrete "USD" "cent"
+          f = Money.discreteFromDecimal
+      f Nothing '.' "0.25" @?= Just dis
+      f Nothing '.' "+0.25" @?= Just dis
+      f (Just ',') '.' "0.25" @?= Just dis
+      f (Just ',') '.' "+0.25" @?= Just dis
+
+  , HU.testCase "USD cent, small, negative" $ do
+      let dis = -25 :: Money.Discrete "USD" "cent"
+          f = Money.discreteFromDecimal
+      f Nothing '.' "-0.25" @?= Just dis
+      f Nothing '.' "-0.25" @?= Just dis
+      f (Just ',') '.' "-0.25" @?= Just dis
+      f (Just ',') '.' "-0.25" @?= Just dis
+
+  , HU.testCase "USD cent, big, positive" $ do
+      let dis = 102300456789 :: Money.Discrete "USD" "cent"
+          f = Money.discreteFromDecimal
+      f Nothing '.' "1023004567.89" @?= Just dis
+      f Nothing '.' "+1023004567.89" @?= Just dis
+      f (Just ',') '.' "1,023,004,567.89" @?= Just dis
+      f (Just ',') '.' "+1,023,004,567.89" @?= Just dis
+
+  , HU.testCase "USD cent, big, negative" $ do
+      let dis = -102300456789 :: Money.Discrete "USD" "cent"
+          f = Money.discreteFromDecimal
+      f Nothing '.' "-1023004567.89" @?= Just dis
+      f Nothing '.' "-1023004567.89" @?= Just dis
+      f (Just ',') '.' "-1,023,004,567.89" @?= Just dis
+      f (Just ',') '.' "-1,023,004,567.89" @?= Just dis
   ]
 
 testRounding
