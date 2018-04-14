@@ -88,7 +88,7 @@ import Data.Monoid ((<>))
 import Data.Proxy (Proxy(..))
 import Data.Ratio ((%), numerator, denominator)
 import Data.Word (Word8)
-import GHC.Exts (Constraint, fromList)
+import GHC.Exts (fromList)
 import qualified GHC.Generics as GHC
 import GHC.TypeLits
   (Symbol, SomeSymbol(..), Nat, SomeNat(..), CmpNat, KnownSymbol, KnownNat,
@@ -328,23 +328,29 @@ discreteCurrency
 discreteCurrency = \_ -> symbolVal (Proxy :: Proxy currency)
 {-# INLINABLE discreteCurrency #-}
 
--- | What approach to use when approximating a fractional number to a whole
+-- | What approach to use when approximating a fractional number to an integer
 -- number.
 --
 -- See 'approximate'.
 data Approximation
-  = Round    -- ^ Approximate using 'round'
-  | Floor    -- ^ Approximate using 'floor'
-  | Ceiling  -- ^ Approximate using 'ceiling'
-  | Truncate -- ^ Approximate using 'truncate'
+  = Round
+  -- ^ Approximate @x@ to the nearest integer, or to the nearest even integer if
+  -- @x@ is equidistant between two integers.
+  | Floor
+  -- ^ Approximate @x@ to the nearest integer less than or equal to @x@.
+  | Ceiling
+  -- ^ Approximate @x@ to the nearest integer greater than or equal to @x@.
+  | Truncate
+  -- ^ Approximate @x@ to the nearest integer betwen @0@ and @x@, inclusive.
   deriving (Eq, Show)
 
 approximate :: Approximation -> Rational -> Integer
 {-# INLINE approximate #-}
-approximate Round = round
-approximate Floor = floor
-approximate Ceiling = ceiling
-approximate Truncate = truncate
+approximate = \case
+  Round -> round
+  Floor -> floor
+  Ceiling -> ceiling
+  Truncate -> truncate
 
 -- | Approximate a 'Dense' value @x@ to the nearest value fully representable in
 -- its @currency@'s @unit@ 'Scale', which might be @x@ itself.
@@ -1524,12 +1530,14 @@ denseToDecimal
   -> String
 {-# INLINE denseToDecimal #-}
 denseToDecimal a plus ytsep dsep fdigs0 ps = \(Dense r0) ->
-  let r1 :: Rational = r0 * scale ps
-      parts :: Integer = approximate a (r1 * (10 ^ fdigs0))
-      ipart :: Natural = fromInteger (abs parts) `div` (10 ^ fdigs0)
-      ftext :: String = drop (length (show ipart)) (show (abs parts))
-      itext :: String = maybe (show ipart) (renderThousands ipart) ytsep
-      fpad0 :: String = List.replicate (fromIntegral fdigs0 - length ftext) '0'
+  -- this string-fu is not particularly efficient.
+  let r1 = r0 * scale ps :: Rational
+      parts = approximate a (r1 * (10 ^ fdigs0)) :: Integer
+      ipart = fromInteger (abs parts) `div` (10 ^ fdigs0) :: Natural
+      ftext | ipart == 0 = show (abs parts) :: String
+            | otherwise = drop (length (show ipart)) (show (abs parts))
+      itext = maybe (show ipart) (renderThousands ipart) ytsep :: String
+      fpad0 = List.replicate (fromIntegral fdigs0 - length ftext) '0' :: String
   in mconcat
        [ if | parts < 0 -> "-"
             | plus && parts > 0 -> "+"
@@ -1547,19 +1555,17 @@ denseToDecimal a plus ytsep dsep fdigs0 ps = \(Dense r0) ->
 -- \"12,045\"
 -- @
 renderThousands :: Natural -> Char -> String
-renderThousands n sep
-  | n < 1000 = show n
-  | otherwise
-      = List.foldl' (flip mappend) mempty
-      $ List.intersperse [sep]
-      $ List.unfoldr (\x ->
-          case divMod x 1000 of
-             (0, 0) -> Nothing
-             (0, z) -> Just (show z, 0)
-             (y, z) | z <  10   -> Just ('0':'0':show z, y)
-                    | z < 100   -> Just (    '0':show z, y)
-                    | otherwise -> Just (        show z, y))
-      $ n
+{-# INLINABLE renderThousands #-}
+renderThousands n0
+  | n0 < 1000 = \_ -> show n0
+  | otherwise = \c -> List.foldl' (flip mappend) mempty (List.unfoldr (f c) n0)
+      where f :: Char -> Natural -> Maybe (String, Natural)
+            f c = \x -> case divMod x 1000 of
+                        (0, 0) -> Nothing
+                        (0, z) -> Just (show z, 0)
+                        (y, z) | z <  10   -> Just (c:'0':'0':show z, y)
+                               | z < 100   -> Just (c:'0':show z, y)
+                               | otherwise -> Just (c:show z, y)
 
 --------------------------------------------------------------------------------
 -- Decimal parsing
@@ -1653,3 +1659,4 @@ rationalFromDecimalP yst sf = do
    pure $! sig $ case yfpart of
      Nothing -> fromInteger (read ipart)
      Just fpart -> read (ipart <> fpart) % (10 ^ length fpart)
+

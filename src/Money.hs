@@ -67,6 +67,8 @@ module Money
  , I.someExchangeRateSrcCurrency
  , I.someExchangeRateDstCurrency
  , I.someExchangeRateRate
+ -- * Misc
+ , I.Approximation(Round, Floor, Ceiling, Truncate)
  ) where
 
 import qualified Money.Internal as I

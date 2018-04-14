@@ -69,9 +69,9 @@ instance QC.Arbitrary Money.SomeDiscrete where
 
 instance QC.Arbitrary (Money.Dense currency) where
   arbitrary = do
-    Just x <- QC.suchThat (Money.dense <$> QC.arbitrary) isJust
+    Just x <- QC.suchThat (Money.denseFromRational <$> QC.arbitrary) isJust
     pure x
-  shrink = catMaybes . fmap Money.dense . QC.shrink . toRational
+  shrink = catMaybes . fmap Money.denseFromRational . QC.shrink . toRational
 
 instance QC.Arbitrary Money.SomeDense where
   arbitrary = do
@@ -85,7 +85,7 @@ instance QC.Arbitrary (Money.ExchangeRate src dst) where
     Just x <- QC.suchThat (fmap Money.exchangeRate QC.arbitrary) isJust
     pure x
   shrink =
-    catMaybes . fmap Money.exchangeRate . QC.shrink . Money.fromExchangeRate
+    catMaybes . fmap Money.exchangeRate . QC.shrink . Money.exchangeRateToRational
 
 instance QC.Arbitrary Money.SomeExchangeRate where
   arbitrary = do
@@ -110,7 +110,7 @@ tests =
   [ testCurrencies
   , testCurrencyUnits
   , testExchange
-  , testRationalDecimal
+  , testDenseToDecimal
   ]
 
 testCurrencies :: Tasty.TestTree
@@ -145,118 +145,396 @@ testCurrencyUnits =
   , testDecimal (Proxy :: Proxy "XAU") (Proxy :: Proxy "grain")
   ]
 
-testRationalDecimal :: Tasty.TestTree
-testRationalDecimal =
-  Tasty.testGroup "Rational/Decimal"
-  [ HU.testCase "rationalRoundToDecimal" $ do
-       let f = Money.rationalRoundToDecimal
-       f False Nothing '.' 2 (1235%1000) @?= "1.24"
-       f True Nothing '.' 2 (1235%1000) @?= "+1.24"
-       f True Nothing '.' 2 (negate (1235%1000)) @?= "-1.24"
-       f False Nothing '.' 2 (negate (1235%1000)) @?= "-1.24"
+testDenseToDecimal :: Tasty.TestTree
+testDenseToDecimal =
+  Tasty.testGroup "denseToDecimal"
+  [ HU.testCase "Round: dns1" $ do
+       render Money.Round dns1 @?=
+         [ "1023004567.90"        --  0
+         , "1,023,004,567.90"     --  1
+         , "+1023004567.90"       --  2
+         , "+1,023,004,567.90"    --  3
+         , "102300456789.50"      --  4
+         , "102,300,456,789.50"   --  5
+         , "+102300456789.50"     --  6
+         , "+102,300,456,789.50"  --  7
+         , "1023004568"           --  8
+         , "1,023,004,568"        --  9
+         , "+1023004568"          -- 10
+         , "+1,023,004,568"       -- 11
+         , "102300456790"         -- 12
+         , "102,300,456,790"      -- 13
+         , "+102300456790"        -- 14
+         , "+102,300,456,790"     -- 15
+         ]
+  , HU.testCase "Round: negate dns1" $ do
+       render Money.Round (negate dns1) @?=
+         [ "-1023004567.90"       --  0
+         , "-1,023,004,567.90"    --  1
+         , "-1023004567.90"       --  2
+         , "-1,023,004,567.90"    --  3
+         , "-102300456789.50"     --  4
+         , "-102,300,456,789.50"  --  5
+         , "-102300456789.50"     --  6
+         , "-102,300,456,789.50"  --  7
+         , "-1023004568"          --  8
+         , "-1,023,004,568"       --  9
+         , "-1023004568"          -- 10
+         , "-1,023,004,568"       -- 11
+         , "-102300456790"        -- 12
+         , "-102,300,456,790"     -- 13
+         , "-102300456790"        -- 14
+         , "-102,300,456,790"     -- 15
+         ]
+  , HU.testCase "Round: dns2" $ do
+       render Money.Round dns2 @?=
+         [ "1.23"    --  0
+         , "1.23"    --  1
+         , "+1.23"   --  2
+         , "+1.23"   --  3
+         , "123.00"  --  4
+         , "123.00"  --  5
+         , "+123.00" --  6
+         , "+123.00" --  7
+         , "1"       --  8
+         , "1"       --  9
+         , "+1"      -- 10
+         , "+1"      -- 11
+         , "123"     -- 12
+         , "123"     -- 13
+         , "+123"    -- 14
+         , "+123"    -- 15
+         ]
+  , HU.testCase "Round: negate dns2" $ do
+       render Money.Round (negate dns2) @?=
+         [ "-1.23"    --  0
+         , "-1.23"    --  1
+         , "-1.23"    --  2
+         , "-1.23"    --  3
+         , "-123.00"  --  4
+         , "-123.00"  --  5
+         , "-123.00"  --  6
+         , "-123.00"  --  7
+         , "-1"       --  8
+         , "-1"       --  9
+         , "-1"       -- 10
+         , "-1"       -- 11
+         , "-123"     -- 12
+         , "-123"     -- 13
+         , "-123"     -- 14
+         , "-123"     -- 15
+         ]
+  , HU.testCase "Round: dns3" $ do
+       render Money.Round dns3 @?=
+         [ "0.34"   --  0
+         , "0.34"   --  1
+         , "+0.34"  --  2
+         , "+0.34"  --  3
+         , "34.50"  --  4
+         , "34.50"  --  5
+         , "+34.50" --  6
+         , "+34.50" --  7
+         , "0"      --  8
+         , "0"      --  9
+         , "0"      -- 10
+         , "0"      -- 11
+         , "34"     -- 12
+         , "34"     -- 13
+         , "+34"    -- 14
+         , "+34"    -- 15
+         ]
+  , HU.testCase "Round: negate dns3" $ do
+       render Money.Round (negate dns3) @?=
+         [ "-0.34"   --  0
+         , "-0.34"   --  1
+         , "-0.34"   --  2
+         , "-0.34"   --  3
+         , "-34.50"  --  4
+         , "-34.50"  --  5
+         , "-34.50"  --  6
+         , "-34.50"  --  7
+         , "0"       --  8
+         , "0"       --  9
+         , "0"       -- 10
+         , "0"       -- 11
+         , "-34"     -- 12
+         , "-34"     -- 13
+         , "-34"     -- 14
+         , "-34"     -- 15
+         ]
+  , HU.testCase "Floor: dns1" $ do
+       render Money.Floor dns1 @?=
+         [ "1023004567.89"        --  0
+         , "1,023,004,567.89"     --  1
+         , "+1023004567.89"       --  2
+         , "+1,023,004,567.89"    --  3
+         , "102300456789.50"      --  4
+         , "102,300,456,789.50"   --  5
+         , "+102300456789.50"     --  6
+         , "+102,300,456,789.50"  --  7
+         , "1023004567"           --  8
+         , "1,023,004,567"        --  9
+         , "+1023004567"          -- 10
+         , "+1,023,004,567"       -- 11
+         , "102300456789"         -- 12
+         , "102,300,456,789"      -- 13
+         , "+102300456789"        -- 14
+         , "+102,300,456,789"     -- 15
+         ]
+  , HU.testCase "Floor: negate dns1" $ do
+       render Money.Floor (negate dns1) @?=
+         [ "-1023004567.90"       --  0
+         , "-1,023,004,567.90"    --  1
+         , "-1023004567.90"       --  2
+         , "-1,023,004,567.90"    --  3
+         , "-102300456789.50"     --  4
+         , "-102,300,456,789.50"  --  5
+         , "-102300456789.50"     --  6
+         , "-102,300,456,789.50"  --  7
+         , "-1023004568"          --  8
+         , "-1,023,004,568"       --  9
+         , "-1023004568"          -- 10
+         , "-1,023,004,568"       -- 11
+         , "-102300456790"        -- 12
+         , "-102,300,456,790"     -- 13
+         , "-102300456790"        -- 14
+         , "-102,300,456,790"     -- 15
+         ]
+  , HU.testCase "Floor: dns2" $ do
+       render Money.Floor dns2 @?=
+         [ "1.23"    --  0
+         , "1.23"    --  1
+         , "+1.23"   --  2
+         , "+1.23"   --  3
+         , "123.00"  --  4
+         , "123.00"  --  5
+         , "+123.00" --  6
+         , "+123.00" --  7
+         , "1"       --  8
+         , "1"       --  9
+         , "+1"      -- 10
+         , "+1"      -- 11
+         , "123"     -- 12
+         , "123"     -- 13
+         , "+123"    -- 14
+         , "+123"    -- 15
+         ]
+  , HU.testCase "Floor: negate dns2" $ do
+       render Money.Floor (negate dns2) @?=
+         [ "-1.23"    --  0
+         , "-1.23"    --  1
+         , "-1.23"    --  2
+         , "-1.23"    --  3
+         , "-123.00"  --  4
+         , "-123.00"  --  5
+         , "-123.00"  --  6
+         , "-123.00"  --  7
+         , "-2"       --  8
+         , "-2"       --  9
+         , "-2"       -- 10
+         , "-2"       -- 11
+         , "-123"     -- 12
+         , "-123"     -- 13
+         , "-123"     -- 14
+         , "-123"     -- 15
+         ]
+  , HU.testCase "Floor: dns3" $ do
+       render Money.Floor dns3 @?=
+         [ "0.34"   --  0
+         , "0.34"   --  1
+         , "+0.34"  --  2
+         , "+0.34"  --  3
+         , "34.50"  --  4
+         , "34.50"  --  5
+         , "+34.50" --  6
+         , "+34.50" --  7
+         , "0"      --  8
+         , "0"      --  9
+         , "0"      -- 10
+         , "0"      -- 11
+         , "34"     -- 12
+         , "34"     -- 13
+         , "+34"    -- 14
+         , "+34"    -- 15
+         ]
+  , HU.testCase "Floor: negate dns3" $ do
+       render Money.Floor (negate dns3) @?=
+         [ "-0.35"   --  0
+         , "-0.35"   --  1
+         , "-0.35"   --  2
+         , "-0.35"   --  3
+         , "-34.50"  --  4
+         , "-34.50"  --  5
+         , "-34.50"  --  6
+         , "-34.50"  --  7
+         , "-1"      --  8
+         , "-1"      --  9
+         , "-1"      -- 10
+         , "-1"      -- 11
+         , "-35"     -- 12
+         , "-35"     -- 13
+         , "-35"     -- 14
+         , "-35"     -- 15
+         ]
+  , HU.testCase "Ceiling: dns1" $ do
+       render Money.Ceiling dns1 @?=
+         [ "1023004567.90"        --  0
+         , "1,023,004,567.90"     --  1
+         , "+1023004567.90"       --  2
+         , "+1,023,004,567.90"    --  3
+         , "102300456789.50"      --  4
+         , "102,300,456,789.50"   --  5
+         , "+102300456789.50"     --  6
+         , "+102,300,456,789.50"  --  7
+         , "1023004568"           --  8
+         , "1,023,004,568"        --  9
+         , "+1023004568"          -- 10
+         , "+1,023,004,568"       -- 11
+         , "102300456790"         -- 12
+         , "102,300,456,790"      -- 13
+         , "+102300456790"        -- 14
+         , "+102,300,456,790"     -- 15
+         ]
+  , HU.testCase "Ceiling: negate dns1" $ do
+       render Money.Ceiling (negate dns1) @?=
+         [ "-1023004567.89"       --  0
+         , "-1,023,004,567.89"    --  1
+         , "-1023004567.89"       --  2
+         , "-1,023,004,567.89"    --  3
+         , "-102300456789.50"     --  4
+         , "-102,300,456,789.50"  --  5
+         , "-102300456789.50"     --  6
+         , "-102,300,456,789.50"  --  7
+         , "-1023004567"          --  8
+         , "-1,023,004,567"       --  9
+         , "-1023004567"          -- 10
+         , "-1,023,004,567"       -- 11
+         , "-102300456789"        -- 12
+         , "-102,300,456,789"     -- 13
+         , "-102300456789"        -- 14
+         , "-102,300,456,789"     -- 15
+         ]
+  , HU.testCase "Ceiling: dns2" $ do
+       render Money.Ceiling dns2 @?=
+         [ "1.23"    --  0
+         , "1.23"    --  1
+         , "+1.23"   --  2
+         , "+1.23"   --  3
+         , "123.00"  --  4
+         , "123.00"  --  5
+         , "+123.00" --  6
+         , "+123.00" --  7
+         , "2"       --  8
+         , "2"       --  9
+         , "+2"      -- 10
+         , "+2"      -- 11
+         , "123"     -- 12
+         , "123"     -- 13
+         , "+123"    -- 14
+         , "+123"    -- 15
+         ]
+  , HU.testCase "Ceiling: negate dns2" $ do
+       render Money.Ceiling (negate dns2) @?=
+         [ "-1.23"    --  0
+         , "-1.23"    --  1
+         , "-1.23"    --  2
+         , "-1.23"    --  3
+         , "-123.00"  --  4
+         , "-123.00"  --  5
+         , "-123.00"  --  6
+         , "-123.00"  --  7
+         , "-1"       --  8
+         , "-1"       --  9
+         , "-1"       -- 10
+         , "-1"       -- 11
+         , "-123"     -- 12
+         , "-123"     -- 13
+         , "-123"     -- 14
+         , "-123"     -- 15
+         ]
+  , HU.testCase "Ceiling: dns3" $ do
+       render Money.Ceiling dns3 @?=
+         [ "0.35"   --  0
+         , "0.35"   --  1
+         , "+0.35"  --  2
+         , "+0.35"  --  3
+         , "34.50"  --  4
+         , "34.50"  --  5
+         , "+34.50" --  6
+         , "+34.50" --  7
+         , "1"      --  8
+         , "1"      --  9
+         , "+1"     -- 10
+         , "+1"     -- 11
+         , "35"     -- 12
+         , "35"     -- 13
+         , "+35"    -- 14
+         , "+35"    -- 15
+         ]
+  , HU.testCase "Ceiling: negate dns3" $ do
+       render Money.Ceiling (negate dns3) @?=
+         [ "-0.34"   --  0
+         , "-0.34"   --  1
+         , "-0.34"   --  2
+         , "-0.34"   --  3
+         , "-34.50"  --  4
+         , "-34.50"  --  5
+         , "-34.50"  --  6
+         , "-34.50"  --  7
+         , "0"       --  8
+         , "0"       --  9
+         , "0"       -- 10
+         , "0"       -- 11
+         , "-34"     -- 12
+         , "-34"     -- 13
+         , "-34"     -- 14
+         , "-34"     -- 15
+         ]
 
-       f False (Just ',') '.' 2 (1235%1000) @?= "1.24"
-       f True (Just ',') '.' 2 (1235%1000) @?= "+1.24"
-       f True (Just ',') '.' 2 (negate (1235%1000)) @?= "-1.24"
-       f False (Just ',') '.' 2 (negate (1235%1000)) @?= "-1.24"
+  , HU.testCase "Truncate: dns1" $ do
+      render Money.Truncate dns1 @?= render Money.Floor dns1
 
-       f False Nothing '.' 2 (1234067895%1000) @?= "1234067.90"
-       f True Nothing '.' 2 (1234007895%1000) @?= "+1234007.90"
-       f True Nothing '.' 2 (negate (1234067895%1000)) @?= "-1234067.90"
-       f False Nothing '.' 2 (negate (1234007895%1000)) @?= "-1234007.90"
+  , HU.testCase "Truncate: negate dns1" $ do
+      render Money.Truncate (negate dns1) @?= render Money.Ceiling (negate dns1)
 
-       f False (Just ',') '.' 2 (1234067895%1000) @?= "1,234,067.90"
-       f True (Just ',') '.' 2 (1234007895%1000) @?= "+1,234,007.90"
-       f True (Just ',') '.' 2 (negate (1234067895%1000)) @?= "-1,234,067.90"
-       f False (Just ',') '.' 2 (negate (1234007895%1000)) @?= "-1,234,007.90"
+  , HU.testCase "Truncate: dns2" $ do
+      render Money.Truncate dns2 @?= render Money.Floor dns2
 
-       f False Nothing '.' 0 (345%1000) @?= "0"
-       f True Nothing '.' 0 (345%1000) @?= "0"
-       f True Nothing '.' 0 (negate (345%1000)) @?= "0"
-       f False Nothing '.' 0 (negate (345%1000)) @?= "0"
+  , HU.testCase "Truncate: negate dns2" $ do
+      render Money.Truncate (negate dns2) @?= render Money.Ceiling (negate dns2)
 
-  , HU.testCase "rationalFloorToDecimal" $ do
-       let f = Money.rationalFloorToDecimal
-       f False Nothing '.' 2 (1235%1000) @?= "1.23"
-       f True Nothing '.' 2 (1235%1000) @?= "+1.23"
-       f True Nothing '.' 2 (negate (1235%1000)) @?= "-1.24"
-       f False Nothing '.' 2 (negate (1235%1000)) @?= "-1.24"
+  , HU.testCase "Truncate: dns3" $ do
+      render Money.Truncate dns3 @?= render Money.Floor dns3
 
-       f False (Just ',') '.' 2 (1235%1000) @?= "1.23"
-       f True (Just ',') '.' 2 (1235%1000) @?= "+1.23"
-       f True (Just ',') '.' 2 (negate (1235%1000)) @?= "-1.24"
-       f False (Just ',') '.' 2 (negate (1235%1000)) @?= "-1.24"
-
-       f False Nothing '.' 2 (1234067895%1000) @?= "1234067.89"
-       f True Nothing '.' 2 (1234007895%1000) @?= "+1234007.89"
-       f True Nothing '.' 2 (negate (1234067895%1000)) @?= "-1234067.90"
-       f False Nothing '.' 2 (negate (1234007895%1000)) @?= "-1234007.90"
-
-       f False (Just ',') '.' 2 (1234067895%1000) @?= "1,234,067.89"
-       f True (Just ',') '.' 2 (1234007895%1000) @?= "+1,234,007.89"
-       f True (Just ',') '.' 2 (negate (1234067895%1000)) @?= "-1,234,067.90"
-       f False (Just ',') '.' 2 (negate (1234007895%1000)) @?= "-1,234,007.90"
-
-       f False Nothing '.' 0 (345%1000) @?= "0"
-       f True Nothing '.' 0 (345%1000) @?= "0"
-       f True Nothing '.' 0 (negate (345%1000)) @?= "-1"
-       f False Nothing '.' 0 (negate (345%1000)) @?= "-1"
-
-  , HU.testCase "rationalCeilingToDecimal" $ do
-       let f = Money.rationalCeilingToDecimal
-       f False Nothing '.' 2 (1235%1000) @?= "1.24"
-       f True Nothing '.' 2 (1235%1000) @?= "+1.24"
-       f True Nothing '.' 2 (negate (1235%1000)) @?= "-1.23"
-       f False Nothing '.' 2 (negate (1235%1000)) @?= "-1.23"
-
-       f False (Just ',') '.' 2 (1235%1000) @?= "1.24"
-       f True (Just ',') '.' 2 (1235%1000) @?= "+1.24"
-       f True (Just ',') '.' 2 (negate (1235%1000)) @?= "-1.23"
-       f False (Just ',') '.' 2 (negate (1235%1000)) @?= "-1.23"
-
-       f False Nothing '.' 2 (1234067895%1000) @?= "1234067.90"
-       f True Nothing '.' 2 (1234007895%1000) @?= "+1234007.90"
-       f True Nothing '.' 2 (negate (1234067895%1000)) @?= "-1234067.89"
-       f False Nothing '.' 2 (negate (1234007895%1000)) @?= "-1234007.89"
-
-       f False (Just ',') '.' 2 (1234067895%1000) @?= "1,234,067.90"
-       f True (Just ',') '.' 2 (1234007895%1000) @?= "+1,234,007.90"
-       f True (Just ',') '.' 2 (negate (1234067895%1000)) @?= "-1,234,067.89"
-       f False (Just ',') '.' 2 (negate (1234007895%1000)) @?= "-1,234,007.89"
-
-       f False Nothing '.' 0 (345%1000) @?= "1"
-       f True Nothing '.' 0 (345%1000) @?= "+1"
-       f True Nothing '.' 0 (negate (345%1000)) @?= "0"
-       f False Nothing '.' 0 (negate (345%1000)) @?= "0"
-
-  , HU.testCase "rationalTruncateToDecimal" $ do
-       let f = Money.rationalTruncateToDecimal
-       f False Nothing '.' 2 (1235%1000) @?= "1.23"
-       f True Nothing '.' 2 (1235%1000) @?= "+1.23"
-       f True Nothing '.' 2 (negate (1235%1000)) @?= "-1.23"
-       f False Nothing '.' 2 (negate (1235%1000)) @?= "-1.23"
-
-       f False (Just ',') '.' 2 (1235%1000) @?= "1.23"
-       f True (Just ',') '.' 2 (1235%1000) @?= "+1.23"
-       f True (Just ',') '.' 2 (negate (1235%1000)) @?= "-1.23"
-       f False (Just ',') '.' 2 (negate (1235%1000)) @?= "-1.23"
-
-       f False Nothing '.' 2 (1234067895%1000) @?= "1234067.89"
-       f True Nothing '.' 2 (1234007895%1000) @?= "+1234007.89"
-       f True Nothing '.' 2 (negate (1234067895%1000)) @?= "-1234067.89"
-       f False Nothing '.' 2 (negate (1234007895%1000)) @?= "-1234007.89"
-
-       f False (Just ',') '.' 2 (1234067895%1000) @?= "1,234,067.89"
-       f True (Just ',') '.' 2 (1234007895%1000) @?= "+1,234,007.89"
-       f True (Just ',') '.' 2 (negate (1234067895%1000)) @?= "-1,234,067.89"
-       f False (Just ',') '.' 2 (negate (1234007895%1000)) @?= "-1,234,007.89"
-
-       f False Nothing '.' 0 (345%1000) @?= "0"
-       f True Nothing '.' 0 (345%1000) @?= "0"
-       f True Nothing '.' 0 (negate (345%1000)) @?= "0"
-       f False Nothing '.' 0 (negate (345%1000)) @?= "0"
-
+  , HU.testCase "Truncate: negate dns3" $ do
+      render Money.Truncate (negate dns3) @?= render Money.Ceiling (negate dns3)
   ]
+  where
+    dns1 :: Money.Dense "USD" = fromRational (1023004567895%1000)
+    dns2 :: Money.Dense "USD" = fromRational (123%100)
+    dns3 :: Money.Dense "USD" = fromRational (345%1000)
+
+    render :: Money.Approximation -> Money.Dense "USD" -> [String]
+    render a dns =
+      let ps1 :: Proxy '(1, 1) = Proxy
+          ps100 :: Proxy '(100, 1) = Proxy
+      in [ Money.denseToDecimal a False Nothing    '.' 2 ps1   dns  --  0
+         , Money.denseToDecimal a False (Just ',') '.' 2 ps1   dns  --  1
+         , Money.denseToDecimal a True  Nothing    '.' 2 ps1   dns  --  2
+         , Money.denseToDecimal a True  (Just ',') '.' 2 ps1   dns  --  3
+         , Money.denseToDecimal a False Nothing    '.' 2 ps100 dns  --  4
+         , Money.denseToDecimal a False (Just ',') '.' 2 ps100 dns  --  5
+         , Money.denseToDecimal a True  Nothing    '.' 2 ps100 dns  --  6
+         , Money.denseToDecimal a True  (Just ',') '.' 2 ps100 dns  --  7
+         , Money.denseToDecimal a False Nothing    '.' 0 ps1   dns  --  8
+         , Money.denseToDecimal a False (Just ',') '.' 0 ps1   dns  --  9
+         , Money.denseToDecimal a True  Nothing    '.' 0 ps1   dns  -- 10
+         , Money.denseToDecimal a True  (Just ',') '.' 0 ps1   dns  -- 11
+         , Money.denseToDecimal a False Nothing    '.' 0 ps100 dns  -- 12
+         , Money.denseToDecimal a False (Just ',') '.' 0 ps100 dns  -- 13
+         , Money.denseToDecimal a True  Nothing    '.' 0 ps100 dns  -- 14
+         , Money.denseToDecimal a True  (Just ',') '.' 0 ps100 dns  -- 15
+         ]
 
 testDense
   :: forall currency
@@ -589,14 +867,14 @@ testExchangeRate ps pd =
          xr === xr . id
   , QC.testProperty "Category: composition with inverse" $
       QC.forAll QC.arbitrary $ \(xr1 :: Money.ExchangeRate src dst) ->
-         (1 === Money.fromExchangeRate (xr1 . Money.flipExchangeRate xr1)) .&&.
-         (1 === Money.fromExchangeRate (Money.flipExchangeRate xr1 . xr1))
+         (1 === Money.exchangeRateToRational (xr1 . Money.exchangeRateRecip xr1)) .&&.
+         (1 === Money.exchangeRateToRational (Money.exchangeRateRecip xr1 . xr1))
   , QC.testProperty "Category: composition with other" $
       QC.forAll QC.arbitrary $ \(xr1 :: Money.ExchangeRate src dst,
                                  xr2 :: Money.ExchangeRate dst src) ->
-         let a = Money.fromExchangeRate xr1 * Money.fromExchangeRate xr2
-         in (a === Money.fromExchangeRate (xr1 . xr2)) .&&.
-            (a === Money.fromExchangeRate (xr2 . xr1))
+         let a = Money.exchangeRateToRational xr1 * Money.exchangeRateToRational xr2
+         in (a === Money.exchangeRateToRational (xr1 . xr2)) .&&.
+            (a === Money.exchangeRateToRational (xr2 . xr1))
 
   , QC.testProperty "read . show == id" $
       QC.forAll QC.arbitrary $ \(xr :: Money.ExchangeRate src dst) ->
@@ -606,14 +884,14 @@ testExchangeRate ps pd =
          Just xr === read (show (Just xr))
   , QC.testProperty "flipExchangeRate . flipExchangeRate == id" $
       QC.forAll QC.arbitrary $ \(xr :: Money.ExchangeRate src dst) ->
-         let xr' = Money.flipExchangeRate xr
-         in (Money.fromExchangeRate xr /= Money.fromExchangeRate xr')
-               ==> (xr === Money.flipExchangeRate xr')
+         let xr' = Money.exchangeRateRecip xr
+         in (Money.exchangeRateToRational xr /= Money.exchangeRateToRational xr')
+               ==> (xr === Money.exchangeRateRecip xr')
   , QC.testProperty "exchange (flipExchangeRate x) . exchange x == id" $
       QC.forAll QC.arbitrary $
          \( c0 :: Money.Dense src
           , xr :: Money.ExchangeRate src dst
-          ) -> c0 === Money.exchange (Money.flipExchangeRate xr)
+          ) -> c0 === Money.exchange (Money.exchangeRateRecip xr)
                                      (Money.exchange xr c0)
   , QC.testProperty "x == 1 ===> exchange x == id" $
       QC.forAll QC.arbitrary $
@@ -624,7 +902,7 @@ testExchangeRate ps pd =
       QC.forAll QC.arbitrary $
          \( c0 :: Money.Dense src
           , xr :: Money.ExchangeRate src dst
-          ) -> (Money.fromExchangeRate xr /= 1)
+          ) -> (Money.exchangeRateToRational xr /= 1)
                   ==> (toRational c0 /= toRational (Money.exchange xr c0))
   , QC.testProperty "fromSomeExchangeRate . someExchangeRate == Just" $
       QC.forAll QC.arbitrary $ \(x :: Money.ExchangeRate src dst) ->
@@ -777,10 +1055,10 @@ testDecimal _ _ =
         (not (Char.isDigit sf || maybe False Char.isDigit yst)
         ) ==> let dec = Money.discreteToDecimal plus yst sf dis
                   Just dns = Money.denseFromDecimal yst sf dec
-              in ((dis, 0) === Money.round dns) .&&.
-                 ((dis, 0) === Money.floor dns) .&&.
-                 ((dis, 0) === Money.ceiling dns) .&&.
-                 ((dis, 0) === Money.truncate dns)
+              in ((dis, 0) === Money.discreteFromDense Money.Round dns) .&&.
+                 ((dis, 0) === Money.discreteFromDense Money.Floor dns) .&&.
+                 ((dis, 0) === Money.discreteFromDense Money.Ceiling dns) .&&.
+                 ((dis, 0) === Money.discreteFromDense Money.Truncate dns)
                  -}
   ]
 
@@ -792,26 +1070,26 @@ testRounding
   -> Tasty.TestTree
 testRounding _ _ =
     Tasty.testGroup "Rounding"
-    [ QC.testProperty "floor"    $ QC.forAll QC.arbitrary (g Money.floor)
-    , QC.testProperty "ceiling"  $ QC.forAll QC.arbitrary (g Money.ceiling)
-    , QC.testProperty "round"    $ QC.forAll QC.arbitrary (g Money.round)
-    , QC.testProperty "truncate" $ QC.forAll QC.arbitrary (g Money.truncate)
-    , QC.testProperty "floor no reminder"    $ QC.forAll QC.arbitrary (h Money.floor)
-    , QC.testProperty "ceiling no reminder"  $ QC.forAll QC.arbitrary (h Money.ceiling)
-    , QC.testProperty "round no reminder"    $ QC.forAll QC.arbitrary (h Money.round)
-    , QC.testProperty "truncate no reminder" $ QC.forAll QC.arbitrary (h Money.truncate)
+    [ QC.testProperty "floor"    $ QC.forAll QC.arbitrary (g (Money.discreteFromDense Money.Floor))
+    , QC.testProperty "ceiling"  $ QC.forAll QC.arbitrary (g (Money.discreteFromDense Money.Ceiling))
+    , QC.testProperty "round"    $ QC.forAll QC.arbitrary (g (Money.discreteFromDense Money.Round))
+    , QC.testProperty "truncate" $ QC.forAll QC.arbitrary (g (Money.discreteFromDense Money.Truncate))
+    , QC.testProperty "floor no reminder"    $ QC.forAll QC.arbitrary (h (Money.discreteFromDense Money.Floor))
+    , QC.testProperty "ceiling no reminder"  $ QC.forAll QC.arbitrary (h (Money.discreteFromDense Money.Ceiling))
+    , QC.testProperty "round no reminder"    $ QC.forAll QC.arbitrary (h (Money.discreteFromDense Money.Round))
+    , QC.testProperty "truncate no reminder" $ QC.forAll QC.arbitrary (h (Money.discreteFromDense Money.Truncate))
     ]
   where
     g :: (Money.Dense currency -> (Money.Discrete' currency (Money.Scale currency unit), Money.Dense currency))
       -> Money.Dense currency
       -> QC.Property
-    g f = \x -> x === case f x of (y, z) -> Money.fromDiscrete y + z
+    g f = \x -> x === case f x of (y, z) -> Money.denseFromDiscrete y + z
 
     h :: (Money.Dense currency -> (Money.Discrete' currency (Money.Scale currency unit), Money.Dense currency))
       -> Money.Discrete currency unit
       -> QC.Property
-    h f = \x -> (Money.fromDiscrete x) === case f (Money.fromDiscrete x) of
-      (y, 0) -> Money.fromDiscrete y
+    h f = \x -> (Money.denseFromDiscrete x) === case f (Money.denseFromDiscrete x) of
+      (y, 0) -> Money.denseFromDiscrete y
       (_, _) -> error "testRounding.h: unexpected"
 
 hush :: Either a b -> Maybe b
