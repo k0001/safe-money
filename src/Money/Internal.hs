@@ -23,7 +23,8 @@
 {-# OPTIONS_GHC -Wno-redundant-constraints #-}
 #endif
 
--- | This is an internal module. Import "Money" instead.
+-- | This is an internal module. You may use stuff exported from here, but we
+-- can't garantee their stability.
 module Money.Internal
  ( -- * Dense monetary values
    Dense
@@ -145,16 +146,16 @@ import qualified GHC.TypeLits as GHC
 -- can still treat monetary values as dense while operating on them. For
 -- example, the half of @USD 3.41@ is @USD 1.705@, which is not an amount that
 -- can't be represented as a number of USD cents (the smallest unit that can
--- represent USD amounts). Nevertheless, if you eventually multiply @USD 1.705@
--- by @4@, for example, you end up with @USD 6.82@, which is again a value
--- representable as USD cents. In other words, 'Dense' monetary values
--- allow us to perform precise calculations deferring the conversion to a
--- 'Discrete' monetary values as much as posible. Once you are ready to
--- aproximate a 'Dense' value to a 'Discrete' value you can use one of
--- 'round', 'floor', 'ceiling' or 'truncate'. Otherwise, using 'toRational' you
+-- represent USD amounts). Nevertheless, if you do manage to represent @USD
+-- 1.709@ somehow, and you eventually multiply @USD 1.705@ by @4@ for example,
+-- then you end up with @USD 6.82@, which is again a value representable as USD
+-- cents. In other words, 'Dense' monetary values allow us to perform precise
+-- calculations deferring the conversion to a 'Discrete' monetary values as much
+-- as posible. Once you are ready to aproximate a 'Dense' value to a 'Discrete'
+-- value you can use one 'discreteFromDense'. Otherwise, using 'toRational' you
 -- can obtain a precise 'Rational' representation.
 --
--- Construct 'Dense' monetary values using denseFromRational, 'fromRational',
+-- Construct 'Dense' monetary values using 'denseFromRational', 'fromRational',
 -- 'fromInteger' or 'fromIntegral'.
 --
 -- /WARNING/ if you want to treat a dense monetary value as a /Real/ number (for
@@ -167,8 +168,8 @@ newtype Dense (currency :: Symbol) = Dense Rational
 
 -- | /WARNING/ if there exists the possibility that the given 'Rational' has a
 -- zero as a denominator, which although unlikely, is possible if the 'Rational'
--- is constructed unsafely using 'GHC.Real.infinity' or 'GHC.Real.notANumber'
--- for example, then use denseFromRational instead of 'fromRational'.
+-- was constructed unsafely using 'GHC.Real.infinity' or 'GHC.Real.notANumber',
+-- then use 'denseFromRational' instead of 'fromRational'.
 instance Fractional (Dense (currency :: Symbol)) where
   {-# INLINABLE recip #-}
   recip (Dense a) = Dense (recip a)
@@ -179,6 +180,10 @@ instance Fractional (Dense (currency :: Symbol)) where
     0 -> error "fromRational :: Rational -> Dense currency: denominator is zero"
     _ -> Dense r
 
+-- | @
+-- > 'show' ('fromRational (1 '%' 3) :: 'Dense' \"USD\")
+-- \"Dense \\"USD\\" 1%3\"
+-- @
 instance forall currency. KnownSymbol currency => Show (Dense currency) where
   showsPrec n = \(Dense r0) ->
     let c = symbolVal (Proxy :: Proxy currency)
@@ -198,14 +203,14 @@ instance forall currency. KnownSymbol currency => Read (Dense currency) where
 -- For example, if you want to represent @USD 12.52316@, then you can use:
 --
 -- @
--- denseFromRational (125316 '%' 10000)
+-- 'denseFromRational' (125316 '%' 10000)
 -- @
 --
 -- Returns 'Nothing' in case the denominator of the given 'Rational' is zero,
--- which although unlikely, is possible if the 'Rational' is constructed
--- unsafely using 'GHC.Real.infinity' or 'GHC.Real.notANumber', for example.
--- If you don't care about that scenario, you can use `fromRational` to build
--- the `Dense` value.
+-- which although unlikely, is possible if the 'Rational' was constructed
+-- unsafely using 'GHC.Real.infinity' or 'GHC.Real.notANumber'. If you don't
+-- care about that scenario, you can use `fromRational` to build the `Dense`
+-- value.
 denseFromRational :: Rational -> Maybe (Dense currency)
 denseFromRational = \r -> if denominator r == 0 then Nothing else Just (Dense r)
 {-# INLINABLE denseFromRational #-}
@@ -260,6 +265,10 @@ deriving instance GoodScale scale => Real (Discrete' currency scale)
 deriving instance GoodScale scale => Integral (Discrete' currency scale)
 deriving instance GoodScale scale => GHC.Generic (Discrete' currency scale)
 
+-- | @
+-- > 'show' (123 :: 'Discrete' \"USD\" \"cent\")
+-- \"Dense \\"USD\\" 100%1 123\"
+-- @
 instance forall currency scale.
   ( KnownSymbol currency, GoodScale scale
   ) => Show (Discrete' currency scale) where
@@ -328,10 +337,7 @@ discreteCurrency
 discreteCurrency = \_ -> symbolVal (Proxy :: Proxy currency)
 {-# INLINABLE discreteCurrency #-}
 
--- | What approach to use when approximating a fractional number to an integer
--- number.
---
--- See 'approximate'.
+-- | Method for approximating a fractional number to an integer number.
 data Approximation
   = Round
   -- ^ Approximate @x@ to the nearest integer, or to the nearest even integer if
@@ -352,24 +358,17 @@ approximate = \case
   Ceiling -> ceiling
   Truncate -> truncate
 
--- | Approximate a 'Dense' value @x@ to the nearest value fully representable in
--- its @currency@'s @unit@ 'Scale', which might be @x@ itself.
+-- | Approximate a 'Dense' value @x@ to the nearest value fully representable a
+-- given @scale@.
 --
--- If @x@ is already fully representable in its @currency@'s @unit@ 'Scale',
--- then the following holds:
---
--- @
--- 'discreteFromDense' a x == ('denseFromDiscrete' x, 0)
--- @
---
--- Otherwise, if the nearest value to @x@ that is not representable in its
--- @currency@'s @unit@ 'Scale' is greater than @x@, then the returned remainder
--- 'Dense' will be non-zero.
+-- If the given 'Dense' doesn't fit entirely in the @scale@, then a non-zero
+-- 'Dense' reminder is returned alongside the 'Discrete' approximation.
 --
 -- Proof that 'discreteFromDense' doesn't lose money:
 --
 -- @
--- x == case 'round' a x of (y, z) -> 'denseFromDiscrete' y + z
+-- x == case 'discreteFromDense' a x of
+--         (y, z) -> 'denseFromDiscrete' y + z
 -- @
 discreteFromDense
   :: forall currency scale
@@ -391,9 +390,8 @@ discreteFromDense a = \c0 ->
 
 --------------------------------------------------------------------------------
 
--- | @'Scale' currency unit@ is an irreducible rational number (expressed as
--- @'(numerator, denominator)@) indicating how many pieces of @unit@ fit in
--- @currency@.
+-- | @'Scale' currency unit@ is an rational number (expressed as @'(numerator,
+-- denominator)@) indicating how many pieces of @unit@ fit in @currency@.
 --
 -- @currency@ is usually a ISO-4217 currency code, but not necessarily.
 --
@@ -417,39 +415,41 @@ discreteFromDense a = \c0 ->
 -- When using 'Discrete' values to represent money, it will be impossible to
 -- represent an amount of @currency@ smaller than @unit@. So, if you decide to
 -- use @Scale \"USD\" \"dollar\"@ as your scale, you will not be able to
--- represent values such as USD 3.50 or USD 21.87, since they are not exact
+-- represent values such as USD 3.50 or USD 21.87 becacuse they are not exact
 -- multiples of a dollar.
 --
 -- If there exists a canonical smallest @unit@ that can fully represent the
--- currency, then an instance @'Scale' currency currency@ exists.
+-- currency in all its denominations, then an instance @'Scale' currency
+-- currency@ exists.
 --
 -- @
 -- type instance 'Scale' \"USD\" \"USD\" = Scale \"USD\" \"cent\"
 -- @
 --
--- For some monetary values, such as precious metals, the smallest representable
--- unit is not obvious, since you can continue to split the precious metal many
--- times before it stops being a precious metal. Still, for practical purposes
--- we can make a sane arbitrary choice of smallest unit. For example, the base
--- unit for XAU (Gold) is the /troy ounce/, which is too big to be considered
--- the smallest unit, but we can arbitrarily choose the /milligrain/ as our
--- smallest unit, which is about as heavy as a single grain of table salt and
--- should be sufficiently precise for all monetary practical purposes. A /troy
--- ounce/ equals 480000 /milligrains/.
+-- For some monetary values, such as precious metals, there is no smallest
+-- representable unit, since you can repeatedly split the precious metal many
+-- times before it stops being a precious metal. Nevertheless, for practical
+-- purposes we can make a sane arbitrary choice of smallest unit. For example,
+-- the base unit for XAU (Gold) is the /troy ounce/, which is too big to be
+-- considered the smallest unit, but we can arbitrarily choose the /milligrain/
+-- as our smallest unit, which is about as heavy as a single grain of table salt
+-- and should be sufficiently precise for all monetary practical purposes. A
+-- /troy ounce/ equals 480000 /milligrains/.
 --
 -- @
--- type instance 'Scale' \"XAG\" \"milligrain\" = '(480000, 1)
+-- type instance 'Scale' \"XAU\" \"milligrain\" = '(480000, 1)
 -- @
 --
 -- You can use other units such as /milligrams/ for measuring XAU, for example.
 -- However, since the amount of /milligrams/ in a /troy ounce/ (31103.477) is
--- not integral, we need to use rational number to express it.
+-- not integral, we need to use rational with a denominator different than 1 to
+-- express it.
 --
 -- @
 -- type instance 'Scale' \"XAU\" \"milligram\" = '(31103477, 1000)
 -- @
 --
--- If you try to obtain the 'Scale of a @currency@ without an obvious smallest
+-- If you try to obtain the 'Scale' of a @currency@ without an obvious smallest
 -- representable @unit@, like XAU, you will get a compile error.
 type family Scale (currency :: Symbol) (unit :: Symbol) :: (Nat, Nat)
 
@@ -497,16 +497,22 @@ mkGoodScale =
      else Nothing
 {-# INLINABLE mkGoodScale #-}
 
--- | Term-level representation for the @currency@'s @unit@ 'Scale'.
+-- | Term-level representation of a currrency @scale@.
 --
 -- For example, the 'Scale' for @\"USD\"@ in @\"cent\"@s is @100/1@.
+--
+-- @
+-- > 'scale' ('Proxy' :: 'Proxy' ('Scale' \"USD\" \"cent\"))
+-- 100 % 1
+-- > 'scale' (x :: 'Discrete' \"USD\" \"cent\")
+-- 100 % 1
+-- @
 --
 -- The returned 'Rational' is statically guaranteed to be a positive number with
 -- a non-zero denominator.
 scale :: forall proxy scale. GoodScale scale => proxy scale -> Rational -- ^
-scale = \_ ->
-   natVal (Proxy :: Proxy (Fst scale)) %
-   natVal (Proxy :: Proxy (Snd scale))
+scale = \_ -> natVal (Proxy :: Proxy (Fst scale)) %
+              natVal (Proxy :: Proxy (Snd scale))
 {-# INLINABLE scale #-}
 
 --------------------------------------------------------------------------------
@@ -548,7 +554,7 @@ newtype ExchangeRate (src :: Symbol) (dst :: Symbol) = ExchangeRate Rational
 -- x . y  ==  y . x
 -- @
 --
--- Multiplicative inverse:
+-- Reciprocal:
 --
 -- @
 -- 1  ==  'exchangeRateToRational' (x . 'exchangeRateRecip' x)
@@ -559,6 +565,10 @@ instance Category ExchangeRate where
   ExchangeRate a . ExchangeRate b = ExchangeRate (a * b)
   {-# INLINE (.) #-}
 
+-- | @
+-- > 'show' '<$>' ('exchangeRateFromRational' (5 % 7) :: 'Maybe' ('ExchangeRate' \"USD\" \"JPY\"))@
+-- Just \"ExchangeRate \\"USD\\" \\"JPY\\" 5%7\"
+-- @
 instance forall src dst.
   ( KnownSymbol src, KnownSymbol dst
   ) => Show (ExchangeRate src dst) where
@@ -592,7 +602,11 @@ exchangeRateToRational = \(ExchangeRate r0) -> r0
 -- | Safely construct an 'ExchangeRate' from a 'Rational' number.
 --
 -- Notice that the absolute value of the given 'Rational' value is used, seeing
--- as there's no such thing as a negative exchange rate.
+-- as there's no such thing as a negative exchange rate. That is,
+--
+-- @
+-- 'exchangeRateFromRational' x   ==   'exchangeRateFromRational' ('negate' x)
+-- @
 --
 -- Returns 'Nothing' in case the denominator of the given 'Rational' is zero,
 -- which although unlikely, is possible if the 'Rational' is constructed
@@ -1528,7 +1542,7 @@ denseToDecimal
   -> Dense currency
   -- ^ The dense monetary amount to render.
   -> String
-{-# INLINE denseToDecimal #-}
+{-# INLINABLE denseToDecimal #-}
 denseToDecimal a plus ytsep dsep fdigs0 ps = \(Dense r0) ->
   -- this string-fu is not particularly efficient.
   let r1 = r0 * scale ps :: Rational

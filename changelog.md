@@ -17,7 +17,7 @@
 * BREAKING CHANGE. COMPILER WILL COMPLAIN. The `flipExchangeRate` function was
   renamed to `exchangeRateRecip`.
 
-* BREAKING CHANGE. The `exchangeRateFromRational` function was renamed to
+* BREAKING CHANGE. The `exchangeRate` function was renamed to
   `exchangeRateFromRational` (which now works accepts negative inputs as well).
 
 * Introduced new functions for rendering and parsing decimal reperesentations of

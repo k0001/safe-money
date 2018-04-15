@@ -39,7 +39,7 @@ module Money
  , I.scale
    -- * Currency exchange
  , I.ExchangeRate
- , I.exchangeRate
+ , I.exchangeRateFromRational
  , I.exchangeRateToRational
  , I.exchangeRateRecip
  , I.exchange
