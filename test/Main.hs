@@ -71,9 +71,10 @@ instance QC.Arbitrary Money.SomeDiscrete where
 
 instance QC.Arbitrary (Money.Dense currency) where
   arbitrary = do
-    Just x <- QC.suchThat (Money.denseFromRational <$> QC.arbitrary) isJust
-    pure x
-  shrink = catMaybes . fmap Money.denseFromRational . QC.shrink . toRational
+     n <- QC.arbitrary
+     d <- QC.suchThat QC.arbitrary (/= 0)
+     pure (Money.denseFromRational (n%d))
+  shrink = map Money.denseFromRational . QC.shrink . toRational
 
 instance QC.Arbitrary Money.SomeDense where
   arbitrary = do
@@ -84,10 +85,11 @@ instance QC.Arbitrary Money.SomeDense where
 
 instance QC.Arbitrary (Money.ExchangeRate src dst) where
   arbitrary = do
-    Just x <- QC.suchThat (fmap Money.exchangeRateFromRational QC.arbitrary) isJust
-    pure x
-  shrink =
-    catMaybes . fmap Money.exchangeRateFromRational . QC.shrink . Money.exchangeRateToRational
+     n <- QC.suchThat QC.arbitrary (/= 0)
+     d <- QC.suchThat QC.arbitrary (/= 0)
+     pure (Money.exchangeRateFromRational (n%d))
+  shrink = map Money.exchangeRateFromRational
+         . QC.shrink . Money.exchangeRateToRational
 
 instance QC.Arbitrary Money.SomeExchangeRate where
   arbitrary = do
@@ -897,13 +899,13 @@ testExchangeRate ps pd =
   , QC.testProperty "x == 1 ===> exchange x == id" $
       QC.forAll QC.arbitrary $
          \( c0 :: Money.Dense src
-          ) -> let Just xr = Money.exchangeRateFromRational 1
+          ) -> let xr = Money.exchangeRateFromRational 1
                in toRational c0 === toRational (Money.exchange xr c0)
   , QC.testProperty "x /= 1 ===> exchange x /= id" $
       QC.forAll QC.arbitrary $
          \( c0 :: Money.Dense src
           , xr :: Money.ExchangeRate src dst
-          ) -> (Money.exchangeRateToRational xr /= 1)
+          ) -> (Money.exchangeRateToRational xr /= 1 && toRational c0 /= 0)
                   ==> (toRational c0 /= toRational (Money.exchange xr c0))
   , QC.testProperty "fromSomeExchangeRate . someExchangeRate == Just" $
       QC.forAll QC.arbitrary $ \(x :: Money.ExchangeRate src dst) ->

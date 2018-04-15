@@ -166,21 +166,16 @@ import qualified GHC.TypeLits as GHC
 newtype Dense (currency :: Symbol) = Dense Rational
   deriving (Eq, Ord, Num, Real, GHC.Generic)
 
--- | /WARNING/ if there exists the possibility that the given 'Rational' has a
--- zero as a denominator, which although unlikely, is possible if the 'Rational'
--- was constructed unsafely using 'GHC.Real.infinity' or 'GHC.Real.notANumber',
--- then use 'denseFromRational' instead of 'fromRational'.
 instance Fractional (Dense (currency :: Symbol)) where
   {-# INLINABLE recip #-}
   recip (Dense a) = Dense (recip a)
   {-# INLINABLE (/) #-}
   Dense a / Dense b = Dense (a / b)
   {-# INLINABLE fromRational #-}
-  fromRational = \r -> case denominator r of
-    0 -> error "fromRational :: Rational -> Dense currency: denominator is zero"
-    _ -> Dense r
+  fromRational = Dense
 
--- | @
+-- |
+-- @
 -- > 'show' ('fromRational (1 '%' 3) :: 'Dense' \"USD\")
 -- \"Dense \\"USD\\" 1%3\"
 -- @
@@ -196,7 +191,7 @@ instance forall currency. KnownSymbol currency => Read (Dense currency) where
   readPrec = Read.parens $ do
     let c = symbolVal (Proxy :: Proxy currency)
     _ <- ReadPrec.lift (ReadP.string ("Dense " ++ show c ++ " "))
-    maybe empty pure =<< fmap denseFromRational Read.readPrec
+    fmap denseFromRational Read.readPrec
 
 -- | Build a 'Dense' monetary value from a 'Rational' value.
 --
@@ -206,13 +201,10 @@ instance forall currency. KnownSymbol currency => Read (Dense currency) where
 -- 'denseFromRational' (125316 '%' 10000)
 -- @
 --
--- Returns 'Nothing' in case the denominator of the given 'Rational' is zero,
--- which although unlikely, is possible if the 'Rational' was constructed
--- unsafely using 'GHC.Real.infinity' or 'GHC.Real.notANumber'. If you don't
--- care about that scenario, you can use `fromRational` to build the `Dense`
--- value.
-denseFromRational :: Rational -> Maybe (Dense currency)
-denseFromRational = \r -> if denominator r == 0 then Nothing else Just (Dense r)
+-- @
+-- 'denseFromRational'   ==   'fromRational'
+denseFromRational :: Rational -> Dense currency
+denseFromRational = Dense
 {-# INLINABLE denseFromRational #-}
 
 -- | 'Dense' currency identifier.
@@ -265,7 +257,8 @@ deriving instance GoodScale scale => Real (Discrete' currency scale)
 deriving instance GoodScale scale => Integral (Discrete' currency scale)
 deriving instance GoodScale scale => GHC.Generic (Discrete' currency scale)
 
--- | @
+-- |
+-- @
 -- > 'show' (123 :: 'Discrete' \"USD\" \"cent\")
 -- \"Dense \\"USD\\" 100%1 123\"
 -- @
@@ -292,7 +285,7 @@ instance forall currency scale.
            , show (numerator s), "%"
            , show (denominator s), " "
            ]))
-    Discrete <$> Read.readPrec
+    fmap Discrete Read.readPrec
 
 #if MIN_VERSION_base(4,9,0)
 instance
@@ -508,8 +501,7 @@ mkGoodScale =
 -- 100 % 1
 -- @
 --
--- The returned 'Rational' is statically guaranteed to be a positive number with
--- a non-zero denominator.
+-- The returned 'Rational' is statically guaranteed to be a positive number.
 scale :: forall proxy scale. GoodScale scale => proxy scale -> Rational -- ^
 scale = \_ -> natVal (Proxy :: Proxy (Fst scale)) %
               natVal (Proxy :: Proxy (Snd scale))
@@ -524,7 +516,7 @@ scale = \_ -> natVal (Proxy :: Proxy (Fst scale)) %
 -- then we can represent this situaion using:
 --
 -- @
--- 'exchangeRateFromRational' (12345 % 10000) :: 'Maybe' ('ExchangeRate' \"USD\" \"GBP\")
+-- 'exchangeRateFromRational' (12345 % 10000) :: 'ExchangeRate' \"USD\" \"GBP\"
 -- @
 newtype ExchangeRate (src :: Symbol) (dst :: Symbol) = ExchangeRate Rational
   deriving (Eq, Ord, GHC.Generic)
@@ -565,9 +557,10 @@ instance Category ExchangeRate where
   ExchangeRate a . ExchangeRate b = ExchangeRate (a * b)
   {-# INLINE (.) #-}
 
--- | @
--- > 'show' '<$>' ('exchangeRateFromRational' (5 % 7) :: 'Maybe' ('ExchangeRate' \"USD\" \"JPY\"))@
--- Just \"ExchangeRate \\"USD\\" \\"JPY\\" 5%7\"
+-- |
+-- @
+-- > 'show' ('exchangeRateFromRational' (5 % 7) :: 'ExchangeRate' \"USD\" \"JPY\")@
+-- \"ExchangeRate \\"USD\\" \\"JPY\\" 5%7\"
 -- @
 instance forall src dst.
   ( KnownSymbol src, KnownSymbol dst
@@ -589,34 +582,26 @@ instance forall src dst.
         d = symbolVal (Proxy :: Proxy dst)
     _ <- ReadPrec.lift (ReadP.string
             ("ExchangeRate " ++ show s ++ " " ++ show d ++ " "))
-    maybe empty pure =<< fmap exchangeRateFromRational Read.readPrec
+    fmap exchangeRateFromRational Read.readPrec
 
 -- | Obtain a 'Rational' representation of the 'ExchangeRate'.
 --
--- This 'Rational' is guaranteed to be greater than 0 and with a non-zero
--- denominator.
+-- This 'Rational' is guaranteed to be a positive number.
 exchangeRateToRational :: ExchangeRate src dst -> Rational
 exchangeRateToRational = \(ExchangeRate r0) -> r0
-{-# INLINABLE exchangeRateToRational #-}
+{-# INLINE exchangeRateToRational #-}
 
 -- | Safely construct an 'ExchangeRate' from a 'Rational' number.
 --
 -- Notice that the absolute value of the given 'Rational' value is used, seeing
--- as there's no such thing as a negative exchange rate. That is,
+-- as there's no such thing as a negative exchange rate. That is:
 --
 -- @
 -- 'exchangeRateFromRational' x   ==   'exchangeRateFromRational' ('negate' x)
 -- @
---
--- Returns 'Nothing' in case the denominator of the given 'Rational' is zero,
--- which although unlikely, is possible if the 'Rational' is constructed
--- unsafely using 'GHC.Real.infinity' or 'GHC.Real.notANumber', for example.
--- If you don't care about that scenario, you can use `fromRational` to build
--- the `Dense` value.
-exchangeRateFromRational :: Rational -> Maybe (ExchangeRate src dst)
-exchangeRateFromRational = \r ->
-  if denominator r == 0 then Nothing else Just (ExchangeRate (abs r))
-{-# INLINABLE exchangeRateFromRational #-}
+exchangeRateFromRational :: Rational -> ExchangeRate src dst
+exchangeRateFromRational = \r -> ExchangeRate (abs r)
+{-# INLINE exchangeRateFromRational #-}
 
 -- | Reciprocal 'ExchangeRate'.
 --
@@ -630,7 +615,9 @@ exchangeRateFromRational = \r ->
 -- Note: If 'ExchangeRate' had a 'Fractional' instance, then 'exchangeRateRecip'
 -- would be the implementation of 'recip'.
 exchangeRateRecip :: ExchangeRate a b -> ExchangeRate b a
-exchangeRateRecip = \(ExchangeRate x) -> ExchangeRate (1 / x)
+exchangeRateRecip = \case
+  ExchangeRate 0 -> ExchangeRate 1
+  ExchangeRate x -> ExchangeRate (1 / x)
 {-# INLINABLE exchangeRateRecip #-}
 
 -- | Apply the 'ExchangeRate' to the given @'Dense' src@ monetary value.
@@ -692,9 +679,10 @@ mkSomeDense
   :: String   -- ^ Currency. ('someDenseCurrency')
   -> Rational -- ^ Scale. ('someDenseAmount')
   -> Maybe SomeDense
-mkSomeDense = \c r -> do
-  guard (denominator r /= 0)
-  Just (SomeDense c r)
+mkSomeDense = \c r ->
+  if (denominator r /= 0)
+  then Just (SomeDense c r)
+  else Nothing
 {-# INLINABLE mkSomeDense #-}
 
 -- | Convert a 'Dense' to a 'SomeDense' for ease of serialization.
@@ -711,9 +699,10 @@ fromSomeDense
   .  KnownSymbol currency
   => SomeDense
   -> Maybe (Dense currency)  -- ^
-fromSomeDense = \dr -> do
-  guard (someDenseCurrency dr == symbolVal (Proxy :: Proxy currency))
-  Just (Dense (someDenseAmount dr))
+fromSomeDense = \dr ->
+  if (someDenseCurrency dr == symbolVal (Proxy :: Proxy currency))
+  then Just (Dense (someDenseAmount dr))
+  else Nothing
 {-# INLINABLE fromSomeDense #-}
 
 -- | Convert a 'SomeDense' to a 'Dense' without knowing the target @currency@.
@@ -783,10 +772,10 @@ mkSomeDiscrete
   -> Rational -- ^ Scale. Positive, non-zero. ('someDiscreteScale')
   -> Integer  -- ^ Amount of unit. ('someDiscreteAmount')
   -> Maybe SomeDiscrete
-mkSomeDiscrete = \c r a -> do
-  guard (denominator r /= 0)
-  guard (r > 0)
-  Just (SomeDiscrete c r a)
+mkSomeDiscrete = \c r a ->
+  if (denominator r /= 0) && (r > 0)
+  then Just (SomeDiscrete c r a)
+  else Nothing
 {-# INLINABLE mkSomeDiscrete #-}
 
 -- | Convert a 'Discrete' to a 'SomeDiscrete' for ease of serialization.
@@ -902,10 +891,10 @@ mkSomeExchangeRate
   -> String   -- ^ Destination currency name. ('someExchangeRateDstCurrency')
   -> Rational -- ^ Exchange rate . Positive, non-zero. ('someExchangeRateRate')
   -> Maybe SomeExchangeRate
-mkSomeExchangeRate = \src dst r -> do
-  guard (denominator r /= 0)
-  guard (r > 0)
-  Just (SomeExchangeRate src dst r)
+mkSomeExchangeRate = \src dst r ->
+  if (denominator r /= 0) && (r > 0)
+  then Just (SomeExchangeRate src dst r)
+  else Nothing
 {-# INLINABLE mkSomeExchangeRate #-}
 
 -- | Convert a 'ExchangeRate' to a 'SomeDiscrete' for ease of serialization.
@@ -1270,7 +1259,7 @@ instance Ae.FromJSON SomeDiscrete where
 -- | Compatible with 'SomeExchangeRate'
 --
 -- Example rendering an 'ExchangeRate' constructed with
--- @'exchangeRateFromRational' (5 % 7) :: 'Maybe' ('ExchangeRate' \"USD\" \"JPY\")@
+-- @'exchangeRateFromRational' (5 % 7) :: 'ExchangeRate' \"USD\" \"JPY\"@
 --
 -- @
 -- [\"USD\", \"JPY\", 5, 7]
@@ -1391,7 +1380,7 @@ instance Xmlbf.FromXml SomeDiscrete where
 -- | Compatible with 'SomeExchangeRate'
 --
 -- Example rendering an 'ExchangeRate' constructed with
--- @'exchangeRateFromRational' (5 % 7) :: 'Maybe' ('ExchangeRate' \"USD\" \"JPY\")@
+-- @'exchangeRateFromRational' (5 % 7) :: 'ExchangeRate' \"USD\" \"JPY\"@
 --
 -- @
 -- \<exchange-rate src=\"USD\" dst=\"JPY\" n=\"5\" d=\"7\"/>
