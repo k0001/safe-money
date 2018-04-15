@@ -45,7 +45,7 @@ module Money.Internal
  , scale
    -- * Currency exchange
  , ExchangeRate
- , exchangeRate
+ , exchangeRateFromRational
  , exchangeRateToRational
  , exchangeRateRecip
  , exchange
@@ -518,7 +518,7 @@ scale = \_ ->
 -- then we can represent this situaion using:
 --
 -- @
--- 'exchangeRate' (12345 % 10000) :: 'Maybe' ('ExchangeRate' \"USD\" \"GBP\")
+-- 'exchangeRateFromRational' (12345 % 10000) :: 'Maybe' ('ExchangeRate' \"USD\" \"GBP\")
 -- @
 newtype ExchangeRate (src :: Symbol) (dst :: Symbol) = ExchangeRate Rational
   deriving (Eq, Ord, GHC.Generic)
@@ -579,7 +579,7 @@ instance forall src dst.
         d = symbolVal (Proxy :: Proxy dst)
     _ <- ReadPrec.lift (ReadP.string
             ("ExchangeRate " ++ show s ++ " " ++ show d ++ " "))
-    maybe empty pure =<< fmap exchangeRate Read.readPrec
+    maybe empty pure =<< fmap exchangeRateFromRational Read.readPrec
 
 -- | Obtain a 'Rational' representation of the 'ExchangeRate'.
 --
@@ -599,10 +599,10 @@ exchangeRateToRational = \(ExchangeRate r0) -> r0
 -- unsafely using 'GHC.Real.infinity' or 'GHC.Real.notANumber', for example.
 -- If you don't care about that scenario, you can use `fromRational` to build
 -- the `Dense` value.
-exchangeRate :: Rational -> Maybe (ExchangeRate src dst)
-exchangeRate = \r ->
+exchangeRateFromRational :: Rational -> Maybe (ExchangeRate src dst)
+exchangeRateFromRational = \r ->
   if denominator r == 0 then Nothing else Just (ExchangeRate (abs r))
-{-# INLINABLE exchangeRate #-}
+{-# INLINABLE exchangeRateFromRational #-}
 
 -- | Reciprocal 'ExchangeRate'.
 --
@@ -1256,7 +1256,7 @@ instance Ae.FromJSON SomeDiscrete where
 -- | Compatible with 'SomeExchangeRate'
 --
 -- Example rendering an 'ExchangeRate' constructed with
--- @'exchangeRate' (5 % 7) :: 'Maybe' ('ExchangeRate' \"USD\" \"JPY\")@
+-- @'exchangeRateFromRational' (5 % 7) :: 'Maybe' ('ExchangeRate' \"USD\" \"JPY\")@
 --
 -- @
 -- [\"USD\", \"JPY\", 5, 7]
@@ -1377,7 +1377,7 @@ instance Xmlbf.FromXml SomeDiscrete where
 -- | Compatible with 'SomeExchangeRate'
 --
 -- Example rendering an 'ExchangeRate' constructed with
--- @'exchangeRate' (5 % 7) :: 'Maybe' ('ExchangeRate' \"USD\" \"JPY\")@
+-- @'exchangeRateFromRational' (5 % 7) :: 'Maybe' ('ExchangeRate' \"USD\" \"JPY\")@
 --
 -- @
 -- \<exchange-rate src=\"USD\" dst=\"JPY\" n=\"5\" d=\"7\"/>

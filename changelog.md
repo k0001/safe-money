@@ -17,18 +17,23 @@
 * BREAKING CHANGE. COMPILER WILL COMPLAIN. The `flipExchangeRate` function was
   renamed to `exchangeRateRecip`.
 
+* BREAKING CHANGE. The `exchangeRateFromRational` function was renamed to
+  `exchangeRateFromRational` (which now works accepts negative inputs as well).
+
 * Introduced new functions for rendering and parsing decimal reperesentations of
   monetary amounts: `denseCurrency`, `discreteCurrency`, `denseFromDecimal`,
   `denseToDecimal`, `discreteFromDecimal`,
 
-* The `Dense` type now has a `Fractional` instance.
+* The `Dense` type now has a `Fractional` instance, with `fromRational` behaving
+  mostly like `exchangeRateFromRational` (excepts it crashes on malformed
+  `Rational`s, much like in the `Fractional` instance for `Dense`).
 
 * The `ErrScaleNonCanonical` type is not exported.
 
 * The `Money.Internal` module is now exposed, but hidden from the Haddock
   documentation.
 
-* New scale: @"BTC" "millibitcoin"@.
+* New scale: `"BTC" "millibitcoin"`.
 
 * Added many tests.
 
