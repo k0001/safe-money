@@ -5,6 +5,7 @@
 }:
 
 let
+lib = stdenv.lib;
 flags' =
   { aeson = true;
     binary = true;
@@ -15,7 +16,6 @@ flags' =
     store = true;
     xmlbf = true;
   } // flags;
-lib = stdenv.lib;
 extraDeps =
   lib.optionals (flags'.aeson) [ aeson ] ++
   lib.optionals (flags'.binary) [ binary ] ++
@@ -28,7 +28,7 @@ extraDeps =
 
 in mkDerivation rec {
   pname = "safe-money";
-  version = "0.4.1";
+  version = "0.5";
   homepage = "https://github.com/k0001/safe-money";
   description = "Type-safe and lossless encoding and manipulation of money, currencies and precious metals";
   license = stdenv.lib.licenses.bsd3;
@@ -38,5 +38,5 @@ in mkDerivation rec {
   testHaskellDepends = libraryHaskellDepends ++
     [ bytestring tasty tasty-hunit tasty-quickcheck ];
   configureFlags =
-    lib.mapAttrs (k: v: "-f" + lib.optionalString (!v) "-" + k) flags';
+    lib.mapAttrsToList (k: v: "-f" + lib.optionalString (!v) "-" + k) flags';
 }

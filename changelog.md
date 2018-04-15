@@ -1,8 +1,36 @@
 # Version 0.5
 
-* Added `denseCurrency`, `discreteCurrency`, `discreteDecimal`.
+* BREAKING CHANGE. COMPILER WILL COMPLAIN. `dense` was renamed to
+  `denseFromRational`.
 
-* TODO consider disabling `store` by default because of its many dependencies.
+* BREAKING CHANGE. COMPILER WILL COMPLAIN. The `round`, `floor`, `ceiling` and
+  `truncate` functions were replaced by a single `discreteFromDense` function
+  taking an argument of type `Approximation` (`Round`, `Floor`, `Ceiling` or
+  `Truncate`) as an argument.
+
+* BREAKING CHANGE. COMPILER WILL COMPLAIN. The `fromDiscrete` function was
+  renamed to `denseFromDiscrete`.
+
+* BREAKING CHANGE. COMPILER WILL COMPLAIN. The `fromExchangeRate` function was
+  renamed to `exchangeRateToRational`.
+
+* BREAKING CHANGE. COMPILER WILL COMPLAIN. The `flipExchangeRate` function was
+  renamed to `exchangeRateRecip`.
+
+* Introduced new functions for rendering and parsing decimal reperesentations of
+  monetary amounts: `denseCurrency`, `discreteCurrency`, `denseFromDecimal`,
+  `denseToDecimal`, `discreteFromDecimal`,
+
+* The `Dense` type now has a `Fractional` instance.
+
+* The `ErrScaleNonCanonical` type is not exported.
+
+* The `Money.Internal` module is now exposed, but hidden from the Haddock
+  documentation.
+
+* New scale: @"BTC" "millibitcoin"@.
+
+* Added many tests.
 
 
 # Version 0.4.1

@@ -21,27 +21,27 @@
 module Money
  ( -- * Dense monetary values
    I.Dense
- , I.dense
  , I.denseCurrency
+ , I.denseFromRational
+ , I.denseFromDiscrete
+ , I.denseFromDecimal
+ , I.denseToDecimal
    -- * Discrete monetary values
  , I.Discrete
  , I.Discrete'
- , I.fromDiscrete
- , I.round
- , I.ceiling
- , I.floor
- , I.truncate
  , I.discreteCurrency
- , I.discreteDecimal
+ , I.discreteFromDense
+ , I.discreteFromDecimal
    -- * Currency scales
  , I.Scale
  , I.GoodScale
+ , I.ErrScaleNonCanonical
  , I.scale
    -- * Currency exchange
  , I.ExchangeRate
  , I.exchangeRate
- , I.fromExchangeRate
- , I.flipExchangeRate
+ , I.exchangeRateToRational
+ , I.exchangeRateRecip
  , I.exchange
    -- * Serializable representations
  , I.SomeDense
@@ -67,6 +67,8 @@ module Money
  , I.someExchangeRateSrcCurrency
  , I.someExchangeRateDstCurrency
  , I.someExchangeRateRate
+ -- * Misc
+ , I.Approximation(Round, Floor, Ceiling, Truncate)
  ) where
 
 import qualified Money.Internal as I
@@ -771,6 +773,7 @@ type instance I.Scale "XPT" "microgram" = '(31103477, 1)
 -- | Bitcoin
 type instance I.Scale "BTC" "BTC" = '(100000000, 1)
 type instance I.Scale "BTC" "bitcoin" = '(1, 1)
+type instance I.Scale "BTC" "millibitcoin" = '(1000, 1)
 type instance I.Scale "BTC" "satoshi" = '(100000000, 1)
 
 -- | Bitcoin

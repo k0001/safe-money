@@ -8,6 +8,7 @@
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
 {-# LANGUAGE KindSignatures #-}
 {-# LANGUAGE LambdaCase #-}
+{-# LANGUAGE MultiWayIf #-}
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE PolyKinds #-}
 {-# LANGUAGE RankNTypes #-}
@@ -26,18 +27,17 @@
 module Money.Internal
  ( -- * Dense monetary values
    Dense
- , dense
  , denseCurrency
+ , denseFromRational
+ , denseFromDiscrete
+ , denseFromDecimal
+ , denseToDecimal
    -- * Discrete monetary values
  , Discrete
  , Discrete'
- , fromDiscrete
- , round
- , ceiling
- , floor
- , truncate
  , discreteCurrency
- , discreteDecimal
+ , discreteFromDense
+ , discreteFromDecimal
    -- * Currency scales
  , Scale
  , GoodScale
@@ -46,8 +46,8 @@ module Money.Internal
    -- * Currency exchange
  , ExchangeRate
  , exchangeRate
- , fromExchangeRate
- , flipExchangeRate
+ , exchangeRateToRational
+ , exchangeRateRecip
  , exchange
    -- * Serializable representations
  , SomeDense
@@ -73,15 +73,16 @@ module Money.Internal
  , someExchangeRateSrcCurrency
  , someExchangeRateDstCurrency
  , someExchangeRateRate
- -- * Msic Textual rendering
- , rationalDecimal
- , renderThousands
+ -- * Misc
+ , Approximation(Round, Floor, Ceiling, Truncate)
  ) where
 
 import Control.Applicative ((<|>), empty)
 import Control.Category (Category((.), id))
 import Control.Monad ((<=<), guard, when)
+import qualified Data.Char as Char
 import Data.Constraint (Dict(Dict))
+import Data.Functor (($>))
 import qualified Data.List as List
 import Data.Monoid ((<>))
 import Data.Proxy (Proxy(..))
@@ -89,13 +90,11 @@ import Data.Ratio ((%), numerator, denominator)
 import Data.Word (Word8)
 import GHC.Exts (fromList)
 import qualified GHC.Generics as GHC
-import GHC.Real (infinity, notANumber)
 import GHC.TypeLits
   (Symbol, SomeSymbol(..), Nat, SomeNat(..), CmpNat, KnownSymbol, KnownNat,
    natVal, someNatVal, symbolVal, someSymbolVal)
 import Numeric.Natural (Natural)
-import Prelude hiding ((.), id, round, ceiling, floor, truncate)
-import qualified Prelude as P
+import Prelude hiding ((.), id)
 import qualified Text.ParserCombinators.ReadPrec as ReadPrec
 import qualified Text.ParserCombinators.ReadP as ReadP
 import qualified Text.Read as Read
@@ -155,7 +154,7 @@ import qualified GHC.TypeLits as GHC
 -- 'round', 'floor', 'ceiling' or 'truncate'. Otherwise, using 'toRational' you
 -- can obtain a precise 'Rational' representation.
 --
--- Construct 'Dense' monetary values using 'dense', 'fromRational',
+-- Construct 'Dense' monetary values using denseFromRational, 'fromRational',
 -- 'fromInteger' or 'fromIntegral'.
 --
 -- /WARNING/ if you want to treat a dense monetary value as a /Real/ number (for
@@ -169,8 +168,16 @@ newtype Dense (currency :: Symbol) = Dense Rational
 -- | /WARNING/ if there exists the possibility that the given 'Rational' has a
 -- zero as a denominator, which although unlikely, is possible if the 'Rational'
 -- is constructed unsafely using 'GHC.Real.infinity' or 'GHC.Real.notANumber'
--- for example, then use 'dense' instead of 'fromRational'.
-deriving instance Fractional (Dense (currency :: Symbol))
+-- for example, then use denseFromRational instead of 'fromRational'.
+instance Fractional (Dense (currency :: Symbol)) where
+  {-# INLINABLE recip #-}
+  recip (Dense a) = Dense (recip a)
+  {-# INLINABLE (/) #-}
+  Dense a / Dense b = Dense (a / b)
+  {-# INLINABLE fromRational #-}
+  fromRational = \r -> case denominator r of
+    0 -> error "fromRational :: Rational -> Dense currency: denominator is zero"
+    _ -> Dense r
 
 instance forall currency. KnownSymbol currency => Show (Dense currency) where
   showsPrec n = \(Dense r0) ->
@@ -184,14 +191,14 @@ instance forall currency. KnownSymbol currency => Read (Dense currency) where
   readPrec = Read.parens $ do
     let c = symbolVal (Proxy :: Proxy currency)
     _ <- ReadPrec.lift (ReadP.string ("Dense " ++ show c ++ " "))
-    maybe empty pure =<< fmap dense Read.readPrec
+    maybe empty pure =<< fmap denseFromRational Read.readPrec
 
 -- | Build a 'Dense' monetary value from a 'Rational' value.
 --
 -- For example, if you want to represent @USD 12.52316@, then you can use:
 --
 -- @
--- 'dense' (125316 % 10000)
+-- denseFromRational (125316 '%' 10000)
 -- @
 --
 -- Returns 'Nothing' in case the denominator of the given 'Rational' is zero,
@@ -199,9 +206,9 @@ instance forall currency. KnownSymbol currency => Read (Dense currency) where
 -- unsafely using 'GHC.Real.infinity' or 'GHC.Real.notANumber', for example.
 -- If you don't care about that scenario, you can use `fromRational` to build
 -- the `Dense` value.
-dense :: Rational -> Maybe (Dense currency)
-dense = \r0 -> if (denominator r0 == 0) then Nothing else Just (Dense r0)
-{-# INLINABLE dense #-}
+denseFromRational :: Rational -> Maybe (Dense currency)
+denseFromRational = \r -> if denominator r == 0 then Nothing else Just (Dense r)
+{-# INLINABLE denseFromRational #-}
 
 -- | 'Dense' currency identifier.
 --
@@ -300,12 +307,12 @@ instance
 
 -- | Convert currency 'Discrete' monetary value into a 'Dense' monetary
 -- value.
-fromDiscrete
+denseFromDiscrete
   :: GoodScale scale
   => Discrete' currency scale
   -> Dense currency -- ^
-fromDiscrete = \c@(Discrete i) -> Dense (fromInteger i / scale c)
-{-# INLINABLE fromDiscrete #-}
+denseFromDiscrete = \c@(Discrete i) -> Dense (fromInteger i / scale c)
+{-# INLINABLE denseFromDiscrete #-}
 
 -- | 'Discrete' currency identifier.
 --
@@ -321,174 +328,72 @@ discreteCurrency
 discreteCurrency = \_ -> symbolVal (Proxy :: Proxy currency)
 {-# INLINABLE discreteCurrency #-}
 
--- | Internal. Used to implement 'round', 'ceiling', 'floor' and 'truncate'.
-roundf
-  :: forall currency scale
-  .  GoodScale scale
-  => (Rational -> Integer) -- ^ 'P.round', 'P.ceiling' or similar.
-  -> Dense currency
-  -> (Discrete' currency scale, Dense currency)
-roundf f = \c0 ->
-  let !r0 = toRational c0 :: Rational
-      !r1 = scale (Proxy :: Proxy scale)
-      !i2 = f (r0 * r1) :: Integer
-      !r2 = fromInteger i2 / r1 :: Rational
-      !d2 = Discrete i2
-      !rest = Dense (r0 - r2)
-  in (d2, rest)
-{-# INLINABLE roundf #-}
+-- | What approach to use when approximating a fractional number to an integer
+-- number.
+--
+-- See 'approximate'.
+data Approximation
+  = Round
+  -- ^ Approximate @x@ to the nearest integer, or to the nearest even integer if
+  -- @x@ is equidistant between two integers.
+  | Floor
+  -- ^ Approximate @x@ to the nearest integer less than or equal to @x@.
+  | Ceiling
+  -- ^ Approximate @x@ to the nearest integer greater than or equal to @x@.
+  | Truncate
+  -- ^ Approximate @x@ to the nearest integer betwen @0@ and @x@, inclusive.
+  deriving (Eq, Show)
 
--- | Round a 'Dense' value @x@ to the nearest value fully representable in
+approximate :: Approximation -> Rational -> Integer
+{-# INLINE approximate #-}
+approximate = \case
+  Round -> round
+  Floor -> floor
+  Ceiling -> ceiling
+  Truncate -> truncate
+
+-- | Approximate a 'Dense' value @x@ to the nearest value fully representable in
 -- its @currency@'s @unit@ 'Scale', which might be @x@ itself.
 --
 -- If @x@ is already fully representable in its @currency@'s @unit@ 'Scale',
 -- then the following holds:
 --
 -- @
--- 'round' x == ('fromDiscrete' x, 0)
+-- 'discreteFromDense' a x == ('denseFromDiscrete' x, 0)
 -- @
 --
--- Otherwise, if the nearest value to @x@ that is fully representable in its
--- @currency@'s @unit@ 'Scale' is greater than @x@, then the following holds:
+-- Otherwise, if the nearest value to @x@ that is not representable in its
+-- @currency@'s @unit@ 'Scale' is greater than @x@, then the returned remainder
+-- 'Dense' will be non-zero.
+--
+-- Proof that 'discreteFromDense' doesn't lose money:
 --
 -- @
--- 'round' == 'ceiling'
+-- x == case 'round' a x of (y, z) -> 'denseFromDiscrete' y + z
 -- @
---
--- Otherwise, the nearest value to @x@ that is fully representable in its
--- @currency@'s @unit@ 'Scale' is smaller than @x@, and the following holds:
---
--- @
--- 'round' == 'floor'
--- @
---
--- Proof that 'round' doesn't lose money:
---
--- @
--- x == case 'round' x of (y, z) -> 'fromDiscrete' y + z
--- @
-round
-  :: GoodScale scale
-  => Dense currency
-  -> (Discrete' currency scale, Dense currency) -- ^
-round = roundf P.round
-{-# INLINABLE round #-}
-
--- | Round a 'Dense' value @x@ to the nearest value fully representable in
--- its @currency@'s @unit@ 'Scale' which is greater than @x@ or equal to @x@.
---
---
--- If @x@ is already fully representable in its @currency@'s @unit@ 'Scale',
--- then the following holds:
---
--- @
--- 'ceiling' x == ('fromDiscrete' x, 0)
--- @
---
--- Otherwise, if @x@ is not representable in its @currency@'s @unit@ 'Scale',
--- then the following holds:
---
--- @
--- 'ceiling' x == (y, z)
--- @
---
--- @
--- x /= y
--- @
---
--- @
--- z < 0
--- @
---
--- Proof that 'ceiling' doesn't lose money:
---
--- @
--- x == case 'ceiling' x of (y, z) -> 'fromDiscrete' y + z
--- @
-ceiling
-  :: GoodScale scale
-  => Dense currency
-  -> (Discrete' currency scale, Dense currency) -- ^
-ceiling = roundf P.ceiling
-{-# INLINABLE ceiling #-}
-
--- | Round a 'Dense' value @x@ to the nearest value fully representable in
--- its @currency@'s @unit@ 'Scale' which is smaller than @x@ or equal to @x@.
---
---
--- If @x@ is already fully representable in its @currency@'s @unit@ 'Scale',
--- then the following holds:
---
--- @
--- 'floor' x == ('fromDiscrete' x, 0)
--- @
---
--- Otherwise, if @x@ is not representable in its @currency@'s @unit@ 'Scale',
--- then the following holds:
---
--- @
--- 'floor' x == (y, z)
--- @
---
--- @
--- x /= y
--- @
---
--- @
--- z > 0
--- @
---
--- Proof that 'floor' doesn't lose money:
---
--- @
--- x == case 'floor' x of (y, z) -> 'fromDiscrete' y + z
--- @
-floor
-  :: GoodScale scale
-  => Dense currency
-  -> (Discrete' currency scale, Dense currency) -- ^
-floor = roundf P.floor
-{-# INLINABLE floor #-}
-
--- | Round a 'Dense' value @x@ to the nearest value between zero and
--- @x@ (inclusive) which is fully representable in its @currency@'s @unit@
--- 'Scale'.
---
--- If @x@ is already fully representable in its @currency@'s @unit@ 'Scale',
--- then the following holds:
---
--- @
--- 'truncate' x == ('fromDiscrete' x, 0)
--- @
---
--- Otherwise, if @x@ is positive, then the following holds:
---
--- @
--- 'truncate' == 'floor'
--- @
---
--- Otherwise, if @x@ is negative, the following holds:
---
--- @
--- 'truncate' == 'ceiling'
--- @
---
--- Proof that 'truncate' doesn't lose money:
---
--- @
--- x == case 'truncate' x of (y, z) -> 'fromDiscrete' y + z
--- @
-truncate
-  :: GoodScale scale
-  => Dense currency
-  -> (Discrete' currency scale, Dense currency) -- ^
-truncate = roundf P.truncate
-{-# INLINABLE truncate #-}
+discreteFromDense
+  :: forall currency scale
+  .  GoodScale scale
+  => Approximation
+  -- ^ Approximation to use if necesary in order to fit the 'Dense' amount in
+  -- the requested @scale@.
+  -> Dense currency
+  -> (Discrete' currency scale, Dense currency)
+discreteFromDense a = \c0 ->
+  let !r0 = toRational c0 :: Rational
+      !r1 = scale (Proxy :: Proxy scale)
+      !i2 = approximate a (r0 * r1) :: Integer
+      !r2 = fromInteger i2 / r1 :: Rational
+      !d2 = Discrete i2
+      !rest = Dense (r0 - r2)
+  in (d2, rest)
+{-# INLINABLE discreteFromDense #-}
 
 --------------------------------------------------------------------------------
 
--- | @'Scale' currency unit@ is a rational number (expressed as @'(numerator,
--- denominator)@) indicating how many pieces of @unit@ fit in @currency@.
+-- | @'Scale' currency unit@ is an irreducible rational number (expressed as
+-- @'(numerator, denominator)@) indicating how many pieces of @unit@ fit in
+-- @currency@.
 --
 -- @currency@ is usually a ISO-4217 currency code, but not necessarily.
 --
@@ -568,8 +473,8 @@ type ErrScaleNonCanonical (currency :: Symbol) = '(0, 0)
 
 -- | Constraints to a scale (like the one returned by @'Scale' currency unit@)
 -- expected to always be satisfied. In particular, the scale is always
--- guaranteed to be a positive rational number ('infinity' and 'notANumber' are
--- forbidden by 'GoodScale').
+-- guaranteed to be a positive rational number ('GHC.Real.infinity' and
+-- 'GHC.Real.notANumber' are forbidden by 'GoodScale').
 type GoodScale (scale :: (Nat, Nat))
    = ( CmpNat 0 (Fst scale) ~ 'LT
      , CmpNat 0 (Snd scale) ~ 'LT
@@ -596,8 +501,8 @@ mkGoodScale =
 --
 -- For example, the 'Scale' for @\"USD\"@ in @\"cent\"@s is @100/1@.
 --
--- The returned 'Rational' is statically guaranteed to be a positive number, and
--- to be different from both 'notANumber' and 'infinity'.
+-- The returned 'Rational' is statically guaranteed to be a positive number with
+-- a non-zero denominator.
 scale :: forall proxy scale. GoodScale scale => proxy scale -> Rational -- ^
 scale = \_ ->
    natVal (Proxy :: Proxy (Fst scale)) %
@@ -622,7 +527,7 @@ newtype ExchangeRate (src :: Symbol) (dst :: Symbol) = ExchangeRate Rational
 -- | Composition of 'ExchangeRate's multiplies exchange rates together:
 --
 -- @
--- 'fromExchangeRate' x * 'fromExchangeRate' y  ==  'fromExchangeRate' (x . y)
+-- 'exchangeRateToRational' x * 'exchangeRateToRational' y  ==  'exchangeRateToRational' (x . y)
 -- @
 --
 -- Identity:
@@ -646,7 +551,7 @@ newtype ExchangeRate (src :: Symbol) (dst :: Symbol) = ExchangeRate Rational
 -- Multiplicative inverse:
 --
 -- @
--- 1  ==  'fromExchangeRate' (x . 'flipExchangeRate' x)
+-- 1  ==  'exchangeRateToRational' (x . 'exchangeRateRecip' x)
 -- @
 instance Category ExchangeRate where
   id = ExchangeRate 1
@@ -678,47 +583,55 @@ instance forall src dst.
 
 -- | Obtain a 'Rational' representation of the 'ExchangeRate'.
 --
--- This 'Rational' is statically guaranteed to be greater than 0, different
--- from 'infinity' and different from 'notANumber'.
-fromExchangeRate :: ExchangeRate src dst -> Rational
-fromExchangeRate = \(ExchangeRate r0) -> r0
-{-# INLINABLE fromExchangeRate #-}
+-- This 'Rational' is guaranteed to be greater than 0 and with a non-zero
+-- denominator.
+exchangeRateToRational :: ExchangeRate src dst -> Rational
+exchangeRateToRational = \(ExchangeRate r0) -> r0
+{-# INLINABLE exchangeRateToRational #-}
 
 -- | Safely construct an 'ExchangeRate' from a 'Rational' number.
 --
--- For construction to succeed, this 'Rational' must be greater than 0,
--- different from 'infinity' and different from 'notANumber'.
+-- Notice that the absolute value of the given 'Rational' value is used, seeing
+-- as there's no such thing as a negative exchange rate.
+--
+-- Returns 'Nothing' in case the denominator of the given 'Rational' is zero,
+-- which although unlikely, is possible if the 'Rational' is constructed
+-- unsafely using 'GHC.Real.infinity' or 'GHC.Real.notANumber', for example.
+-- If you don't care about that scenario, you can use `fromRational` to build
+-- the `Dense` value.
 exchangeRate :: Rational -> Maybe (ExchangeRate src dst)
-exchangeRate = \r0 ->
-  if (r0 <= 0 || infinity == r0 || notANumber == r0)
-  then Nothing else Just (ExchangeRate r0)
+exchangeRate = \r ->
+  if denominator r == 0 then Nothing else Just (ExchangeRate (abs r))
 {-# INLINABLE exchangeRate #-}
 
--- | Flip the direction of an 'ExchangeRate'.
+-- | Reciprocal 'ExchangeRate'.
 --
--- This function retuns the multiplicative inverse of the given 'ExchangeRate',
--- leading to the following identity law:
+-- This function retuns the reciprocal or multiplicative inverse of the given
+-- 'ExchangeRate', leading to the following identity law:
 --
 -- @
--- 'flipExchangeRate' . 'flipExchangeRate'   ==  'id'
+-- 'exchangeRateRecip' . 'exchangeRateRecip'   ==  'id'
 -- @
-flipExchangeRate :: ExchangeRate a b -> ExchangeRate b a
-flipExchangeRate = \(ExchangeRate x) -> ExchangeRate (1 / x)
-{-# INLINABLE flipExchangeRate #-}
+--
+-- Note: If 'ExchangeRate' had a 'Fractional' instance, then 'exchangeRateRecip'
+-- would be the implementation of 'recip'.
+exchangeRateRecip :: ExchangeRate a b -> ExchangeRate b a
+exchangeRateRecip = \(ExchangeRate x) -> ExchangeRate (1 / x)
+{-# INLINABLE exchangeRateRecip #-}
 
 -- | Apply the 'ExchangeRate' to the given @'Dense' src@ monetary value.
 --
 -- Identity law:
 --
 -- @
--- 'exchange' ('flipExchangeRate' x) . 'exchange' x  ==  'id'
+-- 'exchange' ('exchangeRateRecip' x) . 'exchange' x  ==  'id'
 -- @
 --
 -- Use the /Identity law/ for reasoning about going back and forth between @src@
 -- and @dst@ in order to manage any leftovers that might not be representable as
 -- a 'Discrete' monetary value of @src@.
 exchange :: ExchangeRate src dst -> Dense src -> Dense dst
-exchange = \(ExchangeRate r) -> \(Dense s) -> Dense (r * s)
+exchange (ExchangeRate r) = \(Dense s) -> Dense (r * s)
 {-# INLINABLE exchange #-}
 
 --------------------------------------------------------------------------------
@@ -1573,83 +1486,175 @@ storeContramapSize f = \case
 #endif
 
 --------------------------------------------------------------------------------
+-- Decimal rendering
+
+-- | Render a 'Dense' monetary amount as a decimal number in a potentially lossy
+-- manner.
+--
+-- @
+-- > 'denseToDecimal' 'Round' 'True' ('Just' \',\') \'.\' 2
+--      ('Proxy' :: 'Proxy' ('Scale' \"USD\" \"dollar\"))
+--      (123456 % 100 :: 'Dense' \"USD\")
+-- \"+1,234.56\"
+-- @
+--
+-- @
+-- > 'denseToDecimal' 'Round' 'True' ('Just' \',\') \'.\' 2
+--      ('Proxy' :: 'Proxy' ('Scale' \"USD\" \"cent\"))
+--      (123456 % 100 :: 'Dense' \"USD\")
+-- \"+123,456.00\"
+-- @
+denseToDecimal
+  :: GoodScale scale
+  => Approximation
+  -- ^ Approximation to use if necesary in order to fit the 'Dense' amount in
+  -- as many decimal numbers as requested.
+  -> Bool
+  -- ^ Whether to render a leading @\'+\'@ sign in case the amount is positive.
+  -> Maybe Char
+  -- ^ Thousands separator for the integer part, if any (i.e., the @\',\'@ in
+  -- @1,234.56789@).
+  -> Char
+  -- ^ Decimal separator (i.e., the @\'.\'@ in @1,234.56789@)
+  -> Word8
+  -- ^ Number of decimal numbers to render, if any.
+  -> Proxy scale
+  -- ^ Scale used by the integer part of the decimal number. For example, a
+  -- when rendering render @123 % 100 :: Dense "USD"@ as a decimal number with
+  -- three decimal places, a scale of @1@ (i.e. @'Scale' \"USD\" \"dollar\"@)
+  -- would render @1@ as the integer part and @230@ as the fractional part,
+  -- whereas a scale of @100@ (i.e., @'Scale' \"USD\" \"cent\"@) would render
+  -- @123@ as the integer part and @000@ as the fractional part.
+  -> Dense currency
+  -- ^ The dense monetary amount to render.
+  -> String
+{-# INLINE denseToDecimal #-}
+denseToDecimal a plus ytsep dsep fdigs0 ps = \(Dense r0) ->
+  -- this string-fu is not particularly efficient.
+  let r1 = r0 * scale ps :: Rational
+      parts = approximate a (r1 * (10 ^ fdigs0)) :: Integer
+      ipart = fromInteger (abs parts) `div` (10 ^ fdigs0) :: Natural
+      ftext | ipart == 0 = show (abs parts) :: String
+            | otherwise = drop (length (show ipart)) (show (abs parts))
+      itext = maybe (show ipart) (renderThousands ipart) ytsep :: String
+      fpad0 = List.replicate (fromIntegral fdigs0 - length ftext) '0' :: String
+  in mconcat
+       [ if | parts < 0 -> "-"
+            | plus && parts > 0 -> "+"
+            | otherwise -> ""
+       , itext
+       , if | fdigs0 > 0 -> dsep : ftext <> fpad0
+            | otherwise -> ""
+       ]
+
 
 -- | Render a 'Natural' number with thousand markers.
 --
 -- @
--- > 'renderThousands' \',\' 12345
--- \"12,345\"
+-- > 'renderThousands' 12045 \',\'
+-- \"12,045\"
 -- @
-renderThousands :: Char -> Natural -> String
-renderThousands sep n
-  | n < 1000 = show n
-  | otherwise =
-      List.foldl' (flip mappend) mempty $
-      List.intersperse [sep] $
-      List.unfoldr (\x -> case divMod x 1000 of
-                            (0, 0) -> Nothing
-                            (y, z) -> Just (show z, y)) $ n
+renderThousands :: Natural -> Char -> String
+{-# INLINABLE renderThousands #-}
+renderThousands n0
+  | n0 < 1000 = \_ -> show n0
+  | otherwise = \c -> List.foldl' (flip mappend) mempty (List.unfoldr (f c) n0)
+      where f :: Char -> Natural -> Maybe (String, Natural)
+            f c = \x -> case divMod x 1000 of
+                        (0, 0) -> Nothing
+                        (0, z) -> Just (show z, 0)
+                        (y, z) | z <  10   -> Just (c:'0':'0':show z, y)
+                               | z < 100   -> Just (c:'0':show z, y)
+                               | otherwise -> Just (c:show z, y)
 
--- | Render a 'Discrete' amount as a decimal string, using as many fractional
--- digits as necessary to precisely represent the amount.
+--------------------------------------------------------------------------------
+-- Decimal parsing
+
+-- | Parses a decimal representation of a 'Dense'.
 --
--- @
--- > 'discreteDecimal' 'True' ('Just' \',\') \'.\' (123456 :: 'Discrete' \"EUR\" \"cent\")
--- \"+1,234.56\"
--- @
-discreteDecimal
+-- Leading @\'-\'@ and @\'+\'@ characters are considered.
+denseFromDecimal
+  :: Maybe Char
+  -- ^ Thousands separator for the integer part, if any (i.e., the @\',\'@ in
+  -- @-1,234.56789@).
+  -> Char
+  -- ^ Decimal separator (i.e., the @\'.\'@ in @-1,234.56789@)
+  -> String
+  -- ^ The raw string containing the decimal representation (e.g.,
+  -- @"-1,234.56789"@).
+  -> Maybe (Dense currency)
+denseFromDecimal yst sf = fmap Dense . rationalFromDecimal yst sf
+
+-- | Parses a decimal representation of a 'Discrete'.
+--
+-- Leading @\'-\'@ and @\'+\'@ characters are considered.
+--
+-- Notice that parsing will fail unless the entire precision of the decimal
+-- number can be represented in the desired @scale@.
+discreteFromDecimal
   :: GoodScale scale
-  => Bool
-  -- ^ Whether to render a leading @\'+\'@ sign in case the amount is
-  -- non-negative.
-  --
-  -- Notice that a leading @\'-\'@ is always added in case the amount is
-  -- negative.
-  -> Maybe Char
-  -- ^ Thousands separator for the integer part, if any (e.g., the @\',\'@ in
-  -- @1,234.56789@).
+  => Maybe Char
+  -- ^ Thousands separator for the integer part, if any (i.e., the @\',\'@ in
+  -- @-1,234.56789@).
   -> Char
-  -- ^ Decimal separator (e.g., the @\'.\'@ in @1,234.56789@)
-  -> Discrete' currency scale
-  -- ^ The 'Discrete' amount to render.
+  -- ^ Decimal separator (i.e., the @\'.\'@ in @-1,234.56789@)
   -> String
-discreteDecimal plus yitsep dsep dis =
-  rationalDecimal P.round plus yitsep dsep
-     (P.ceiling (logBase 10 (fromRational (scale dis) :: Double)))
-     (toRational (fromDiscrete dis))
+  -- ^ The raw string containing the decimal representation (e.g.,
+  -- @"-1,234.56789"@).
+  -> Maybe (Discrete' currency scale)
+discreteFromDecimal yst sf = \s -> do
+  dns <- denseFromDecimal yst sf s
+  case discreteFromDense Truncate dns of
+    (x, 0) -> Just x
+    _ -> Nothing -- We fail for decimals that don't fit exactly in our scale.
 
--- | Render a 'Rational' number using its approximate decimal representation.
---
--- Prefer to use 'discreteDecimal' if you are rendering a 'Discrete'
--- value.
-rationalDecimal
-  :: (Rational -> Integer)
-  -- ^ A rounding function to be used if necessary (i.e., one of 'P.floor',
-  -- 'P.ceiling', 'P.round' or 'P.trucate' from "Prelude").
-  -> Bool
-  -- ^ Whether to render a leading @\'+\'@ sign in case the amount is non-negative.
-  -> Maybe Char
-  -- ^ Thousands separator for the integer part, if any (e.g., the @\',\'@ in
-  -- @1,234.56789@).
+rationalFromDecimal
+  :: Maybe Char
+  -- ^ Thousands separator for the integer part, if any (i.e., the @\',\'@ in
+  -- @-1,234.56789@).
   -> Char
-  -- ^ Decimal separator (e.g., the @\'.\'@ in @1,234.56789@)
-  -> Word8
-  -- ^ Number of decimal numbers to render, if any.
-  -> Rational
-  -- ^ The rational number to render.
+  -- ^ Decimal separator (i.e., the @\'.\'@ in @-1,234.56789@)
   -> String
-rationalDecimal rnd plus yitsep dsep fdigs0 r0 =
-  let -- integer part
-      ipart :: Integer = (if fdigs0 < 1 then rnd else P.floor) (abs r0)
-      -- fractional part
-      fpart :: Integer = rnd ((abs r0 - fromInteger ipart + 1) * (10 ^ fdigs0))
-      ftext :: String = List.drop 1 (show fpart)
-      fpad :: String = List.replicate (fromIntegral fdigs0 - length ftext) '0'
-  in mconcat
-       [ if r0 < 0 then "-" else if plus then "+" else ""
-       , maybe (show ipart)
-               (flip renderThousands (fromInteger ipart))
-               yitsep
-       , if fdigs0 > 0 then dsep : ftext <> fpad else ""
-       ]
+  -- ^ The raw string containing the decimal representation (e.g.,
+  -- @"-1,234.56789"@).
+  -> Maybe Rational
+rationalFromDecimal yst sf = \s ->
+  case ReadP.readP_to_S (rationalFromDecimalP yst sf) s of
+    [(x,"")] -> Just x
+    _ -> Nothing
+
+-- TODO limit number of digits parsed to prevent DoS
+rationalFromDecimalP
+  :: Maybe Char
+  -- ^ Thousands separator for the integer part, if any (i.e., the @\',\'@ in
+  -- @-1,234.56789@).
+  --
+  -- The separator can't be a digit or control character. If it is, then parsing
+  -- will always fail.
+  -> Char
+  -- ^ Decimal separator (i.e., the @\'.\'@ in @-1,234.56789@).
+  --
+  -- The separator can't be a digit or control character. If it is, then parsing
+  -- will always fail.
+  -> ReadP.ReadP Rational
+rationalFromDecimalP yst sf = do
+   guard (not (Char.isDigit sf || maybe False Char.isDigit yst))
+   sig :: Rational -> Rational <-
+     (ReadP.char '-' $> negate) <|>
+     (ReadP.char '+' $> id) <|>
+     (pure id)
+   ipart :: String <- case yst of
+     Nothing -> ReadP.munch1 Char.isDigit
+     Just st -> mappend
+       <$> (ReadP.count 3 (ReadP.satisfy Char.isDigit) <|>
+            ReadP.count 2 (ReadP.satisfy Char.isDigit) <|>
+            ReadP.count 1 (ReadP.satisfy Char.isDigit))
+       <*> (fmap concat $ ReadP.many
+              (ReadP.char st *> ReadP.count 3 (ReadP.satisfy Char.isDigit)))
+   yfpart :: Maybe String <-
+     (ReadP.char sf *> fmap Just (ReadP.munch1 Char.isDigit) <* ReadP.eof) <|>
+     (ReadP.eof $> Nothing)
+   pure $! sig $ case yfpart of
+     Nothing -> fromInteger (read ipart)
+     Just fpart -> read (ipart <> fpart) % (10 ^ length fpart)
 
