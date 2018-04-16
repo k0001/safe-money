@@ -41,9 +41,11 @@ module Money
    -- * Currency exchange
  , I.ExchangeRate
  , I.exchangeRate
- , I.exchangeRateToRational
- , I.exchangeRateRecip
  , I.exchange
+ , I.exchangeRateRecip
+ , I.exchangeRateFromDecimal
+ , I.exchangeRateToDecimal
+ , I.exchangeRateToRational
    -- * Serializable representations
  , I.SomeDense
  , I.toSomeDense

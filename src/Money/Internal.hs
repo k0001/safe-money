@@ -48,9 +48,11 @@ module Money.Internal
    -- * Currency exchange
  , ExchangeRate
  , exchangeRate
+ , exchange
+ , exchangeRateFromDecimal
+ , exchangeRateToDecimal
  , exchangeRateToRational
  , exchangeRateRecip
- , exchange
    -- * Serializable representations
  , SomeDense
  , toSomeDense
@@ -1557,8 +1559,32 @@ denseToDecimal
   -> String
 {-# INLINABLE denseToDecimal #-}
 denseToDecimal a plus ytsep dsep fdigs0 ps = \(Dense r0) ->
-  -- this string-fu is not particularly efficient.
   rationalToDecimal a plus ytsep dsep fdigs0 (scale ps * r0)
+
+-- | Render a 'ExchangeRate' as a decimal number in a potentially lossy manner.
+--
+-- @
+-- > 'exchangeRateToDecimal' 'Round' 'True' ('Just' \',\') \'.\' 2
+--       '<$>' ('exchangeRate' (123456 % 100) :: 'Maybe' ('ExchangeRate' \"USD\" \"EUR\"))
+-- 'Just' \"1,234.56\"
+-- @
+exchangeRateToDecimal
+  :: Approximation
+  -- ^ Approximation to use if necesary in order to fit the 'Dense' amount in
+  -- as many decimal numbers as requested.
+  -> Maybe Char
+  -- ^ Thousands separator for the integer part, if any (i.e., the @\',\'@ in
+  -- @1,234.56789@).
+  -> Char
+  -- ^ Decimal separator (i.e., the @\'.\'@ in @1,234.56789@)
+  -> Word8
+  -- ^ Number of decimal numbers to render, if any.
+  -> ExchangeRate src dst
+  -- ^ The 'ExchangeRate' to render.
+  -> String
+{-# INLINABLE exchangeRateToDecimal #-}
+exchangeRateToDecimal a ytsep dsep fdigs0 = \(ExchangeRate r0) ->
+  rationalToDecimal a False ytsep dsep fdigs0 r0
 
 rationalToDecimal
   :: Approximation
@@ -1654,6 +1680,22 @@ discreteFromDecimal yst sf = \s -> do
   case discreteFromDense Truncate dns of
     (x, 0) -> Just x
     _ -> Nothing -- We fail for decimals that don't fit exactly in our scale.
+
+-- | Parses a decimal representation of an 'ExchangeRate'.
+exchangeRateFromDecimal
+  :: Maybe Char
+  -- ^ Thousands separator for the integer part, if any (i.e., the @\',\'@ in
+  -- @1,234.56789@).
+  -> Char
+  -- ^ Decimal separator (i.e., the @\'.\'@ in @1,234.56789@)
+  -> String
+  -- ^ The raw string containing the decimal representation (e.g.,
+  -- @"1,234.56789"@).
+  -> Maybe (ExchangeRate src dst)
+exchangeRateFromDecimal yst sf = \case
+  ('-':_) -> Nothing
+  ('+':_) -> Nothing
+  str -> exchangeRate =<< rationalFromDecimal yst sf str
 
 rationalFromDecimal
   :: Maybe Char
