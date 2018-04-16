@@ -48,7 +48,7 @@ module Money.Internal
  , ExchangeRate
  , exchangeRateFromRational
  , exchangeRateToRational
- , exchangeRateRecip
+ , exchangeRateFlip
  , exchange
    -- * Serializable representations
  , SomeDense
@@ -549,7 +549,7 @@ newtype ExchangeRate (src :: Symbol) (dst :: Symbol) = ExchangeRate Rational
 -- Reciprocal:
 --
 -- @
--- 1  ==  'exchangeRateToRational' (x . 'exchangeRateRecip' x)
+-- 1  ==  'exchangeRateToRational' (x . 'exchangeRateFlip' x)
 -- @
 instance Category ExchangeRate where
   id = ExchangeRate 1
@@ -582,7 +582,8 @@ instance forall src dst.
         d = symbolVal (Proxy :: Proxy dst)
     _ <- ReadPrec.lift (ReadP.string
             ("ExchangeRate " ++ show s ++ " " ++ show d ++ " "))
-    fmap exchangeRateFromRational Read.readPrec
+    maybe empty pure =<< fmap exchangeRateFromRational Read.readPrec
+
 
 -- | Obtain a 'Rational' representation of the 'ExchangeRate'.
 --
@@ -591,16 +592,16 @@ exchangeRateToRational :: ExchangeRate src dst -> Rational
 exchangeRateToRational = \(ExchangeRate r0) -> r0
 {-# INLINE exchangeRateToRational #-}
 
--- | Safely construct an 'ExchangeRate' from a 'Rational' number.
---
--- Notice that the absolute value of the given 'Rational' value is used, seeing
--- as there's no such thing as a negative exchange rate. That is:
+-- | Safely construct an 'ExchangeRate' from a *positive* 'Rational' number.
 --
 -- @
 -- 'exchangeRateFromRational' x   ==   'exchangeRateFromRational' ('negate' x)
 -- @
-exchangeRateFromRational :: Rational -> ExchangeRate src dst
-exchangeRateFromRational = \r -> ExchangeRate (abs r)
+exchangeRateFromRational :: Rational -> Maybe (ExchangeRate src dst)
+exchangeRateFromRational = \r ->
+  if denominator r /= 0 && r > 0
+  then Just (ExchangeRate r)
+  else Nothing
 {-# INLINE exchangeRateFromRational #-}
 
 -- | Reciprocal 'ExchangeRate'.
@@ -609,23 +610,24 @@ exchangeRateFromRational = \r -> ExchangeRate (abs r)
 -- 'ExchangeRate', leading to the following identity law:
 --
 -- @
--- 'exchangeRateRecip' . 'exchangeRateRecip'   ==  'id'
+-- 'exchangeRateFlip' . 'exchangeRateFlip'   ==  'id'
 -- @
 --
--- Note: If 'ExchangeRate' had a 'Fractional' instance, then 'exchangeRateRecip'
+-- Note: If 'ExchangeRate' had a 'Fractional' instance, then 'exchangeRateFlip'
 -- would be the implementation of 'recip'.
-exchangeRateRecip :: ExchangeRate a b -> ExchangeRate b a
-exchangeRateRecip = \case
-  ExchangeRate 0 -> ExchangeRate 1
-  ExchangeRate x -> ExchangeRate (1 / x)
-{-# INLINABLE exchangeRateRecip #-}
+exchangeRateFlip :: ExchangeRate a b -> ExchangeRate b a
+exchangeRateFlip = \(ExchangeRate x) ->
+   -- This is safe, 'exchangeRateFromRational' guarantees that @x@ isn't zero.
+   ExchangeRate (1 / x)
+
+{-# INLINABLE exchangeRateFlip #-}
 
 -- | Apply the 'ExchangeRate' to the given @'Dense' src@ monetary value.
 --
 -- Identity law:
 --
 -- @
--- 'exchange' ('exchangeRateRecip' x) . 'exchange' x  ==  'id'
+-- 'exchange' ('exchangeRateFlip' x) . 'exchange' x  ==  'id'
 -- @
 --
 -- Use the /Identity law/ for reasoning about going back and forth between @src@

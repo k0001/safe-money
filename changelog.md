@@ -15,7 +15,7 @@
   renamed to `exchangeRateToRational`.
 
 * BREAKING CHANGE. COMPILER WILL COMPLAIN. The `flipExchangeRate` function was
-  renamed to `exchangeRateRecip`.
+  renamed to `exchangeRateFlip`.
 
 * BREAKING CHANGE. The `exchangeRate` function was renamed to
   `exchangeRateFromRational` (which now works accepts negative inputs as well).

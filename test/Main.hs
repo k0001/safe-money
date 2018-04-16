@@ -85,10 +85,10 @@ instance QC.Arbitrary Money.SomeDense where
 
 instance QC.Arbitrary (Money.ExchangeRate src dst) where
   arbitrary = do
-     n <- QC.suchThat QC.arbitrary (/= 0)
-     d <- QC.suchThat QC.arbitrary (/= 0)
-     pure (Money.exchangeRateFromRational (n%d))
-  shrink = map Money.exchangeRateFromRational
+    let myxr = fmap Money.exchangeRateFromRational QC.arbitrary
+    Just x <- QC.suchThat myxr isJust
+    pure x
+  shrink = catMaybes . fmap Money.exchangeRateFromRational
          . QC.shrink . Money.exchangeRateToRational
 
 instance QC.Arbitrary Money.SomeExchangeRate where
@@ -870,8 +870,8 @@ testExchangeRate ps pd =
          xr === xr . id
   , QC.testProperty "Category: composition with inverse" $
       QC.forAll QC.arbitrary $ \(xr1 :: Money.ExchangeRate src dst) ->
-         (1 === Money.exchangeRateToRational (xr1 . Money.exchangeRateRecip xr1)) .&&.
-         (1 === Money.exchangeRateToRational (Money.exchangeRateRecip xr1 . xr1))
+         (1 === Money.exchangeRateToRational (xr1 . Money.exchangeRateFlip xr1)) .&&.
+         (1 === Money.exchangeRateToRational (Money.exchangeRateFlip xr1 . xr1))
   , QC.testProperty "Category: composition with other" $
       QC.forAll QC.arbitrary $ \(xr1 :: Money.ExchangeRate src dst,
                                  xr2 :: Money.ExchangeRate dst src) ->
@@ -887,21 +887,21 @@ testExchangeRate ps pd =
          Just xr === read (show (Just xr))
   , QC.testProperty "flipExchangeRate . flipExchangeRate == id" $
       QC.forAll QC.arbitrary $ \(xr :: Money.ExchangeRate src dst) ->
-         let xr' = Money.exchangeRateRecip xr
+         let xr' = Money.exchangeRateFlip xr
          in (Money.exchangeRateToRational xr /= Money.exchangeRateToRational xr')
-               ==> (xr === Money.exchangeRateRecip xr')
+               ==> (xr === Money.exchangeRateFlip xr')
   , QC.testProperty "exchange (flipExchangeRate x) . exchange x == id" $
       QC.forAll QC.arbitrary $
          \( c0 :: Money.Dense src
           , xr :: Money.ExchangeRate src dst
-          ) -> c0 === Money.exchange (Money.exchangeRateRecip xr)
+          ) -> c0 === Money.exchange (Money.exchangeRateFlip xr)
                                      (Money.exchange xr c0)
-  , QC.testProperty "x == 1 ===> exchange x == id" $
+  , QC.testProperty "x == 1 ==> exchange x == id" $
       QC.forAll QC.arbitrary $
          \( c0 :: Money.Dense src
-          ) -> let xr = Money.exchangeRateFromRational 1
+          ) -> let Just xr = Money.exchangeRateFromRational 1
                in toRational c0 === toRational (Money.exchange xr c0)
-  , QC.testProperty "x /= 1 ===> exchange x /= id" $
+  , QC.testProperty "x /= 1 ==> exchange x /= id" $
       QC.forAll QC.arbitrary $
          \( c0 :: Money.Dense src
           , xr :: Money.ExchangeRate src dst
