@@ -42,7 +42,7 @@ module Money
  , I.ExchangeRate
  , I.exchangeRate
  , I.exchangeRateToRational
- , I.exchangeRateFlip
+ , I.exchangeRateRecip
  , I.exchange
    -- * Serializable representations
  , I.SomeDense

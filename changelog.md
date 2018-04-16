@@ -12,7 +12,7 @@
   renamed to `exchangeRateToRational`.
 
 * BREAKING CHANGE. COMPILER WILL COMPLAIN. The `flipExchangeRate` function was
-  renamed to `exchangeRateFlip`.
+  renamed to `exchangeRateRecip`.
 
 * BREAKING CHANGE. COMPILER WILL COMPLAIN. The `Dense` is not an instance of
   `Fractional` anymore because `recip` and `/` could potentially crash.
@@ -23,7 +23,7 @@
 
 * Introduced `discrete` constructor which behaves just like `fromInteger`.
 
-* The `ErrScaleNonCanonical` type is not exported.
+* The `ErrScaleNonCanonical` type is now exported.
 
 * The `Money.Internal` module is now exposed, but hidden from the Haddock
   documentation.

@@ -49,7 +49,7 @@ module Money.Internal
  , ExchangeRate
  , exchangeRate
  , exchangeRateToRational
- , exchangeRateFlip
+ , exchangeRateRecip
  , exchange
    -- * Serializable representations
  , SomeDense
@@ -187,8 +187,8 @@ instance
 
 -- |
 -- @
--- > 'show' ('fromRational (1 '%' 3) :: 'Dense' \"USD\")
--- \"Dense \\"USD\\" 1%3\"
+-- > 'show' ('dense' (1 '%' 3) :: 'Dense' \"USD\")
+-- \"Dense \\\"USD\\\" 1%3\"
 -- @
 instance forall currency. KnownSymbol currency => Show (Dense currency) where
   showsPrec n = \(Dense r0) ->
@@ -272,7 +272,7 @@ deriving instance GoodScale scale => GHC.Generic (Discrete' currency scale)
 -- |
 -- @
 -- > 'show' (123 :: 'Discrete' \"USD\" \"cent\")
--- \"Dense \\"USD\\" 100%1 123\"
+-- \"Dense \\\"USD\\\" 100%1 123\"
 -- @
 instance forall currency scale.
   ( KnownSymbol currency, GoodScale scale
@@ -571,7 +571,7 @@ newtype ExchangeRate (src :: Symbol) (dst :: Symbol) = ExchangeRate Rational
 -- Reciprocal:
 --
 -- @
--- 1  ==  'exchangeRateToRational' (x . 'exchangeRateFlip' x)
+-- 1  ==  'exchangeRateToRational' (x . 'exchangeRateRecip' x)
 -- @
 instance Category ExchangeRate where
   id = ExchangeRate 1
@@ -582,7 +582,7 @@ instance Category ExchangeRate where
 -- |
 -- @
 -- > 'show' ('exchangeRate' (5 % 7) :: 'ExchangeRate' \"USD\" \"JPY\")@
--- \"ExchangeRate \\"USD\\" \\"JPY\\" 5%7\"
+-- \"ExchangeRate \\\"USD\\\" \\\"JPY\\\" 5%7\"
 -- @
 instance forall src dst.
   ( KnownSymbol src, KnownSymbol dst
@@ -632,24 +632,24 @@ exchangeRate = \r ->
 -- 'ExchangeRate', leading to the following identity law:
 --
 -- @
--- 'exchangeRateFlip' . 'exchangeRateFlip'   ==  'id'
+-- 'exchangeRateRecip' . 'exchangeRateRecip'   ==  'id'
 -- @
 --
--- Note: If 'ExchangeRate' had a 'Fractional' instance, then 'exchangeRateFlip'
+-- Note: If 'ExchangeRate' had a 'Fractional' instance, then 'exchangeRateRecip'
 -- would be the implementation of 'recip'.
-exchangeRateFlip :: ExchangeRate a b -> ExchangeRate b a
-exchangeRateFlip = \(ExchangeRate x) ->
+exchangeRateRecip :: ExchangeRate a b -> ExchangeRate b a
+exchangeRateRecip = \(ExchangeRate x) ->
    -- This is safe, 'exchangeRate' guarantees that @x@ isn't zero.
    ExchangeRate (1 / x)
 
-{-# INLINABLE exchangeRateFlip #-}
+{-# INLINABLE exchangeRateRecip #-}
 
 -- | Apply the 'ExchangeRate' to the given @'Dense' src@ monetary value.
 --
 -- Identity law:
 --
 -- @
--- 'exchange' ('exchangeRateFlip' x) . 'exchange' x  ==  'id'
+-- 'exchange' ('exchangeRateRecip' x) . 'exchange' x  ==  'id'
 -- @
 --
 -- Use the /Identity law/ for reasoning about going back and forth between @src@
@@ -1196,7 +1196,7 @@ instance Ser.Serialise SomeExchangeRate where
 #ifdef HAS_aeson
 -- | Compatible with 'SomeDense'
 --
--- Example rendering @'fromRational' (2 % 3) :: 'Dense' \"BTC\"@:
+-- Example rendering @'dense' (2 % 3) :: 'Dense' \"BTC\"@:
 --
 -- @
 -- [\"BTC\", 2, 3]
@@ -1333,7 +1333,7 @@ instance Ae.FromJSON SomeExchangeRate where
 
 -- | Compatible with 'SomeDense'
 --
--- Example rendering @'fromRational' (2 % 3) :: 'Dense' \"BTC\"@:
+-- Example rendering @'dense' (2 % 3) :: 'Dense' \"BTC\"@:
 --
 -- @
 -- \<money-dense c=\"BTC\" n=\"2\" d=\"3\"/>
@@ -1521,14 +1521,14 @@ storeContramapSize f = \case
 -- @
 -- > 'denseToDecimal' 'Round' 'True' ('Just' \',\') \'.\' 2
 --      ('Proxy' :: 'Proxy' ('Scale' \"USD\" \"dollar\"))
---      (123456 % 100 :: 'Dense' \"USD\")
+--      ('dense' (123456 % 100) :: 'Dense' \"USD\")
 -- \"+1,234.56\"
 -- @
 --
 -- @
 -- > 'denseToDecimal' 'Round' 'True' ('Just' \',\') \'.\' 2
 --      ('Proxy' :: 'Proxy' ('Scale' \"USD\" \"cent\"))
---      (123456 % 100 :: 'Dense' \"USD\")
+--      ('dense' (123456 % 100) :: 'Dense' \"USD\")
 -- \"+123,456.00\"
 -- @
 denseToDecimal
@@ -1547,7 +1547,7 @@ denseToDecimal
   -- ^ Number of decimal numbers to render, if any.
   -> Proxy scale
   -- ^ Scale used by the integer part of the decimal number. For example, a
-  -- when rendering render @123 % 100 :: Dense "USD"@ as a decimal number with
+  -- when rendering render @'dense' (123 % 100) :: 'Dense' "USD"@ as a decimal number with
   -- three decimal places, a scale of @1@ (i.e. @'Scale' \"USD\" \"dollar\"@)
   -- would render @1@ as the integer part and @230@ as the fractional part,
   -- whereas a scale of @100@ (i.e., @'Scale' \"USD\" \"cent\"@) would render
