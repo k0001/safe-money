@@ -14,13 +14,14 @@
 * BREAKING CHANGE. COMPILER WILL COMPLAIN. The `flipExchangeRate` function was
   renamed to `exchangeRateFlip`.
 
+* BREAKING CHANGE. COMPILER WILL COMPLAIN. The `Dense` is not an instance of
+  `Fractional` anymore because `recip` and `/` could potentially crash.
+
 * Introduced new functions for rendering and parsing decimal reperesentations of
   monetary amounts: `denseCurrency`, `discreteCurrency`, `denseFromDecimal`,
   `denseToDecimal`, `discreteFromDecimal`,
 
 * Introduced `discrete` constructor which behaves just like `fromInteger`.
-
-* The `Dense` type now has a `Fractional` instance.
 
 * The `ErrScaleNonCanonical` type is not exported.
 

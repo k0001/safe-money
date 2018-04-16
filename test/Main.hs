@@ -513,9 +513,9 @@ testDenseToDecimal =
       render Money.Truncate (negate dns3) @?= render Money.Ceiling (negate dns3)
   ]
   where
-    dns1 :: Money.Dense "USD" = fromRational (1023004567895%1000)
-    dns2 :: Money.Dense "USD" = fromRational (123%100)
-    dns3 :: Money.Dense "USD" = fromRational (345%1000)
+    dns1 :: Money.Dense "USD" = Money.dense (1023004567895%1000)
+    dns2 :: Money.Dense "USD" = Money.dense (123%100)
+    dns3 :: Money.Dense "USD" = Money.dense (345%1000)
 
     render :: Money.Approximation -> Money.Dense "USD" -> [String]
     render a dns =

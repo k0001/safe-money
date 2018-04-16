@@ -156,8 +156,8 @@ import qualified GHC.TypeLits as GHC
 -- value you can use one 'discreteFromDense'. Otherwise, using 'toRational' you
 -- can obtain a precise 'Rational' representation.
 --
--- Construct 'Dense' monetary values using 'dense', 'fromRational',
--- 'fromInteger' or 'fromIntegral'.
+-- Construct 'Dense' monetary values using 'dense', 'fromInteger' or
+-- 'fromIntegral'.
 --
 -- /WARNING/ if you want to treat a dense monetary value as a /Real/ number (for
 -- example, to take the square root of that monetary value), then you are on
@@ -167,13 +167,23 @@ import qualified GHC.TypeLits as GHC
 newtype Dense (currency :: Symbol) = Dense Rational
   deriving (Eq, Ord, Num, Real, GHC.Generic)
 
-instance Fractional (Dense (currency :: Symbol)) where
-  {-# INLINABLE recip #-}
-  recip (Dense a) = Dense (recip a)
-  {-# INLINABLE (/) #-}
-  Dense a / Dense b = Dense (a / b)
-  {-# INLINABLE fromRational #-}
-  fromRational = Dense
+#if MIN_VERSION_base(4,9,0)
+instance
+  ( GHC.TypeError
+      (('GHC.Text "The ") 'GHC.:<>:
+       ('GHC.ShowType Dense) 'GHC.:<>:
+       ('GHC.Text " type is deliberately not an instance of ") 'GHC.:<>:
+       ('GHC.ShowType Fractional) 'GHC.:$$:
+       ('GHC.Text "because functions like 'recip' and '/' can diverge.") 'GHC.:$$:
+       ('GHC.Text "Temporarily convert the ") 'GHC.:<>:
+       ('GHC.ShowType Dense) 'GHC.:<>:
+       ('GHC.Text " value to a ") 'GHC.:<>:
+       ('GHC.ShowType Rational) 'GHC.:$$:
+       ('GHC.Text " if you know what you are doing."))
+  ) => Fractional (Dense currency) where
+  fromRational = undefined
+  recip = undefined
+#endif
 
 -- |
 -- @
@@ -225,7 +235,8 @@ denseCurrency = symbolVal
 --
 -- @currency@ is usually a ISO-4217 currency code, but not necessarily.
 --
--- Construct 'Discrete' values using 'discrete' or 'fromInteger'.
+-- Construct 'Discrete' values using 'discrete', 'fromInteger' or
+-- 'fromIntegral'.
 --
 -- For example, if you want to represent @GBP 21.05@, where the smallest
 -- represetable unit for a GBP (United Kingdom Pound) is the /penny/, and 100
