@@ -22,13 +22,14 @@ module Money
  ( -- * Dense monetary values
    I.Dense
  , I.denseCurrency
- , I.denseFromRational
+ , I.dense
  , I.denseFromDiscrete
  , I.denseFromDecimal
  , I.denseToDecimal
    -- * Discrete monetary values
  , I.Discrete
  , I.Discrete'
+ , I.discrete
  , I.discreteCurrency
  , I.discreteFromDense
  , I.discreteFromDecimal
@@ -39,7 +40,7 @@ module Money
  , I.scale
    -- * Currency exchange
  , I.ExchangeRate
- , I.exchangeRateFromRational
+ , I.exchangeRate
  , I.exchangeRateToRational
  , I.exchangeRateFlip
  , I.exchange

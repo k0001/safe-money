@@ -1,8 +1,5 @@
 # Version 0.5
 
-* BREAKING CHANGE. COMPILER WILL COMPLAIN. `dense` was renamed to
-  `denseFromRational`.
-
 * BREAKING CHANGE. COMPILER WILL COMPLAIN. The `round`, `floor`, `ceiling` and
   `truncate` functions were replaced by a single `discreteFromDense` function
   taking an argument of type `Approximation` (`Round`, `Floor`, `Ceiling` or
@@ -17,16 +14,13 @@
 * BREAKING CHANGE. COMPILER WILL COMPLAIN. The `flipExchangeRate` function was
   renamed to `exchangeRateFlip`.
 
-* BREAKING CHANGE. The `exchangeRate` function was renamed to
-  `exchangeRateFromRational` (which now works accepts negative inputs as well).
-
 * Introduced new functions for rendering and parsing decimal reperesentations of
   monetary amounts: `denseCurrency`, `discreteCurrency`, `denseFromDecimal`,
   `denseToDecimal`, `discreteFromDecimal`,
 
-* The `Dense` type now has a `Fractional` instance, with `fromRational` behaving
-  mostly like `exchangeRateFromRational` (excepts it crashes on malformed
-  `Rational`s, much like in the `Fractional` instance for `Dense`).
+* Introduced `discrete` constructor which behaves just like `fromInteger`.
+
+* The `Dense` type now has a `Fractional` instance.
 
 * The `ErrScaleNonCanonical` type is not exported.
 

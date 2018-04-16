@@ -29,13 +29,14 @@ module Money.Internal
  ( -- * Dense monetary values
    Dense
  , denseCurrency
- , denseFromRational
+ , dense
  , denseFromDiscrete
  , denseFromDecimal
  , denseToDecimal
    -- * Discrete monetary values
  , Discrete
  , Discrete'
+ , discrete
  , discreteCurrency
  , discreteFromDense
  , discreteFromDecimal
@@ -46,7 +47,7 @@ module Money.Internal
  , scale
    -- * Currency exchange
  , ExchangeRate
- , exchangeRateFromRational
+ , exchangeRate
  , exchangeRateToRational
  , exchangeRateFlip
  , exchange
@@ -155,7 +156,7 @@ import qualified GHC.TypeLits as GHC
 -- value you can use one 'discreteFromDense'. Otherwise, using 'toRational' you
 -- can obtain a precise 'Rational' representation.
 --
--- Construct 'Dense' monetary values using 'denseFromRational', 'fromRational',
+-- Construct 'Dense' monetary values using 'dense', 'fromRational',
 -- 'fromInteger' or 'fromIntegral'.
 --
 -- /WARNING/ if you want to treat a dense monetary value as a /Real/ number (for
@@ -191,21 +192,21 @@ instance forall currency. KnownSymbol currency => Read (Dense currency) where
   readPrec = Read.parens $ do
     let c = symbolVal (Proxy :: Proxy currency)
     _ <- ReadPrec.lift (ReadP.string ("Dense " ++ show c ++ " "))
-    fmap denseFromRational Read.readPrec
+    fmap dense Read.readPrec
 
 -- | Build a 'Dense' monetary value from a 'Rational' value.
 --
 -- For example, if you want to represent @USD 12.52316@, then you can use:
 --
 -- @
--- 'denseFromRational' (125316 '%' 10000)
+-- 'dense' (125316 '%' 10000)
 -- @
 --
 -- @
--- 'denseFromRational'   ==   'fromRational'
-denseFromRational :: Rational -> Dense currency
-denseFromRational = Dense
-{-# INLINABLE denseFromRational #-}
+-- 'dense'   ==   'fromRational'
+dense :: Rational -> Dense currency
+dense = Dense
+{-# INLINABLE dense #-}
 
 -- | 'Dense' currency identifier.
 --
@@ -224,7 +225,7 @@ denseCurrency = symbolVal
 --
 -- @currency@ is usually a ISO-4217 currency code, but not necessarily.
 --
--- Construct 'Discrete' values using 'fromInteger'.
+-- Construct 'Discrete' values using 'discrete' or 'fromInteger'.
 --
 -- For example, if you want to represent @GBP 21.05@, where the smallest
 -- represetable unit for a GBP (United Kingdom Pound) is the /penny/, and 100
@@ -306,6 +307,16 @@ instance
   fromRational = undefined
   recip = undefined
 #endif
+
+-- | Construct a 'Discrete' value.
+--
+-- @
+-- 'discrete'  ==  'fromInteger'
+-- @
+discrete :: GoodScale scale => Integer -> Discrete' currency scale
+discrete = Discrete
+{-# INLINE discrete #-}
+
 
 -- | Convert currency 'Discrete' monetary value into a 'Dense' monetary
 -- value.
@@ -516,7 +527,7 @@ scale = \_ -> natVal (Proxy :: Proxy (Fst scale)) %
 -- then we can represent this situaion using:
 --
 -- @
--- 'exchangeRateFromRational' (12345 % 10000) :: 'ExchangeRate' \"USD\" \"GBP\"
+-- 'exchangeRate' (12345 % 10000) :: 'ExchangeRate' \"USD\" \"GBP\"
 -- @
 newtype ExchangeRate (src :: Symbol) (dst :: Symbol) = ExchangeRate Rational
   deriving (Eq, Ord, GHC.Generic)
@@ -559,7 +570,7 @@ instance Category ExchangeRate where
 
 -- |
 -- @
--- > 'show' ('exchangeRateFromRational' (5 % 7) :: 'ExchangeRate' \"USD\" \"JPY\")@
+-- > 'show' ('exchangeRate' (5 % 7) :: 'ExchangeRate' \"USD\" \"JPY\")@
 -- \"ExchangeRate \\"USD\\" \\"JPY\\" 5%7\"
 -- @
 instance forall src dst.
@@ -582,7 +593,7 @@ instance forall src dst.
         d = symbolVal (Proxy :: Proxy dst)
     _ <- ReadPrec.lift (ReadP.string
             ("ExchangeRate " ++ show s ++ " " ++ show d ++ " "))
-    maybe empty pure =<< fmap exchangeRateFromRational Read.readPrec
+    maybe empty pure =<< fmap exchangeRate Read.readPrec
 
 
 -- | Obtain a 'Rational' representation of the 'ExchangeRate'.
@@ -595,14 +606,14 @@ exchangeRateToRational = \(ExchangeRate r0) -> r0
 -- | Safely construct an 'ExchangeRate' from a *positive* 'Rational' number.
 --
 -- @
--- 'exchangeRateFromRational' x   ==   'exchangeRateFromRational' ('negate' x)
+-- 'exchangeRate' x   ==   'exchangeRate' ('negate' x)
 -- @
-exchangeRateFromRational :: Rational -> Maybe (ExchangeRate src dst)
-exchangeRateFromRational = \r ->
+exchangeRate :: Rational -> Maybe (ExchangeRate src dst)
+exchangeRate = \r ->
   if denominator r /= 0 && r > 0
   then Just (ExchangeRate r)
   else Nothing
-{-# INLINE exchangeRateFromRational #-}
+{-# INLINE exchangeRate #-}
 
 -- | Reciprocal 'ExchangeRate'.
 --
@@ -617,7 +628,7 @@ exchangeRateFromRational = \r ->
 -- would be the implementation of 'recip'.
 exchangeRateFlip :: ExchangeRate a b -> ExchangeRate b a
 exchangeRateFlip = \(ExchangeRate x) ->
-   -- This is safe, 'exchangeRateFromRational' guarantees that @x@ isn't zero.
+   -- This is safe, 'exchangeRate' guarantees that @x@ isn't zero.
    ExchangeRate (1 / x)
 
 {-# INLINABLE exchangeRateFlip #-}
@@ -1261,7 +1272,7 @@ instance Ae.FromJSON SomeDiscrete where
 -- | Compatible with 'SomeExchangeRate'
 --
 -- Example rendering an 'ExchangeRate' constructed with
--- @'exchangeRateFromRational' (5 % 7) :: 'ExchangeRate' \"USD\" \"JPY\"@
+-- @'exchangeRate' (5 % 7) :: 'ExchangeRate' \"USD\" \"JPY\"@
 --
 -- @
 -- [\"USD\", \"JPY\", 5, 7]
@@ -1382,7 +1393,7 @@ instance Xmlbf.FromXml SomeDiscrete where
 -- | Compatible with 'SomeExchangeRate'
 --
 -- Example rendering an 'ExchangeRate' constructed with
--- @'exchangeRateFromRational' (5 % 7) :: 'ExchangeRate' \"USD\" \"JPY\"@
+-- @'exchangeRate' (5 % 7) :: 'ExchangeRate' \"USD\" \"JPY\"@
 --
 -- @
 -- \<exchange-rate src=\"USD\" dst=\"JPY\" n=\"5\" d=\"7\"/>

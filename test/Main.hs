@@ -73,8 +73,8 @@ instance QC.Arbitrary (Money.Dense currency) where
   arbitrary = do
      n <- QC.arbitrary
      d <- QC.suchThat QC.arbitrary (/= 0)
-     pure (Money.denseFromRational (n%d))
-  shrink = map Money.denseFromRational . QC.shrink . toRational
+     pure (Money.dense (n%d))
+  shrink = map Money.dense . QC.shrink . toRational
 
 instance QC.Arbitrary Money.SomeDense where
   arbitrary = do
@@ -85,10 +85,10 @@ instance QC.Arbitrary Money.SomeDense where
 
 instance QC.Arbitrary (Money.ExchangeRate src dst) where
   arbitrary = do
-    let myxr = fmap Money.exchangeRateFromRational QC.arbitrary
+    let myxr = fmap Money.exchangeRate QC.arbitrary
     Just x <- QC.suchThat myxr isJust
     pure x
-  shrink = catMaybes . fmap Money.exchangeRateFromRational
+  shrink = catMaybes . fmap Money.exchangeRate
          . QC.shrink . Money.exchangeRateToRational
 
 instance QC.Arbitrary Money.SomeExchangeRate where
@@ -899,7 +899,7 @@ testExchangeRate ps pd =
   , QC.testProperty "x == 1 ==> exchange x == id" $
       QC.forAll QC.arbitrary $
          \( c0 :: Money.Dense src
-          ) -> let Just xr = Money.exchangeRateFromRational 1
+          ) -> let Just xr = Money.exchangeRate 1
                in toRational c0 === toRational (Money.exchange xr c0)
   , QC.testProperty "x /= 1 ==> exchange x /= id" $
       QC.forAll QC.arbitrary $
