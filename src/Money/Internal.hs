@@ -1558,8 +1558,28 @@ denseToDecimal
 {-# INLINABLE denseToDecimal #-}
 denseToDecimal a plus ytsep dsep fdigs0 ps = \(Dense r0) ->
   -- this string-fu is not particularly efficient.
-  let r1 = r0 * scale ps :: Rational
-      parts = approximate a (r1 * (10 ^ fdigs0)) :: Integer
+  rationalToDecimal a plus ytsep dsep fdigs0 (scale ps * r0)
+
+rationalToDecimal
+  :: Approximation
+  -- ^ Approximation to use if necesary in order to fit the 'Dense' amount in
+  -- as many decimal numbers as requested.
+  -> Bool
+  -- ^ Whether to render a leading @\'+\'@ sign in case the amount is positive.
+  -> Maybe Char
+  -- ^ Thousands separator for the integer part, if any (i.e., the @\',\'@ in
+  -- @1,234.56789@).
+  -> Char
+  -- ^ Decimal separator (i.e., the @\'.\'@ in @1,234.56789@)
+  -> Word8
+  -- ^ Number of decimal numbers to render, if any.
+  -> Rational
+  -- ^ The dense monetary amount to render.
+  -> String
+{-# INLINABLE rationalToDecimal #-}
+rationalToDecimal a plus ytsep dsep fdigs0 = \r0 ->
+  -- this string-fu is not particularly efficient.
+  let parts = approximate a (r0 * (10 ^ fdigs0)) :: Integer
       ipart = fromInteger (abs parts) `div` (10 ^ fdigs0) :: Natural
       ftext | ipart == 0 = show (abs parts) :: String
             | otherwise = drop (length (show ipart)) (show (abs parts))
