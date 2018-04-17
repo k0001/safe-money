@@ -219,7 +219,10 @@ instance forall currency. KnownSymbol currency => Read (Dense currency) where
 -- @
 -- 'dense'   ==   'fromRational'
 dense :: Rational -> Dense currency
-dense = Dense
+dense = \r ->
+  if denominator r /= 0
+  then Dense r
+  else error "dense: Malformed Rational given (denominator is zero)."
 {-# INLINABLE dense #-}
 
 -- | 'Dense' currency identifier.
