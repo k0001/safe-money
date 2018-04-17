@@ -12,7 +12,7 @@ module Main where
 import Control.Category (Category((.), id))
 import qualified Data.ByteString.Lazy as BSL
 import qualified Data.Char as Char
-import Data.Maybe (catMaybes, isJust, isNothing)
+import Data.Maybe (catMaybes, isJust, isNothing, fromJust)
 import Data.Proxy (Proxy(Proxy))
 import Data.Ratio ((%), numerator, denominator)
 import Data.Word (Word8)
@@ -65,38 +65,33 @@ instance QC.Arbitrary Money.SomeDiscrete where
   arbitrary = do
     let md = Money.mkSomeDiscrete
                <$> QC.arbitrary <*> QC.arbitrary <*> QC.arbitrary
-    Just x <- QC.suchThat md isJust
-    pure x
+    fromJust <$> QC.suchThat md isJust
   shrink = \x -> Money.withSomeDiscrete x (map Money.toSomeDiscrete . QC.shrink)
 
 instance QC.Arbitrary (Money.Dense currency) where
   arbitrary = do
-     n <- QC.arbitrary
-     d <- QC.suchThat QC.arbitrary (/= 0)
-     pure (Money.dense (n%d))
-  shrink = map Money.dense . QC.shrink . toRational
+     let myd = fmap Money.dense QC.arbitrary
+     fromJust <$> QC.suchThat myd isJust
+  shrink = catMaybes . map Money.dense . QC.shrink . toRational
 
 instance QC.Arbitrary Money.SomeDense where
   arbitrary = do
     let md = Money.mkSomeDense <$> QC.arbitrary <*> QC.arbitrary
-    Just x <- QC.suchThat md isJust
-    pure x
+    fromJust <$> QC.suchThat md isJust
   shrink = \x -> Money.withSomeDense x (map Money.toSomeDense . QC.shrink)
 
 instance QC.Arbitrary (Money.ExchangeRate src dst) where
   arbitrary = do
     let myxr = fmap Money.exchangeRate QC.arbitrary
-    Just x <- QC.suchThat myxr isJust
-    pure x
-  shrink = catMaybes . fmap Money.exchangeRate
+    fromJust <$> QC.suchThat myxr isJust
+  shrink = catMaybes . map Money.exchangeRate
          . QC.shrink . Money.exchangeRateToRational
 
 instance QC.Arbitrary Money.SomeExchangeRate where
   arbitrary = do
     let md = Money.mkSomeExchangeRate
                <$> QC.arbitrary <*> QC.arbitrary <*> QC.arbitrary
-    Just x <- QC.suchThat md isJust
-    pure x
+    fromJust <$> QC.suchThat md isJust
   shrink = \x ->
     Money.withSomeExchangeRate x (map Money.toSomeExchangeRate . QC.shrink)
 

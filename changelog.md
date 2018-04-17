@@ -24,6 +24,9 @@
 
 * Introduced `discrete` constructor which behaves just like `fromInteger`.
 
+* Introduced the `dense'` constructor as an unsafe but convenient version of
+  `dense`.
+
 * The `ErrScaleNonCanonical` type is now exported.
 
 * The `Money.Internal` module is now exposed, but hidden from the Haddock

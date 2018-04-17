@@ -30,6 +30,7 @@ module Money.Internal
    Dense
  , denseCurrency
  , dense
+ , dense'
  , denseFromDiscrete
  , denseFromDecimal
  , denseToDecimal
@@ -94,7 +95,7 @@ import Data.Monoid ((<>))
 import Data.Proxy (Proxy(..))
 import Data.Ratio ((%), numerator, denominator)
 import Data.Word (Word8)
-import GHC.Exts (fromList)
+import GHC.Exts (Constraint, fromList)
 import qualified GHC.Generics as GHC
 import GHC.TypeLits
   (Symbol, SomeSymbol(..), Nat, SomeNat(..), CmpNat, KnownSymbol, KnownNat,
@@ -172,8 +173,10 @@ newtype Dense (currency :: Symbol) = Dense Rational
   deriving (Eq, Ord, Num, Real, GHC.Generic)
 
 #if MIN_VERSION_base(4,9,0)
-instance
-  ( GHC.TypeError
+
+type family TypeErrFractionalDense :: Constraint where
+  TypeErrFractionalDense
+    = GHC.TypeError
       (('GHC.Text "The ") 'GHC.:<>:
        ('GHC.ShowType Dense) 'GHC.:<>:
        ('GHC.Text " type is deliberately not an instance of ") 'GHC.:<>:
@@ -184,7 +187,8 @@ instance
        ('GHC.Text " value to a ") 'GHC.:<>:
        ('GHC.ShowType Rational) 'GHC.:$$:
        ('GHC.Text " if you know what you are doing."))
-  ) => Fractional (Dense currency) where
+
+instance TypeErrFractionalDense => Fractional (Dense currency) where
   fromRational = undefined
   recip = undefined
 #endif
@@ -206,7 +210,7 @@ instance forall currency. KnownSymbol currency => Read (Dense currency) where
   readPrec = Read.parens $ do
     let c = symbolVal (Proxy :: Proxy currency)
     _ <- ReadPrec.lift (ReadP.string ("Dense " ++ show c ++ " "))
-    fmap dense Read.readPrec
+    maybe empty pure =<< fmap dense Read.readPrec
 
 -- | Build a 'Dense' monetary value from a 'Rational' value.
 --
@@ -216,14 +220,42 @@ instance forall currency. KnownSymbol currency => Read (Dense currency) where
 -- 'dense' (125316 '%' 10000)
 -- @
 --
--- @
--- 'dense'   ==   'fromRational'
-dense :: Rational -> Dense currency
+-- Notice that 'dense' returns 'Nothing' in case the given 'Rational''s
+-- denominator is zero, which although unlikely, it is possible if the
+-- 'Rational' was unsafely constructed. When dealing with hardcoded or trusted
+-- 'Rational' values, you can use 'dense'' instead of 'dense' which unsafely
+-- constructs a 'Dense'.
+dense :: Rational -> Maybe (Dense currency)
 dense = \r ->
   if denominator r /= 0
-  then Dense r
-  else error "dense: Malformed Rational given (denominator is zero)."
+  then Just (Dense r)
+  else Nothing
 {-# INLINABLE dense #-}
+
+-- | Unsafely build a 'Dense' monetary value from a 'Rational' value. Contrary
+-- to 'dense', this function *crashes* if the given 'Rational' has zero as a
+-- denominator, which is something very unlikely to happen unlesse the given
+-- 'Rational' was itself unsafely constructed. Other than that, 'dense' and
+-- 'dense'' behave the same.
+--
+-- Prefer to use 'dense' when dealing with 'Rational' inputs from untrusted
+-- sources.
+--
+-- @
+-- ∀x. 'denominator' x /= 0
+--       ⇒ 'dense' x == 'Just' ('dense'' x)
+-- @
+--
+-- @
+-- ∀x. 'denominator' x == 0
+--       ⇒ 'undefined' == 'dense'' x
+-- @
+dense' :: Rational -> Dense currency
+dense' = \r ->
+  if denominator r /= 0
+  then Dense r
+  else error "dense': malformed Rational given (denominator is zero)."
+{-# INLINABLE dense' #-}
 
 -- | 'Dense' currency identifier.
 --
@@ -307,19 +339,23 @@ instance forall currency scale.
     fmap Discrete Read.readPrec
 
 #if MIN_VERSION_base(4,9,0)
+type family TypeErrFractionalDiscrete :: Constraint where
+  TypeErrFractionalDiscrete
+    = GHC.TypeError
+        (('GHC.Text "The ") 'GHC.:<>:
+         ('GHC.ShowType Discrete') 'GHC.:<>:
+         ('GHC.Text " type is deliberately not a ") 'GHC.:<>:
+         ('GHC.ShowType Fractional) 'GHC.:$$:
+         ('GHC.Text "instance. Convert the ") 'GHC.:<>:
+         ('GHC.ShowType Discrete') 'GHC.:<>:
+         ('GHC.Text " value to a ") 'GHC.:<>:
+         ('GHC.ShowType Dense) 'GHC.:$$:
+         ('GHC.Text "value and use the ") 'GHC.:<>:
+         ('GHC.ShowType Fractional) 'GHC.:<>:
+         ('GHC.Text " features on it instead."))
+
 instance
-  ( GHC.TypeError
-      (('GHC.Text "The ") 'GHC.:<>:
-       ('GHC.ShowType Discrete') 'GHC.:<>:
-       ('GHC.Text " type is deliberately not a ") 'GHC.:<>:
-       ('GHC.ShowType Fractional) 'GHC.:$$:
-       ('GHC.Text "instance. Convert the ") 'GHC.:<>:
-       ('GHC.ShowType Discrete') 'GHC.:<>:
-       ('GHC.Text " value to a ") 'GHC.:<>:
-       ('GHC.ShowType Dense) 'GHC.:$$:
-       ('GHC.Text "value and use the ") 'GHC.:<>:
-       ('GHC.ShowType Fractional) 'GHC.:<>:
-       ('GHC.Text " features on it instead."))
+  ( TypeErrFractionalDiscrete
   , GoodScale scale
   ) => Fractional (Discrete' currency scale) where
   fromRational = undefined

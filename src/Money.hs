@@ -23,6 +23,7 @@ module Money
    I.Dense
  , I.denseCurrency
  , I.dense
+ , I.dense'
  , I.denseFromDiscrete
  , I.denseFromDecimal
  , I.denseToDecimal
