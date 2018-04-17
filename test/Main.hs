@@ -50,8 +50,8 @@ import qualified Xmlbf
 import qualified Data.Text as Text
 #endif
 
-import qualified Money
-import qualified Money.Internal
+import Money ()
+import qualified Money.Internal as Money
 
 --------------------------------------------------------------------------------
 
@@ -106,6 +106,22 @@ instance QC.Arbitrary Money.Approximation where
                        , pure Money.Ceiling
                        , pure Money.Truncate ]
 
+-- | Generates a valid 'Money.rationalToDecimal' result. Returns the thousand
+-- and decimal separators as welland decimal separators as well.
+genDecimal :: QC.Gen (String, Maybe Char, Char)
+genDecimal = do
+  aprox :: Money.Approximation <- QC.arbitrary
+  plus :: Bool <- QC.arbitrary
+  let msep = QC.suchThat QC.arbitrary (not . Char.isDigit)
+  ds :: Char <- msep
+  yts :: Maybe Char <- genMaybe msep
+  digs :: Word8 <- QC.arbitrary
+  r :: Rational <- (%) <$> QC.arbitrary <*> QC.suchThat QC.arbitrary (/= 0)
+  pure (Money.rationalToDecimal aprox plus yts ds digs r, yts, ds)
+
+genMaybe :: QC.Gen a -> QC.Gen (Maybe a)
+genMaybe m = QC.oneof [pure Nothing, fmap Just m]
+
 --------------------------------------------------------------------------------
 
 main :: IO ()
@@ -120,8 +136,8 @@ tests =
   [ testCurrencies
   , testCurrencyUnits
   , testExchange
-  , testDenseToDecimal
-  , testDenseFromDecimal
+  , testRationalToDecimal
+  , testRationalFromDecimal
   , testDiscreteFromDecimal
   ]
 
@@ -148,396 +164,266 @@ testCurrencyUnits =
   , testDiscrete (Proxy :: Proxy "XAU") (Proxy :: Proxy "grain")
   ]
 
-testDenseToDecimal :: Tasty.TestTree
-testDenseToDecimal =
-  Tasty.testGroup "denseToDecimal"
-  [ HU.testCase "Round: dns1" $ do
-       render Money.Round dns1 @?=
+
+testRationalToDecimal :: Tasty.TestTree
+testRationalToDecimal =
+  Tasty.testGroup "rationalToDecimal"
+  [ HU.testCase "Round: r1" $ do
+       render Money.Round r1 @?=
          [ "1023004567.90"        --  0
          , "1,023,004,567.90"     --  1
          , "+1023004567.90"       --  2
          , "+1,023,004,567.90"    --  3
-         , "102300456789.50"      --  4
-         , "102,300,456,789.50"   --  5
-         , "+102300456789.50"     --  6
-         , "+102,300,456,789.50"  --  7
          , "1023004568"           --  8
          , "1,023,004,568"        --  9
          , "+1023004568"          -- 10
          , "+1,023,004,568"       -- 11
-         , "102300456790"         -- 12
-         , "102,300,456,790"      -- 13
-         , "+102300456790"        -- 14
-         , "+102,300,456,790"     -- 15
          ]
-  , HU.testCase "Round: negate dns1" $ do
-       render Money.Round (negate dns1) @?=
+  , HU.testCase "Round: negate r1" $ do
+       render Money.Round (negate r1) @?=
          [ "-1023004567.90"       --  0
          , "-1,023,004,567.90"    --  1
          , "-1023004567.90"       --  2
          , "-1,023,004,567.90"    --  3
-         , "-102300456789.50"     --  4
-         , "-102,300,456,789.50"  --  5
-         , "-102300456789.50"     --  6
-         , "-102,300,456,789.50"  --  7
          , "-1023004568"          --  8
          , "-1,023,004,568"       --  9
          , "-1023004568"          -- 10
          , "-1,023,004,568"       -- 11
-         , "-102300456790"        -- 12
-         , "-102,300,456,790"     -- 13
-         , "-102300456790"        -- 14
-         , "-102,300,456,790"     -- 15
          ]
-  , HU.testCase "Round: dns2" $ do
-       render Money.Round dns2 @?=
+  , HU.testCase "Round: r2" $ do
+       render Money.Round r2 @?=
          [ "1.23"    --  0
          , "1.23"    --  1
          , "+1.23"   --  2
          , "+1.23"   --  3
-         , "123.00"  --  4
-         , "123.00"  --  5
-         , "+123.00" --  6
-         , "+123.00" --  7
          , "1"       --  8
          , "1"       --  9
          , "+1"      -- 10
          , "+1"      -- 11
-         , "123"     -- 12
-         , "123"     -- 13
-         , "+123"    -- 14
-         , "+123"    -- 15
          ]
-  , HU.testCase "Round: negate dns2" $ do
-       render Money.Round (negate dns2) @?=
+  , HU.testCase "Round: negate r2" $ do
+       render Money.Round (negate r2) @?=
          [ "-1.23"    --  0
          , "-1.23"    --  1
          , "-1.23"    --  2
          , "-1.23"    --  3
-         , "-123.00"  --  4
-         , "-123.00"  --  5
-         , "-123.00"  --  6
-         , "-123.00"  --  7
          , "-1"       --  8
          , "-1"       --  9
          , "-1"       -- 10
          , "-1"       -- 11
-         , "-123"     -- 12
-         , "-123"     -- 13
-         , "-123"     -- 14
-         , "-123"     -- 15
          ]
-  , HU.testCase "Round: dns3" $ do
-       render Money.Round dns3 @?=
+  , HU.testCase "Round: r3" $ do
+       render Money.Round r3 @?=
          [ "0.34"   --  0
          , "0.34"   --  1
          , "+0.34"  --  2
          , "+0.34"  --  3
-         , "34.50"  --  4
-         , "34.50"  --  5
-         , "+34.50" --  6
-         , "+34.50" --  7
          , "0"      --  8
          , "0"      --  9
          , "0"      -- 10
          , "0"      -- 11
-         , "34"     -- 12
-         , "34"     -- 13
-         , "+34"    -- 14
-         , "+34"    -- 15
          ]
-  , HU.testCase "Round: negate dns3" $ do
-       render Money.Round (negate dns3) @?=
+  , HU.testCase "Round: negate r3" $ do
+       render Money.Round (negate r3) @?=
          [ "-0.34"   --  0
          , "-0.34"   --  1
          , "-0.34"   --  2
          , "-0.34"   --  3
-         , "-34.50"  --  4
-         , "-34.50"  --  5
-         , "-34.50"  --  6
-         , "-34.50"  --  7
          , "0"       --  8
          , "0"       --  9
          , "0"       -- 10
          , "0"       -- 11
-         , "-34"     -- 12
-         , "-34"     -- 13
-         , "-34"     -- 14
-         , "-34"     -- 15
          ]
-  , HU.testCase "Floor: dns1" $ do
-       render Money.Floor dns1 @?=
+  , HU.testCase "Floor: r1" $ do
+       render Money.Floor r1 @?=
          [ "1023004567.89"        --  0
          , "1,023,004,567.89"     --  1
          , "+1023004567.89"       --  2
          , "+1,023,004,567.89"    --  3
-         , "102300456789.50"      --  4
-         , "102,300,456,789.50"   --  5
-         , "+102300456789.50"     --  6
-         , "+102,300,456,789.50"  --  7
          , "1023004567"           --  8
          , "1,023,004,567"        --  9
          , "+1023004567"          -- 10
          , "+1,023,004,567"       -- 11
-         , "102300456789"         -- 12
-         , "102,300,456,789"      -- 13
-         , "+102300456789"        -- 14
-         , "+102,300,456,789"     -- 15
          ]
-  , HU.testCase "Floor: negate dns1" $ do
-       render Money.Floor (negate dns1) @?=
+  , HU.testCase "Floor: negate r1" $ do
+       render Money.Floor (negate r1) @?=
          [ "-1023004567.90"       --  0
          , "-1,023,004,567.90"    --  1
          , "-1023004567.90"       --  2
          , "-1,023,004,567.90"    --  3
-         , "-102300456789.50"     --  4
-         , "-102,300,456,789.50"  --  5
-         , "-102300456789.50"     --  6
-         , "-102,300,456,789.50"  --  7
          , "-1023004568"          --  8
          , "-1,023,004,568"       --  9
          , "-1023004568"          -- 10
          , "-1,023,004,568"       -- 11
-         , "-102300456790"        -- 12
-         , "-102,300,456,790"     -- 13
-         , "-102300456790"        -- 14
-         , "-102,300,456,790"     -- 15
          ]
-  , HU.testCase "Floor: dns2" $ do
-       render Money.Floor dns2 @?=
+  , HU.testCase "Floor: r2" $ do
+       render Money.Floor r2 @?=
          [ "1.23"    --  0
          , "1.23"    --  1
          , "+1.23"   --  2
          , "+1.23"   --  3
-         , "123.00"  --  4
-         , "123.00"  --  5
-         , "+123.00" --  6
-         , "+123.00" --  7
          , "1"       --  8
          , "1"       --  9
          , "+1"      -- 10
          , "+1"      -- 11
-         , "123"     -- 12
-         , "123"     -- 13
-         , "+123"    -- 14
-         , "+123"    -- 15
          ]
-  , HU.testCase "Floor: negate dns2" $ do
-       render Money.Floor (negate dns2) @?=
+  , HU.testCase "Floor: negate r2" $ do
+       render Money.Floor (negate r2) @?=
          [ "-1.23"    --  0
          , "-1.23"    --  1
          , "-1.23"    --  2
          , "-1.23"    --  3
-         , "-123.00"  --  4
-         , "-123.00"  --  5
-         , "-123.00"  --  6
-         , "-123.00"  --  7
          , "-2"       --  8
          , "-2"       --  9
          , "-2"       -- 10
          , "-2"       -- 11
-         , "-123"     -- 12
-         , "-123"     -- 13
-         , "-123"     -- 14
-         , "-123"     -- 15
          ]
-  , HU.testCase "Floor: dns3" $ do
-       render Money.Floor dns3 @?=
+  , HU.testCase "Floor: r3" $ do
+       render Money.Floor r3 @?=
          [ "0.34"   --  0
          , "0.34"   --  1
          , "+0.34"  --  2
          , "+0.34"  --  3
-         , "34.50"  --  4
-         , "34.50"  --  5
-         , "+34.50" --  6
-         , "+34.50" --  7
          , "0"      --  8
          , "0"      --  9
          , "0"      -- 10
          , "0"      -- 11
-         , "34"     -- 12
-         , "34"     -- 13
-         , "+34"    -- 14
-         , "+34"    -- 15
          ]
-  , HU.testCase "Floor: negate dns3" $ do
-       render Money.Floor (negate dns3) @?=
+  , HU.testCase "Floor: negate r3" $ do
+       render Money.Floor (negate r3) @?=
          [ "-0.35"   --  0
          , "-0.35"   --  1
          , "-0.35"   --  2
          , "-0.35"   --  3
-         , "-34.50"  --  4
-         , "-34.50"  --  5
-         , "-34.50"  --  6
-         , "-34.50"  --  7
          , "-1"      --  8
          , "-1"      --  9
          , "-1"      -- 10
          , "-1"      -- 11
-         , "-35"     -- 12
-         , "-35"     -- 13
-         , "-35"     -- 14
-         , "-35"     -- 15
          ]
-  , HU.testCase "Ceiling: dns1" $ do
-       render Money.Ceiling dns1 @?=
+  , HU.testCase "Ceiling: r1" $ do
+       render Money.Ceiling r1 @?=
          [ "1023004567.90"        --  0
          , "1,023,004,567.90"     --  1
          , "+1023004567.90"       --  2
          , "+1,023,004,567.90"    --  3
-         , "102300456789.50"      --  4
-         , "102,300,456,789.50"   --  5
-         , "+102300456789.50"     --  6
-         , "+102,300,456,789.50"  --  7
          , "1023004568"           --  8
          , "1,023,004,568"        --  9
          , "+1023004568"          -- 10
          , "+1,023,004,568"       -- 11
-         , "102300456790"         -- 12
-         , "102,300,456,790"      -- 13
-         , "+102300456790"        -- 14
-         , "+102,300,456,790"     -- 15
          ]
-  , HU.testCase "Ceiling: negate dns1" $ do
-       render Money.Ceiling (negate dns1) @?=
+  , HU.testCase "Ceiling: negate r1" $ do
+       render Money.Ceiling (negate r1) @?=
          [ "-1023004567.89"       --  0
          , "-1,023,004,567.89"    --  1
          , "-1023004567.89"       --  2
          , "-1,023,004,567.89"    --  3
-         , "-102300456789.50"     --  4
-         , "-102,300,456,789.50"  --  5
-         , "-102300456789.50"     --  6
-         , "-102,300,456,789.50"  --  7
          , "-1023004567"          --  8
          , "-1,023,004,567"       --  9
          , "-1023004567"          -- 10
          , "-1,023,004,567"       -- 11
-         , "-102300456789"        -- 12
-         , "-102,300,456,789"     -- 13
-         , "-102300456789"        -- 14
-         , "-102,300,456,789"     -- 15
          ]
-  , HU.testCase "Ceiling: dns2" $ do
-       render Money.Ceiling dns2 @?=
+  , HU.testCase "Ceiling: r2" $ do
+       render Money.Ceiling r2 @?=
          [ "1.23"    --  0
          , "1.23"    --  1
          , "+1.23"   --  2
          , "+1.23"   --  3
-         , "123.00"  --  4
-         , "123.00"  --  5
-         , "+123.00" --  6
-         , "+123.00" --  7
          , "2"       --  8
          , "2"       --  9
          , "+2"      -- 10
          , "+2"      -- 11
-         , "123"     -- 12
-         , "123"     -- 13
-         , "+123"    -- 14
-         , "+123"    -- 15
          ]
-  , HU.testCase "Ceiling: negate dns2" $ do
-       render Money.Ceiling (negate dns2) @?=
+  , HU.testCase "Ceiling: negate r2" $ do
+       render Money.Ceiling (negate r2) @?=
          [ "-1.23"    --  0
          , "-1.23"    --  1
          , "-1.23"    --  2
          , "-1.23"    --  3
-         , "-123.00"  --  4
-         , "-123.00"  --  5
-         , "-123.00"  --  6
-         , "-123.00"  --  7
          , "-1"       --  8
          , "-1"       --  9
          , "-1"       -- 10
          , "-1"       -- 11
-         , "-123"     -- 12
-         , "-123"     -- 13
-         , "-123"     -- 14
-         , "-123"     -- 15
          ]
-  , HU.testCase "Ceiling: dns3" $ do
-       render Money.Ceiling dns3 @?=
+  , HU.testCase "Ceiling: r3" $ do
+       render Money.Ceiling r3 @?=
          [ "0.35"   --  0
          , "0.35"   --  1
          , "+0.35"  --  2
          , "+0.35"  --  3
-         , "34.50"  --  4
-         , "34.50"  --  5
-         , "+34.50" --  6
-         , "+34.50" --  7
          , "1"      --  8
          , "1"      --  9
          , "+1"     -- 10
          , "+1"     -- 11
-         , "35"     -- 12
-         , "35"     -- 13
-         , "+35"    -- 14
-         , "+35"    -- 15
          ]
-  , HU.testCase "Ceiling: negate dns3" $ do
-       render Money.Ceiling (negate dns3) @?=
+  , HU.testCase "Ceiling: negate r3" $ do
+       render Money.Ceiling (negate r3) @?=
          [ "-0.34"   --  0
          , "-0.34"   --  1
          , "-0.34"   --  2
          , "-0.34"   --  3
-         , "-34.50"  --  4
-         , "-34.50"  --  5
-         , "-34.50"  --  6
-         , "-34.50"  --  7
          , "0"       --  8
          , "0"       --  9
          , "0"       -- 10
          , "0"       -- 11
-         , "-34"     -- 12
-         , "-34"     -- 13
-         , "-34"     -- 14
-         , "-34"     -- 15
          ]
 
-  , HU.testCase "Truncate: dns1" $ do
-      render Money.Truncate dns1 @?= render Money.Floor dns1
+  , HU.testCase "Truncate: r1" $ do
+      render Money.Truncate r1 @?= render Money.Floor r1
 
-  , HU.testCase "Truncate: negate dns1" $ do
-      render Money.Truncate (negate dns1) @?= render Money.Ceiling (negate dns1)
+  , HU.testCase "Truncate: negate r1" $ do
+      render Money.Truncate (negate r1) @?= render Money.Ceiling (negate r1)
 
-  , HU.testCase "Truncate: dns2" $ do
-      render Money.Truncate dns2 @?= render Money.Floor dns2
+  , HU.testCase "Truncate: r2" $ do
+      render Money.Truncate r2 @?= render Money.Floor r2
 
-  , HU.testCase "Truncate: negate dns2" $ do
-      render Money.Truncate (negate dns2) @?= render Money.Ceiling (negate dns2)
+  , HU.testCase "Truncate: negate r2" $ do
+      render Money.Truncate (negate r2) @?= render Money.Ceiling (negate r2)
 
-  , HU.testCase "Truncate: dns3" $ do
-      render Money.Truncate dns3 @?= render Money.Floor dns3
+  , HU.testCase "Truncate: r3" $ do
+      render Money.Truncate r3 @?= render Money.Floor r3
 
-  , HU.testCase "Truncate: negate dns3" $ do
-      render Money.Truncate (negate dns3) @?= render Money.Ceiling (negate dns3)
+  , HU.testCase "Truncate: negate r3" $ do
+      render Money.Truncate (negate r3) @?= render Money.Ceiling (negate r3)
   ]
   where
-    dns1 :: Money.Dense "USD" = Money.dense (1023004567895%1000)
-    dns2 :: Money.Dense "USD" = Money.dense (123%100)
-    dns3 :: Money.Dense "USD" = Money.dense (345%1000)
+    r1 :: Rational = 1023004567895 % 1000
+    r2 :: Rational = 123 % 100
+    r3 :: Rational = 345 % 1000
 
-    render :: Money.Approximation -> Money.Dense "USD" -> [String]
-    render a dns =
-      let ps1 :: Proxy '(1, 1) = Proxy
-          ps100 :: Proxy '(100, 1) = Proxy
-      in [ Money.denseToDecimal a False Nothing    '.' 2 ps1   dns  --  0
-         , Money.denseToDecimal a False (Just ',') '.' 2 ps1   dns  --  1
-         , Money.denseToDecimal a True  Nothing    '.' 2 ps1   dns  --  2
-         , Money.denseToDecimal a True  (Just ',') '.' 2 ps1   dns  --  3
-         , Money.denseToDecimal a False Nothing    '.' 2 ps100 dns  --  4
-         , Money.denseToDecimal a False (Just ',') '.' 2 ps100 dns  --  5
-         , Money.denseToDecimal a True  Nothing    '.' 2 ps100 dns  --  6
-         , Money.denseToDecimal a True  (Just ',') '.' 2 ps100 dns  --  7
-         , Money.denseToDecimal a False Nothing    '.' 0 ps1   dns  --  8
-         , Money.denseToDecimal a False (Just ',') '.' 0 ps1   dns  --  9
-         , Money.denseToDecimal a True  Nothing    '.' 0 ps1   dns  -- 10
-         , Money.denseToDecimal a True  (Just ',') '.' 0 ps1   dns  -- 11
-         , Money.denseToDecimal a False Nothing    '.' 0 ps100 dns  -- 12
-         , Money.denseToDecimal a False (Just ',') '.' 0 ps100 dns  -- 13
-         , Money.denseToDecimal a True  Nothing    '.' 0 ps100 dns  -- 14
-         , Money.denseToDecimal a True  (Just ',') '.' 0 ps100 dns  -- 15
-         ]
+    render :: Money.Approximation -> Rational -> [String]
+    render a r =
+      [ Money.rationalToDecimal a False Nothing    '.' 2 r  --  0
+      , Money.rationalToDecimal a False (Just ',') '.' 2 r  --  1
+      , Money.rationalToDecimal a True  Nothing    '.' 2 r  --  2
+      , Money.rationalToDecimal a True  (Just ',') '.' 2 r  --  3
+      , Money.rationalToDecimal a False Nothing    '.' 0 r  --  8
+      , Money.rationalToDecimal a False (Just ',') '.' 0 r  --  9
+      , Money.rationalToDecimal a True  Nothing    '.' 0 r  -- 10
+      , Money.rationalToDecimal a True  (Just ',') '.' 0 r  -- 11
+      ]
+
+testRationalFromDecimal :: Tasty.TestTree
+testRationalFromDecimal =
+  Tasty.testGroup "rationalFromDecimal"
+  [ QC.testProperty "Unsupported separators" $
+      let mbadsep :: QC.Gen Char = QC.suchThat QC.arbitrary Char.isDigit
+      in QC.forAll ((,) <$> mbadsep <*> mbadsep) $ \(s1 :: Char, s2 :: Char) ->
+           let f = Money.rationalFromDecimal
+           in (f Nothing s1 (error "untouched") === Nothing) .&&.
+              (f (Just s1) s2 (error "untouched") === Nothing) .&&.
+              (f (Just s1) s1 (error "untouched") === Nothing)
+
+  , QC.testProperty "Lossy roundtrip" $
+      -- We check that the roundtrip results in a close amount with a fractional
+      -- difference of up to one.
+      QC.forAll QC.arbitrary $ \(r :: Rational, sd :: Char, yst :: Maybe Char,
+                                 plus :: Bool, digs :: Word8,
+                                 aprox :: Money.Approximation) ->
+        ( not (Char.isDigit sd || maybe False Char.isDigit yst)
+        ) ==> let dec = Money.rationalToDecimal aprox plus yst sd digs r
+                  Just r' = Money.rationalFromDecimal yst sd dec
+              in 1 > abs (abs r - abs r')
+  ]
 
 testDense
   :: forall currency
@@ -549,25 +435,48 @@ testDense pc =
   [ QC.testProperty "read . show == id" $
       QC.forAll QC.arbitrary $ \(x :: Money.Dense currency) ->
          x === read (show x)
+
   , QC.testProperty "read . show . Just == Just " $
       QC.forAll QC.arbitrary $ \(x :: Money.Dense currency) ->
          Just x === read (show (Just x))
+
   , QC.testProperty "fromSomeDense . someDense == Just" $
       QC.forAll QC.arbitrary $ \(x :: Money.Dense currency) ->
          Just x === Money.fromSomeDense (Money.toSomeDense x)
+
   , QC.testProperty "fromSomeDense works only for same currency" $
       QC.forAll QC.arbitrary $ \(dr :: Money.SomeDense) ->
         (Money.someDenseCurrency dr /= symbolVal pc)
            ==> isNothing (Money.fromSomeDense dr :: Maybe (Money.Dense currency))
+
   , QC.testProperty "withSomeDense" $
       QC.forAll QC.arbitrary $ \(x :: Money.Dense currency) ->
         let dr = Money.toSomeDense x
         in Money.withSomeDense dr $ \x' ->
              (show x, dr, Money.toSomeDense (x + 1))
                 === (show x', Money.toSomeDense x', Money.toSomeDense (x' + 1))
+
   , QC.testProperty "denseCurrency" $
       QC.forAll QC.arbitrary $ \(x :: Money.Dense currency) ->
         Money.denseCurrency x === symbolVal pc
+
+  , QC.testProperty "denseToDecimal: Same as rationalToDecimal" $
+      let msep :: QC.Gen Char = QC.suchThat QC.arbitrary (not . Char.isDigit)
+          gen = (,,) <$> msep <*> genMaybe msep <*> QC.arbitrary
+      in QC.forAll gen $ \( sd :: Char, yst :: Maybe Char
+                          , ( dns :: Money.Dense currency, plus :: Bool,
+                              digs :: Word8, aprox :: Money.Approximation) ) ->
+            let dnsd = Money.denseToDecimal aprox plus yst sd digs
+                         (Proxy :: Proxy '(1,1)) dns
+                rd = Money.rationalToDecimal aprox plus yst sd digs
+                       (toRational dns)
+            in dnsd === rd
+
+  , QC.testProperty "denseFromDecimal: Same as rationalFromDecimal" $
+      QC.forAll genDecimal $ \(dec :: String, yts :: Maybe Char, ds :: Char) ->
+         let Just r = Money.rationalFromDecimal yts ds dec
+             Just dns = Money.denseFromDecimal yts ds dec
+         in r === toRational (dns :: Money.Dense currency)
 
 #ifdef HAS_aeson
   , QC.testProperty "Aeson encoding roundtrip" $
@@ -699,25 +608,8 @@ testExchange =
   , testExchangeRate (Proxy :: Proxy "XAU") (Proxy :: Proxy "USD")
   , testExchangeRate (Proxy :: Proxy "XAU") (Proxy :: Proxy "VUV")
   , testExchangeRate (Proxy :: Proxy "XAU") (Proxy :: Proxy "XAU")
-  , testExchangeRateDecimal
   ]
 
-
-testExchangeRateDecimal :: Tasty.TestTree
-testExchangeRateDecimal =
-  Tasty.testGroup "Decimal"
-  [ QC.testProperty "Lossy roundtrip" $
-      -- We check that the roundtrip results in a close amount with a fractional
-      -- difference of up to one.
-      QC.forAll QC.arbitrary $ \(xr :: Money.ExchangeRate "ETH" "BTC", sd :: Char,
-                                 yst :: Maybe Char, digs :: Word8,
-                                 aprox :: Money.Approximation) ->
-      ( not (Char.isDigit sd || maybe False Char.isDigit yst)
-      ) ==> let dec = Money.exchangeRateToDecimal aprox yst sd digs xr
-                Just xr' = Money.exchangeRateFromDecimal yst sd dec
-            in 1 > abs (Money.exchangeRateToRational xr
-                          - Money.exchangeRateToRational xr')
-  ]
 
 testDiscrete
   :: forall (currency :: Symbol) (unit :: Symbol)
@@ -940,6 +832,24 @@ testExchangeRate ps pd =
         in Money.withSomeExchangeRate dr $ \x' ->
              (show x, dr) === (show x', Money.toSomeExchangeRate x')
 
+  , QC.testProperty "exchangeRateToDecimal: Same as rationalToDecimal" $
+      let msep :: QC.Gen Char = QC.suchThat QC.arbitrary (not . Char.isDigit)
+          gen = (,,) <$> msep <*> genMaybe msep <*> QC.arbitrary
+      in QC.forAll gen $ \( sd :: Char, yst :: Maybe Char
+                          , ( xr :: Money.ExchangeRate src dst, digs :: Word8
+                            , aprox :: Money.Approximation ) ) ->
+           let xrd = Money.exchangeRateToDecimal aprox yst sd digs xr
+               rd = Money.rationalToDecimal aprox False yst sd digs
+                       (Money.exchangeRateToRational xr)
+           in xrd === rd
+
+  , QC.testProperty "exchangeRateFromDecimal: Same as rationalFromDecimal" $
+      QC.forAll genDecimal $ \(dec :: String, yts :: Maybe Char, ds :: Char) ->
+         let Just r = Money.rationalFromDecimal yts ds dec
+             yxr = Money.exchangeRateFromDecimal yts ds dec
+                      :: Maybe (Money.ExchangeRate src dst)
+         in (r > 0) ==> (Just r === fmap Money.exchangeRateToRational yxr)
+
 #ifdef HAS_aeson
   , QC.testProperty "Aeson encoding roundtrip" $
       QC.forAll QC.arbitrary $ \(x :: Money.ExchangeRate src dst) ->
@@ -1052,86 +962,11 @@ testExchangeRate ps pd =
 #endif
   ]
 
-testDenseFromDecimal :: Tasty.TestTree
-testDenseFromDecimal =
-  Tasty.testGroup "denseFromDecimal"
-  [ HU.testCase "Unsupported decimal separator" $ do
-      Money.denseFromDecimal Nothing '2' "1225"
-        @?= (Nothing :: Maybe (Money.Dense "USD"))
-      Money.denseFromDecimal (Just ',') '2' "1225"
-        @?= (Nothing :: Maybe (Money.Dense "USD"))
-
-  , QC.testProperty "Lossy roundtrip" $
-      -- We check that the roundtrip results in a close amount with a fractional
-      -- difference of up to one.
-      QC.forAll QC.arbitrary $ \(dns :: Money.Dense "USD", sd :: Char,
-                                 yst :: Maybe Char, plus :: Bool, digs :: Word8,
-                                 aprox :: Money.Approximation) ->
-      ( not (Char.isDigit sd || maybe False Char.isDigit yst)
-      ) ==> let dec = Money.denseToDecimal aprox plus yst sd digs
-                        (Proxy @ '(1,1)) dns
-                Just dns' = Money.denseFromDecimal yst sd dec
-            in 1 > abs (abs dns - abs dns')
-
-  , HU.testCase "Too large" $ do
-      Money.discreteFromDecimal Nothing '.' "0.053"
-        @?= (Nothing :: Maybe (Money.Discrete "USD" "cent"))
-      Money.discreteFromDecimal (Just ',') '.' "0.253"
-        @?= (Nothing :: Maybe (Money.Discrete "USD" "cent"))
-
-  , HU.testCase "USD cent, small, zero" $ do
-      let dis = 0 :: Money.Discrete "USD" "cent"
-          f = Money.discreteFromDecimal
-      f Nothing '.' "0" @?= Just dis
-      f Nothing '.' "+0" @?= Just dis
-      f Nothing '.' "-0" @?= Just dis
-      f (Just ',') '.' "0" @?= Just dis
-      f (Just ',') '.' "+0" @?= Just dis
-      f (Just ',') '.' "-0" @?= Just dis
-
-  , HU.testCase "USD cent, small, positive" $ do
-      let dis = 25 :: Money.Discrete "USD" "cent"
-          f = Money.discreteFromDecimal
-      f Nothing '.' "0.25" @?= Just dis
-      f Nothing '.' "+0.25" @?= Just dis
-      f (Just ',') '.' "0.25" @?= Just dis
-      f (Just ',') '.' "+0.25" @?= Just dis
-
-  , HU.testCase "USD cent, small, negative" $ do
-      let dis = -25 :: Money.Discrete "USD" "cent"
-          f = Money.discreteFromDecimal
-      f Nothing '.' "-0.25" @?= Just dis
-      f Nothing '.' "-0.25" @?= Just dis
-      f (Just ',') '.' "-0.25" @?= Just dis
-      f (Just ',') '.' "-0.25" @?= Just dis
-
-  , HU.testCase "USD cent, big, positive" $ do
-      let dis = 102300456789 :: Money.Discrete "USD" "cent"
-          f = Money.discreteFromDecimal
-      f Nothing '.' "1023004567.89" @?= Just dis
-      f Nothing '.' "+1023004567.89" @?= Just dis
-      f (Just ',') '.' "1,023,004,567.89" @?= Just dis
-      f (Just ',') '.' "+1,023,004,567.89" @?= Just dis
-
-  , HU.testCase "USD cent, big, negative" $ do
-      let dis = -102300456789 :: Money.Discrete "USD" "cent"
-          f = Money.discreteFromDecimal
-      f Nothing '.' "-1023004567.89" @?= Just dis
-      f Nothing '.' "-1023004567.89" @?= Just dis
-      f (Just ',') '.' "-1,023,004,567.89" @?= Just dis
-      f (Just ',') '.' "-1,023,004,567.89" @?= Just dis
-  ]
 
 testDiscreteFromDecimal :: Tasty.TestTree
 testDiscreteFromDecimal =
   Tasty.testGroup "discreteFromDecimal"
-  [ HU.testCase "Unsupported decimal separator" $ do
-      Money.discreteFromDecimal Nothing '2' "1225"
-        @?= (Nothing :: Maybe (Money.Discrete "USD" "cent"))
-      Money.discreteFromDecimal (Just ',') '2' "1225"
-        @?= (Nothing :: Maybe (Money.Discrete "USD" "cent"))
-
-  , HU.testCase "Too large" $ do
+  [ HU.testCase "Too large" $ do
       Money.discreteFromDecimal Nothing '.' "0.053"
         @?= (Nothing :: Maybe (Money.Discrete "USD" "cent"))
       Money.discreteFromDecimal (Just ',') '.' "0.253"

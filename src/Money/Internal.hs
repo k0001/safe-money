@@ -79,6 +79,8 @@ module Money.Internal
  , someExchangeRateRate
  -- * Misc
  , Approximation(Round, Floor, Ceiling, Truncate)
+ , rationalToDecimal
+ , rationalFromDecimal
  ) where
 
 import Control.Applicative ((<|>), empty)
@@ -1694,7 +1696,6 @@ exchangeRateFromDecimal
   -> Maybe (ExchangeRate src dst)
 exchangeRateFromDecimal yst sf = \case
   ('-':_) -> Nothing
-  ('+':_) -> Nothing
   str -> exchangeRate =<< rationalFromDecimal yst sf str
 
 rationalFromDecimal
