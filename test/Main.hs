@@ -699,6 +699,24 @@ testExchange =
   , testExchangeRate (Proxy :: Proxy "XAU") (Proxy :: Proxy "USD")
   , testExchangeRate (Proxy :: Proxy "XAU") (Proxy :: Proxy "VUV")
   , testExchangeRate (Proxy :: Proxy "XAU") (Proxy :: Proxy "XAU")
+  , testExchangeRateDecimal
+  ]
+
+
+testExchangeRateDecimal :: Tasty.TestTree
+testExchangeRateDecimal =
+  Tasty.testGroup "Decimal"
+  [ QC.testProperty "Lossy roundtrip" $
+      -- We check that the roundtrip results in a close amount with a fractional
+      -- difference of up to one.
+      QC.forAll QC.arbitrary $ \(xr :: Money.ExchangeRate "ETH" "BTC", sd :: Char,
+                                 yst :: Maybe Char, digs :: Word8,
+                                 aprox :: Money.Approximation) ->
+      ( not (Char.isDigit sd || maybe False Char.isDigit yst)
+      ) ==> let dec = Money.exchangeRateToDecimal aprox yst sd digs xr
+                Just xr' = Money.exchangeRateFromDecimal yst sd dec
+            in 1 > abs (Money.exchangeRateToRational xr
+                          - Money.exchangeRateToRational xr')
   ]
 
 testDiscrete
@@ -1053,7 +1071,7 @@ testDenseFromDecimal =
       ) ==> let dec = Money.denseToDecimal aprox plus yst sd digs
                         (Proxy @ '(1,1)) dns
                 Just dns' = Money.denseFromDecimal yst sd dec
-            in abs (abs dns - abs dns') < 1
+            in 1 > abs (abs dns - abs dns')
 
   , HU.testCase "Too large" $ do
       Money.discreteFromDecimal Nothing '.' "0.053"
