@@ -1767,7 +1767,9 @@ rationalFromDecimalP
   -- will always fail.
   -> ReadP.ReadP Rational
 rationalFromDecimalP yst sf = do
-   guard (not (Char.isDigit sf || maybe False Char.isDigit yst))
+   case yst of
+     Just st | st == sf || Char.isDigit st -> empty
+     _ -> guard (not (Char.isDigit sf))
    sig :: Rational -> Rational <-
      (ReadP.char '-' $> negate) <|>
      (ReadP.char '+' $> id) <|>

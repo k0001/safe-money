@@ -107,12 +107,19 @@ genDecimal :: QC.Gen (String, Maybe Char, Char)
 genDecimal = do
   aprox :: Money.Approximation <- QC.arbitrary
   plus :: Bool <- QC.arbitrary
-  let msep = QC.suchThat QC.arbitrary (not . Char.isDigit)
-  ds :: Char <- msep
-  yts :: Maybe Char <- genMaybe msep
   digs :: Word8 <- QC.arbitrary
   r :: Rational <- (%) <$> QC.arbitrary <*> QC.suchThat QC.arbitrary (/= 0)
+  (yts, ds) <- genDecimalSeps
   pure (Money.rationalToDecimal aprox plus yts ds digs r, yts, ds)
+
+-- | Generates valid separators for decimal representations (see genDecimal).
+genDecimalSeps :: QC.Gen (Maybe Char, Char)
+genDecimalSeps = do
+  let msep = QC.suchThat QC.arbitrary (not . Char.isDigit)
+  ds :: Char <- msep
+  yts :: Maybe Char <- genMaybe (QC.suchThat msep (/= ds))
+  pure (yts, ds)
+
 
 genMaybe :: QC.Gen a -> QC.Gen (Maybe a)
 genMaybe m = QC.oneof [pure Nothing, fmap Just m]
@@ -123,7 +130,7 @@ main :: IO ()
 main =  Tasty.defaultMainWithIngredients
   [ Tasty.consoleTestReporter
   , Tasty.listingTests
-  ] tests
+  ] (Tasty.localOption (QC.QuickCheckTests 500) tests)
 
 tests :: Tasty.TestTree
 tests =
@@ -402,22 +409,25 @@ testRationalFromDecimal =
   Tasty.testGroup "rationalFromDecimal"
   [ QC.testProperty "Unsupported separators" $
       let mbadsep :: QC.Gen Char = QC.suchThat QC.arbitrary Char.isDigit
-      in QC.forAll ((,) <$> mbadsep <*> mbadsep) $ \(s1 :: Char, s2 :: Char) ->
-           let f = Money.rationalFromDecimal
-           in (f Nothing s1 (error "untouched") === Nothing) .&&.
-              (f (Just s1) s2 (error "untouched") === Nothing) .&&.
-              (f (Just s1) s1 (error "untouched") === Nothing)
+          mgoodsep :: QC.Gen Char = QC.suchThat QC.arbitrary (not . Char.isDigit)
+      in QC.forAll ((,,) <$> mbadsep <*> mbadsep <*> mgoodsep) $
+           \(s1 :: Char, s2 :: Char, s3 :: Char) ->
+              let f = Money.rationalFromDecimal
+              in (f Nothing s1 (error "untouched") === Nothing) .&&.
+                 (f (Just s1) s2 (error "untouched") === Nothing) .&&.
+                 (f (Just s1) s1 (error "untouched") === Nothing) .&&.
+                 (f (Just s3) s3 (error "untouched") === Nothing)
 
   , QC.testProperty "Lossy roundtrip" $
       -- We check that the roundtrip results in a close amount with a fractional
       -- difference of up to one.
-      QC.forAll QC.arbitrary $ \(r :: Rational, sd :: Char, yst :: Maybe Char,
-                                 plus :: Bool, digs :: Word8,
-                                 aprox :: Money.Approximation) ->
-        ( not (Char.isDigit sd || maybe False Char.isDigit yst)
-        ) ==> let dec = Money.rationalToDecimal aprox plus yst sd digs r
-                  Just r' = Money.rationalFromDecimal yst sd dec
-              in 1 > abs (abs r - abs r')
+      let gen = (,) <$> genDecimalSeps <*> QC.arbitrary
+      in QC.forAll gen $ \( (yst :: Maybe Char, sd :: Char)
+                       , (r :: Rational, plus :: Bool, digs :: Word8,
+                          aprox :: Money.Approximation) ) ->
+           let dec = Money.rationalToDecimal aprox plus yst sd digs r
+               Just r' = Money.rationalFromDecimal yst sd dec
+           in 1 > abs (abs r - abs r')
   ]
 
 testDense
@@ -456,11 +466,10 @@ testDense pc =
         Money.denseCurrency x === symbolVal pc
 
   , QC.testProperty "denseToDecimal: Same as rationalToDecimal" $
-      let msep :: QC.Gen Char = QC.suchThat QC.arbitrary (not . Char.isDigit)
-          gen = (,,) <$> msep <*> genMaybe msep <*> QC.arbitrary
-      in QC.forAll gen $ \( sd :: Char, yst :: Maybe Char
-                          , ( dns :: Money.Dense currency, plus :: Bool,
-                              digs :: Word8, aprox :: Money.Approximation) ) ->
+      let gen = (,) <$> genDecimalSeps <*> QC.arbitrary
+      in QC.forAll gen $ \( (yst :: Maybe Char, sd :: Char)
+                          , (dns :: Money.Dense currency, plus :: Bool,
+                             digs :: Word8, aprox :: Money.Approximation) ) ->
             let dnsd1 = Money.denseToDecimal aprox plus yst sd digs
                          (Proxy :: Proxy '(1,1)) dns
                 dnsd100 = Money.denseToDecimal aprox plus yst sd digs
@@ -832,11 +841,10 @@ testExchangeRate ps pd =
              (show x, dr) === (show x', Money.toSomeExchangeRate x')
 
   , QC.testProperty "exchangeRateToDecimal: Same as rationalToDecimal" $
-      let msep :: QC.Gen Char = QC.suchThat QC.arbitrary (not . Char.isDigit)
-          gen = (,,) <$> msep <*> genMaybe msep <*> QC.arbitrary
-      in QC.forAll gen $ \( sd :: Char, yst :: Maybe Char
-                          , ( xr :: Money.ExchangeRate src dst, digs :: Word8
-                            , aprox :: Money.Approximation ) ) ->
+      let gen = (,) <$> genDecimalSeps <*> QC.arbitrary
+      in QC.forAll gen $ \( (yst :: Maybe Char, sd :: Char)
+                          , (xr :: Money.ExchangeRate src dst, digs :: Word8,
+                             aprox :: Money.Approximation ) ) ->
            let xrd = Money.exchangeRateToDecimal aprox yst sd digs xr
                rd = Money.rationalToDecimal aprox False yst sd digs
                        (Money.exchangeRateToRational xr)
@@ -848,15 +856,6 @@ testExchangeRate ps pd =
              yxr = Money.exchangeRateFromDecimal yts ds dec
                       :: Maybe (Money.ExchangeRate src dst)
          in (r > 0) ==> (Just r === fmap Money.exchangeRateToRational yxr)
-         {-
-          -
-      exchangeRateFromDecimal: Same as rationalFromDecimal:                 FAIL
-        *** Failed! (after 56 tests):
-        Exception:
-          test/Main.hs:847:14-58: Irrefutable pattern failed for pattern Just r
-        ("+0)827",Just ')',')')
-        Use --quickcheck-replay=453509 to reproduce.
--}
 
 #ifdef HAS_aeson
   , QC.testProperty "Aeson encoding roundtrip" $
