@@ -466,11 +466,15 @@ testDense pc =
       in QC.forAll gen $ \( sd :: Char, yst :: Maybe Char
                           , ( dns :: Money.Dense currency, plus :: Bool,
                               digs :: Word8, aprox :: Money.Approximation) ) ->
-            let dnsd = Money.denseToDecimal aprox plus yst sd digs
+            let dnsd1 = Money.denseToDecimal aprox plus yst sd digs
                          (Proxy :: Proxy '(1,1)) dns
-                rd = Money.rationalToDecimal aprox plus yst sd digs
-                       (toRational dns)
-            in dnsd === rd
+                dnsd100 = Money.denseToDecimal aprox plus yst sd digs
+                             (Proxy :: Proxy '(100,1)) dns
+                rd1 = Money.rationalToDecimal aprox plus yst sd digs
+                        (toRational dns)
+                rd100 = Money.rationalToDecimal aprox plus yst sd digs
+                          (toRational dns * 100)
+            in (dnsd1 === rd1) .&&. (dnsd100 === rd100)
 
   , QC.testProperty "denseFromDecimal: Same as rationalFromDecimal" $
       QC.forAll genDecimal $ \(dec :: String, yts :: Maybe Char, ds :: Char) ->
