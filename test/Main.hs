@@ -848,6 +848,15 @@ testExchangeRate ps pd =
              yxr = Money.exchangeRateFromDecimal yts ds dec
                       :: Maybe (Money.ExchangeRate src dst)
          in (r > 0) ==> (Just r === fmap Money.exchangeRateToRational yxr)
+         {-
+          -
+      exchangeRateFromDecimal: Same as rationalFromDecimal:                 FAIL
+        *** Failed! (after 56 tests):
+        Exception:
+          test/Main.hs:847:14-58: Irrefutable pattern failed for pattern Just r
+        ("+0)827",Just ')',')')
+        Use --quickcheck-replay=453509 to reproduce.
+-}
 
 #ifdef HAS_aeson
   , QC.testProperty "Aeson encoding roundtrip" $
