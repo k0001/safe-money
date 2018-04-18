@@ -55,8 +55,9 @@ import qualified Xmlbf
 import qualified Data.Text as Text
 #endif
 
-import Money ()
+import qualified Money
 import qualified Money.Internal as Money
+  (rationalFromDecimal, rationalToDecimal)
 
 --------------------------------------------------------------------------------
 
