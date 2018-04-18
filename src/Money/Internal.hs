@@ -18,10 +18,7 @@
 {-# LANGUAGE TypeOperators #-}
 {-# LANGUAGE UndecidableInstances #-}
 {-# OPTIONS_HADDOCK hide #-}
-
-#if MIN_VERSION_base(4,9,0)
 {-# OPTIONS_GHC -Wno-redundant-constraints #-}
-#endif
 
 -- | This is an internal module. You may use stuff exported from here, but we
 -- can't garantee their stability.
@@ -101,6 +98,7 @@ import qualified GHC.Generics as GHC
 import GHC.TypeLits
   (Symbol, SomeSymbol(..), Nat, SomeNat(..), CmpNat, KnownSymbol, KnownNat,
    natVal, someNatVal, symbolVal, someSymbolVal)
+import qualified GHC.TypeLits as GHC
 import Numeric.Natural (Natural)
 import Prelude hiding ((.), id)
 import qualified Text.ParserCombinators.ReadPrec as ReadPrec
@@ -141,42 +139,37 @@ import qualified Data.Store as Store
 import qualified Xmlbf
 #endif
 
-#if MIN_VERSION_base(4,9,0)
-import qualified GHC.TypeLits as GHC
-#endif
-
 --------------------------------------------------------------------------------
 -- | 'Dense' represents a dense monetary value for @currency@ (usually a
 -- ISO-4217 currency code, but not necessarily) as a rational number.
 --
--- While monetary values associated with a particular currency are discrete, you
--- can still treat monetary values as dense while operating on them. For
--- example, the half of @USD 3.41@ is @USD 1.705@, which is not an amount that
--- can't be represented as a number of USD cents (the smallest unit that can
+-- While monetary values associated with a particular currency are
+-- discrete (e.g., an exact number of coins and bills), you can still treat
+-- monetary values as dense while operating on them. For example, the half
+-- of @USD 3.41@ is @USD 1.705@, which is not an amount that can't be
+-- represented as a number of USD cents (the smallest unit that can
 -- represent USD amounts). Nevertheless, if you do manage to represent @USD
--- 1.709@ somehow, and you eventually multiply @USD 1.705@ by @4@ for example,
--- then you end up with @USD 6.82@, which is again a value representable as USD
--- cents. In other words, 'Dense' monetary values allow us to perform precise
--- calculations deferring the conversion to a 'Discrete' monetary values as much
--- as posible. Once you are ready to approximate a 'Dense' value to a 'Discrete'
--- value you can use one 'discreteFromDense'. Otherwise, using 'toRational' you
--- can obtain a precise 'Rational' representation.
+-- 1.709@ somehow, and you eventually multiply @USD 1.705@ by @4@ for
+-- example, then you end up with @USD 6.82@, which is again a value
+-- representable as USD cents. In other words, 'Dense' monetary values
+-- allow us to perform precise calculations deferring the conversion to a
+-- 'Discrete' monetary values as much as posible. Once you are ready to
+-- approximate a 'Dense' value to a 'Discrete' value you can use one
+-- 'discreteFromDense'. Otherwise, using 'toRational' you can obtain a
+-- precise 'Rational' representation.
+
+-- Construct 'Dense' monetary values using 'dense'.
 --
--- Construct 'Dense' monetary values using 'dense', 'fromInteger' or
--- 'fromIntegral'.
---
--- /WARNING/ if you want to treat a dense monetary value as a /Real/ number (for
--- example, to take the square root of that monetary value), then you are on
--- your own. We can only guarantee lossless manipulation of rational values, so
--- you will need to convert back and forth betwen the 'Rational' representation
--- for 'Dense' and your (likely lossy) representation for /Real/ numbers.
+-- /WARNING/ if you want to treat a dense monetary value as a /Real/ number
+-- like 'Float' or 'Double', then you are on your own. We can only
+-- guarantee lossless manipulation of rational values, so you will need to
+-- convert back and forth betwen the 'Rational' representation for 'Dense'
+-- and your (likely lossy) representation for /Real/ numbers.
 newtype Dense (currency :: Symbol) = Dense Rational
   deriving (Eq, Ord, Num, Real, GHC.Generic)
 
-#if MIN_VERSION_base(4,9,0)
-
-type family TypeErrFractionalDense :: Constraint where
-  TypeErrFractionalDense
+type family ErrFractionalDense :: Constraint where
+  ErrFractionalDense
     = GHC.TypeError
       (('GHC.Text "The ") 'GHC.:<>:
        ('GHC.ShowType Dense) 'GHC.:<>:
@@ -189,14 +182,13 @@ type family TypeErrFractionalDense :: Constraint where
        ('GHC.ShowType Rational) 'GHC.:$$:
        ('GHC.Text " if you know what you are doing."))
 
-instance TypeErrFractionalDense => Fractional (Dense currency) where
+instance ErrFractionalDense => Fractional (Dense currency) where
   fromRational = undefined
   recip = undefined
-#endif
 
 -- |
 -- @
--- > 'show' ('dense' (1 '%' 3) :: 'Dense' \"USD\")
+-- > 'show' ('dense'' (1 '%' 3) :: 'Dense' \"USD\")
 -- \"Dense \\\"USD\\\" 1%3\"
 -- @
 instance forall currency. KnownSymbol currency => Show (Dense currency) where
@@ -231,11 +223,11 @@ dense = \r ->
   if denominator r /= 0
   then Just (Dense r)
   else Nothing
-{-# INLINABLE dense #-}
+{-# INLINE dense #-}
 
 -- | Unsafely build a 'Dense' monetary value from a 'Rational' value. Contrary
 -- to 'dense', this function *crashes* if the given 'Rational' has zero as a
--- denominator, which is something very unlikely to happen unlesse the given
+-- denominator, which is something very unlikely to happen unless the given
 -- 'Rational' was itself unsafely constructed. Other than that, 'dense' and
 -- 'dense'' behave the same.
 --
@@ -243,13 +235,13 @@ dense = \r ->
 -- sources.
 --
 -- @
--- ∀x. 'denominator' x /= 0
---       ⇒ 'dense' x == 'Just' ('dense'' x)
+-- 'denominator' x /= 0
+--   ⇒ 'dense' x == 'Just' ('dense'' x)
 -- @
 --
 -- @
--- ∀x. 'denominator' x == 0
---       ⇒ 'undefined' == 'dense'' x
+-- 'denominator' x == 0
+--   ⇒ 'undefined' == 'dense'' x
 -- @
 dense' :: Rational -> Dense currency
 dense' = \r ->
@@ -261,12 +253,12 @@ dense' = \r ->
 -- | 'Dense' currency identifier.
 --
 -- @
--- > 'denseCurrency' (4 :: 'Dense' \"USD\")
+-- > 'denseCurrency' ('dense'' 4 :: 'Dense' \"USD\")
 -- \"USD\"
 -- @
 denseCurrency :: KnownSymbol currency => Dense currency -> String
 denseCurrency = symbolVal
-{-# INLINABLE denseCurrency #-}
+{-# INLINE denseCurrency #-}
 
 -- | 'Discrete' represents a discrete monetary value for a @currency@ expresed
 -- as an integer amount of a particular @unit@. For example, with @currency ~
@@ -275,8 +267,7 @@ denseCurrency = symbolVal
 --
 -- @currency@ is usually a ISO-4217 currency code, but not necessarily.
 --
--- Construct 'Discrete' values using 'discrete', 'fromInteger' or
--- 'fromIntegral'.
+-- Construct 'Discrete' values using 'discrete'.
 --
 -- For example, if you want to represent @GBP 21.05@, where the smallest
 -- represetable unit for a GBP (United Kingdom Pound) is the /penny/, and 100
@@ -284,7 +275,7 @@ denseCurrency = symbolVal
 -- use:
 --
 -- @
--- 'fromInteger' 2105 :: Discrete \"GBP\" \"penny\"
+-- 'discrete' 2105 :: 'Discrete' \"GBP\" \"penny\"
 -- @
 --
 -- Because @2015 / 100 == 20.15@.
@@ -292,7 +283,7 @@ type Discrete (currency :: Symbol) (unit :: Symbol)
   = Discrete' currency (Scale currency unit)
 
 -- | 'Discrete'' represents a discrete monetary value for a @currency@ expresed
--- as an amount of @scale@, which is a rational number expressed as @(numerator,
+-- as amount of @scale@, which is a rational number expressed as @(numerator,
 -- denominator)@.
 --
 -- You'll be using 'Discrete' instead of 'Discrete'' most of the time, which
@@ -311,8 +302,8 @@ deriving instance GoodScale scale => GHC.Generic (Discrete' currency scale)
 
 -- |
 -- @
--- > 'show' (123 :: 'Discrete' \"USD\" \"cent\")
--- \"Dense \\\"USD\\\" 100%1 123\"
+-- > 'show' ('discrete' 123 :: 'Discrete' \"USD\" \"cent\")
+-- \"Discrete \\\"USD\\\" 100%1 123\"
 -- @
 instance forall currency scale.
   ( KnownSymbol currency, GoodScale scale
@@ -339,9 +330,8 @@ instance forall currency scale.
            ]))
     fmap Discrete Read.readPrec
 
-#if MIN_VERSION_base(4,9,0)
-type family TypeErrFractionalDiscrete :: Constraint where
-  TypeErrFractionalDiscrete
+type family ErrFractionalDiscrete :: Constraint where
+  ErrFractionalDiscrete
     = GHC.TypeError
         (('GHC.Text "The ") 'GHC.:<>:
          ('GHC.ShowType Discrete') 'GHC.:<>:
@@ -356,18 +346,13 @@ type family TypeErrFractionalDiscrete :: Constraint where
          ('GHC.Text " features on it instead."))
 
 instance
-  ( TypeErrFractionalDiscrete
+  ( ErrFractionalDiscrete
   , GoodScale scale
   ) => Fractional (Discrete' currency scale) where
   fromRational = undefined
   recip = undefined
-#endif
 
 -- | Construct a 'Discrete' value.
---
--- @
--- 'discrete'  ==  'fromInteger'
--- @
 discrete :: GoodScale scale => Integer -> Discrete' currency scale
 discrete = Discrete
 {-# INLINE discrete #-}
@@ -380,12 +365,12 @@ denseFromDiscrete
   => Discrete' currency scale
   -> Dense currency -- ^
 denseFromDiscrete = \c@(Discrete i) -> Dense (fromInteger i / scale c)
-{-# INLINABLE denseFromDiscrete #-}
+{-# INLINE denseFromDiscrete #-}
 
 -- | 'Discrete' currency identifier.
 --
 -- @
--- > 'discreteCurrency' (4 :: 'Discrete' \"USD\" \"cent\")
+-- > 'discreteCurrency' ('discrete' 4 :: 'Discrete' \"USD\" \"cent\")
 -- \"USD\"
 -- @
 discreteCurrency
@@ -394,7 +379,7 @@ discreteCurrency
   => Discrete' currency scale
   -> String -- ^
 discreteCurrency = \_ -> symbolVal (Proxy :: Proxy currency)
-{-# INLINABLE discreteCurrency #-}
+{-# INLINE discreteCurrency #-}
 
 -- | Method for approximating a fractional number to an integer number.
 data Approximation
@@ -512,7 +497,6 @@ discreteFromDense a = \c0 ->
 -- representable @unit@, like XAU, you will get a compile error.
 type family Scale (currency :: Symbol) (unit :: Symbol) :: (Nat, Nat)
 
-#if MIN_VERSION_base(4,9,0)
 -- | A friendly 'GHC.TypeError' to use for a @currency@ that doesn't have a
 -- canonical small unit.
 type family ErrScaleNonCanonical (currency :: Symbol) :: k where
@@ -520,15 +504,6 @@ type family ErrScaleNonCanonical (currency :: Symbol) :: k where
     ( 'GHC.Text c 'GHC.:<>:
       'GHC.Text " is not a currency with a canonical smallest unit," 'GHC.:$$:
       'GHC.Text "be explicit about the currency unit you want to use." )
-#else
--- | Forbid a @currency@ that doesn't have a canonical small unit.
---
--- In GHC versions before 8.0 we can't provide a nice error message here, so we
--- simply set this to a value that will fail to satisfy 'GoodScale'. As a
--- consequence, trying to use this 'Scale' will result in a cryptic error saying
--- /«@Couldn't match type ‘'EQ’ with ‘'LT’@»/.
-type ErrScaleNonCanonical (currency :: Symbol) = '(0, 0)
-#endif
 
 -- | Constraints to a scale (like the one returned by @'Scale' currency unit@)
 -- expected to always be satisfied. In particular, the scale is always
@@ -563,6 +538,9 @@ mkGoodScale =
 -- @
 -- > 'scale' ('Proxy' :: 'Proxy' ('Scale' \"USD\" \"cent\"))
 -- 100 % 1
+-- @
+--
+-- @
 -- > 'scale' (x :: 'Discrete' \"USD\" \"cent\")
 -- 100 % 1
 -- @
@@ -571,7 +549,7 @@ mkGoodScale =
 scale :: forall proxy scale. GoodScale scale => proxy scale -> Rational -- ^
 scale = \_ -> natVal (Proxy :: Proxy (Fst scale)) %
               natVal (Proxy :: Proxy (Snd scale))
-{-# INLINABLE scale #-}
+{-# INLINE scale #-}
 
 --------------------------------------------------------------------------------
 
@@ -582,7 +560,7 @@ scale = \_ -> natVal (Proxy :: Proxy (Fst scale)) %
 -- then we can represent this situaion using:
 --
 -- @
--- 'exchangeRate' (12345 % 10000) :: 'ExchangeRate' \"USD\" \"GBP\"
+-- 'exchangeRate' (12345 % 10000) :: 'Maybe' ('ExchangeRate' \"USD\" \"GBP\")
 -- @
 newtype ExchangeRate (src :: Symbol) (dst :: Symbol) = ExchangeRate Rational
   deriving (Eq, Ord, GHC.Generic)
@@ -625,8 +603,8 @@ instance Category ExchangeRate where
 
 -- |
 -- @
--- > 'show' ('exchangeRate' (5 % 7) :: 'ExchangeRate' \"USD\" \"JPY\")@
--- \"ExchangeRate \\\"USD\\\" \\\"JPY\\\" 5%7\"
+-- > 'show' ('exchangeRate' (5 % 7) :: 'Maybe' ('ExchangeRate' \"USD\" \"JPY\"))@
+-- 'Just' \"ExchangeRate \\\"USD\\\" \\\"JPY\\\" 5%7\"
 -- @
 instance forall src dst.
   ( KnownSymbol src, KnownSymbol dst
@@ -659,10 +637,6 @@ exchangeRateToRational = \(ExchangeRate r0) -> r0
 {-# INLINE exchangeRateToRational #-}
 
 -- | Safely construct an 'ExchangeRate' from a *positive* 'Rational' number.
---
--- @
--- 'exchangeRate' x   ==   'exchangeRate' ('negate' x)
--- @
 exchangeRate :: Rational -> Maybe (ExchangeRate src dst)
 exchangeRate = \r ->
   if denominator r /= 0 && r > 0
@@ -683,10 +657,8 @@ exchangeRate = \r ->
 -- would be the implementation of 'recip'.
 exchangeRateRecip :: ExchangeRate a b -> ExchangeRate b a
 exchangeRateRecip = \(ExchangeRate x) ->
-   -- This is safe, 'exchangeRate' guarantees that @x@ isn't zero.
-   ExchangeRate (1 / x)
-
-{-# INLINABLE exchangeRateRecip #-}
+   ExchangeRate (1 / x)   -- 'exchangeRate' guarantees that @x@ isn't zero.
+{-# INLINE exchangeRateRecip #-}
 
 -- | Apply the 'ExchangeRate' to the given @'Dense' src@ monetary value.
 --
@@ -701,7 +673,7 @@ exchangeRateRecip = \(ExchangeRate x) ->
 -- a 'Discrete' monetary value of @src@.
 exchange :: ExchangeRate src dst -> Dense src -> Dense dst
 exchange (ExchangeRate r) = \(Dense s) -> Dense (r * s)
-{-# INLINABLE exchange #-}
+{-# INLINE exchange #-}
 
 --------------------------------------------------------------------------------
 -- SomeDense
@@ -731,12 +703,12 @@ deriving instance Ord SomeDense
 -- | Currency name.
 someDenseCurrency :: SomeDense -> String
 someDenseCurrency = _someDenseCurrency
-{-# INLINABLE someDenseCurrency #-}
+{-# INLINE someDenseCurrency #-}
 
 -- | Currency unit amount.
 someDenseAmount :: SomeDense -> Rational
 someDenseAmount = _someDenseAmount
-{-# INLINABLE someDenseAmount #-}
+{-# INLINE someDenseAmount #-}
 
 -- | Build a 'SomeDense' from raw values.
 --
@@ -758,7 +730,7 @@ toSomeDense :: KnownSymbol currency => Dense currency -> SomeDense
 toSomeDense = \(Dense r0 :: Dense currency) ->
   let c = symbolVal (Proxy :: Proxy currency)
   in SomeDense c r0
-{-# INLINABLE toSomeDense #-}
+{-# INLINE toSomeDense #-}
 
 -- | Attempt to convert a 'SomeDense' to a 'Dense', provided you know the target
 -- @currency@.
@@ -818,17 +790,17 @@ deriving instance Ord SomeDiscrete
 -- | Currency name.
 someDiscreteCurrency :: SomeDiscrete -> String
 someDiscreteCurrency = _someDiscreteCurrency
-{-# INLINABLE someDiscreteCurrency #-}
+{-# INLINE someDiscreteCurrency #-}
 
 -- | Positive, non-zero.
 someDiscreteScale :: SomeDiscrete -> Rational
 someDiscreteScale = _someDiscreteScale
-{-# INLINABLE someDiscreteScale #-}
+{-# INLINE someDiscreteScale #-}
 
 -- | Amount of currency unit.
 someDiscreteAmount :: SomeDiscrete -> Integer
 someDiscreteAmount = _someDiscreteAmount
-{-# INLINABLE someDiscreteAmount #-}
+{-# INLINE someDiscreteAmount #-}
 
 -- | Internal. Build a 'SomeDiscrete' from raw values.
 --
@@ -937,17 +909,17 @@ deriving instance Ord SomeExchangeRate
 -- | Source currency name.
 someExchangeRateSrcCurrency :: SomeExchangeRate -> String
 someExchangeRateSrcCurrency = _someExchangeRateSrcCurrency
-{-# INLINABLE someExchangeRateSrcCurrency #-}
+{-# INLINE someExchangeRateSrcCurrency #-}
 
 -- | Destination currency name.
 someExchangeRateDstCurrency :: SomeExchangeRate -> String
 someExchangeRateDstCurrency = _someExchangeRateDstCurrency
-{-# INLINABLE someExchangeRateDstCurrency #-}
+{-# INLINE someExchangeRateDstCurrency #-}
 
 -- | Exchange rate. Positive, non-zero.
 someExchangeRateRate :: SomeExchangeRate -> Rational
 someExchangeRateRate = _someExchangeRateRate
-{-# INLINABLE someExchangeRateRate #-}
+{-# INLINE someExchangeRateRate #-}
 
 -- | Internal. Build a 'SomeExchangeRate' from raw values.
 --
@@ -1573,7 +1545,7 @@ storeContramapSize f = \case
 -- > 'denseToDecimal' 'Round' 'True' ('Just' \',\') \'.\' 2
 --      ('Proxy' :: 'Proxy' ('Scale' \"USD\" \"cent\"))
 --      ('dense' (123456 % 100) :: 'Dense' \"USD\")
--- Just \"+123,456.00\"
+-- 'Just' \"+123,456.00\"
 -- @
 --
 -- This function returns 'Nothing' if it is not possible to reliably render the
@@ -1594,12 +1566,13 @@ denseToDecimal
   -> Word8
   -- ^ Number of decimal numbers to render, if any.
   -> Proxy scale
-  -- ^ Scale used by the integer part of the decimal number. For example, a
-  -- when rendering render @'dense' (123 % 100) :: 'Dense' "USD"@ as a decimal number with
-  -- three decimal places, a scale of @1@ (i.e. @'Scale' \"USD\" \"dollar\"@)
-  -- would render @1@ as the integer part and @230@ as the fractional part,
-  -- whereas a scale of @100@ (i.e., @'Scale' \"USD\" \"cent\"@) would render
-  -- @123@ as the integer part and @000@ as the fractional part.
+  -- ^ Scale used by the integer part of the decimal number. For example, a when
+  -- rendering render @'dense' (123 % 100) :: 'Dense' "USD"@ as a decimal number
+  -- with three decimal places, a scale of @1@ (i.e. @'Scale' \"USD\"
+  -- \"dollar\"@) would render @1@ as the integer part and @230@ as the
+  -- fractional part, whereas a scale of @100@ (i.e., @'Scale' \"USD\"
+  -- \"cent\"@) would render @123@ as the integer part and @000@ as the
+  -- fractional part.
   -> Dense currency
   -- ^ The dense monetary amount to render.
   -> Maybe String
