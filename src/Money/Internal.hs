@@ -90,6 +90,7 @@ import Control.Monad ((<=<), guard, when)
 import qualified Data.Char as Char
 import Data.Constraint (Dict(Dict))
 import Data.Functor (($>))
+import Data.Foldable (for_)
 import qualified Data.List as List
 import Data.Monoid ((<>))
 import Data.Proxy (Proxy(..))
@@ -157,7 +158,7 @@ import qualified GHC.TypeLits as GHC
 -- then you end up with @USD 6.82@, which is again a value representable as USD
 -- cents. In other words, 'Dense' monetary values allow us to perform precise
 -- calculations deferring the conversion to a 'Discrete' monetary values as much
--- as posible. Once you are ready to aproximate a 'Dense' value to a 'Discrete'
+-- as posible. Once you are ready to approximate a 'Dense' value to a 'Discrete'
 -- value you can use one 'discreteFromDense'. Otherwise, using 'toRational' you
 -- can obtain a precise 'Rational' representation.
 --
@@ -1565,15 +1566,19 @@ storeContramapSize f = \case
 -- > 'denseToDecimal' 'Round' 'True' ('Just' \',\') \'.\' 2
 --      ('Proxy' :: 'Proxy' ('Scale' \"USD\" \"dollar\"))
 --      ('dense' (123456 % 100) :: 'Dense' \"USD\")
--- \"+1,234.56\"
+-- 'Just' \"+1,234.56\"
 -- @
 --
 -- @
 -- > 'denseToDecimal' 'Round' 'True' ('Just' \',\') \'.\' 2
 --      ('Proxy' :: 'Proxy' ('Scale' \"USD\" \"cent\"))
 --      ('dense' (123456 % 100) :: 'Dense' \"USD\")
--- \"+123,456.00\"
+-- Just \"+123,456.00\"
 -- @
+--
+-- This function returns 'Nothing' if it is not possible to reliably render the
+-- decimal string due to a bad choice of separators. That is, if the separators
+-- are digits or equal among themselves, this function returns 'Nothing'.
 denseToDecimal
   :: GoodScale scale
   => Approximation
@@ -1597,7 +1602,9 @@ denseToDecimal
   -- @123@ as the integer part and @000@ as the fractional part.
   -> Dense currency
   -- ^ The dense monetary amount to render.
-  -> String
+  -> Maybe String
+  -- ^ Returns 'Nothing' is the given separators are not acceptable (i.e., they
+  -- are digits, or they are equal).
 {-# INLINABLE denseToDecimal #-}
 denseToDecimal a plus ytsep dsep fdigs0 ps = \(Dense r0) ->
   rationalToDecimal a plus ytsep dsep fdigs0 (scale ps * r0)
@@ -1606,9 +1613,13 @@ denseToDecimal a plus ytsep dsep fdigs0 ps = \(Dense r0) ->
 --
 -- @
 -- > 'exchangeRateToDecimal' 'Round' 'True' ('Just' \',\') \'.\' 2
---       '<$>' ('exchangeRate' (123456 % 100) :: 'Maybe' ('ExchangeRate' \"USD\" \"EUR\"))
+--       '=<<' ('exchangeRate' (123456 % 100) :: 'Maybe' ('ExchangeRate' \"USD\" \"EUR\"))
 -- 'Just' \"1,234.56\"
 -- @
+--
+-- This function returns 'Nothing' if it is not possible to reliably render the
+-- decimal string due to a bad choice of separators. That is, if the separators
+-- are digits or equal among themselves, this function returns 'Nothing'.
 exchangeRateToDecimal
   :: Approximation
   -- ^ Approximation to use if necesary in order to fit the 'Dense' amount in
@@ -1622,11 +1633,18 @@ exchangeRateToDecimal
   -- ^ Number of decimal numbers to render, if any.
   -> ExchangeRate src dst
   -- ^ The 'ExchangeRate' to render.
-  -> String
+  -> Maybe String
+  -- ^ Returns 'Nothing' is the given separators are not acceptable (i.e., they
+  -- are digits, or they are equal).
 {-# INLINABLE exchangeRateToDecimal #-}
 exchangeRateToDecimal a ytsep dsep fdigs0 = \(ExchangeRate r0) ->
   rationalToDecimal a False ytsep dsep fdigs0 r0
 
+-- | Render a 'Rational' number as a decimal approximation.
+--
+-- This function returns 'Nothing' if it is not possible to reliably render the
+-- decimal string due to a bad choice of separators. That is, if the separators
+-- are digits or equal among themselves, this function returns 'Nothing'.
 rationalToDecimal
   :: Approximation
   -- ^ Approximation to use if necesary in order to fit the 'Dense' amount in
@@ -1642,9 +1660,14 @@ rationalToDecimal
   -- ^ Number of decimal numbers to render, if any.
   -> Rational
   -- ^ The dense monetary amount to render.
-  -> String
+  -> Maybe String
+  -- ^ Returns 'Nothing' is the given separators are not acceptable (i.e., they
+  -- are digits, or they are equal).
 {-# INLINABLE rationalToDecimal #-}
-rationalToDecimal a plus ytsep dsep fdigs0 = \r0 ->
+rationalToDecimal a plus ytsep dsep fdigs0 = \r0 -> do
+  for_ ytsep $ \tsep ->
+     guard (tsep /= dsep && not (Char.isDigit tsep))
+  guard (not (Char.isDigit dsep))
   -- this string-fu is not particularly efficient.
   let parts = approximate a (r0 * (10 ^ fdigs0)) :: Integer
       ipart = fromInteger (abs parts) `div` (10 ^ fdigs0) :: Natural
@@ -1652,14 +1675,14 @@ rationalToDecimal a plus ytsep dsep fdigs0 = \r0 ->
             | otherwise = drop (length (show ipart)) (show (abs parts))
       itext = maybe (show ipart) (renderThousands ipart) ytsep :: String
       fpad0 = List.replicate (fromIntegral fdigs0 - length ftext) '0' :: String
-  in mconcat
-       [ if | parts < 0 -> "-"
-            | plus && parts > 0 -> "+"
-            | otherwise -> ""
-       , itext
-       , if | fdigs0 > 0 -> dsep : ftext <> fpad0
-            | otherwise -> ""
-       ]
+  Just $ mconcat
+    [ if | parts < 0 -> "-"
+         | plus && parts > 0 -> "+"
+         | otherwise -> ""
+    , itext
+    , if | fdigs0 > 0 -> dsep : ftext <> fpad0
+         | otherwise -> ""
+    ]
 
 
 -- | Render a 'Natural' number with thousand markers.
@@ -1766,24 +1789,24 @@ rationalFromDecimalP
   -- The separator can't be a digit or control character. If it is, then parsing
   -- will always fail.
   -> ReadP.ReadP Rational
-rationalFromDecimalP yst sf = do
-   case yst of
-     Just st | st == sf || Char.isDigit st -> empty
-     _ -> guard (not (Char.isDigit sf))
+rationalFromDecimalP ytsep dsep = do
+   for_ ytsep $ \tsep ->
+      guard (tsep /= dsep && not (Char.isDigit tsep))
+   guard (not (Char.isDigit dsep))
    sig :: Rational -> Rational <-
      (ReadP.char '-' $> negate) <|>
      (ReadP.char '+' $> id) <|>
      (pure id)
-   ipart :: String <- case yst of
+   ipart :: String <- case ytsep of
      Nothing -> ReadP.munch1 Char.isDigit
-     Just st -> mappend
+     Just tsep -> mappend
        <$> (ReadP.count 3 (ReadP.satisfy Char.isDigit) <|>
             ReadP.count 2 (ReadP.satisfy Char.isDigit) <|>
             ReadP.count 1 (ReadP.satisfy Char.isDigit))
        <*> (fmap concat $ ReadP.many
-              (ReadP.char st *> ReadP.count 3 (ReadP.satisfy Char.isDigit)))
+              (ReadP.char tsep *> ReadP.count 3 (ReadP.satisfy Char.isDigit)))
    yfpart :: Maybe String <-
-     (ReadP.char sf *> fmap Just (ReadP.munch1 Char.isDigit) <* ReadP.eof) <|>
+     (ReadP.char dsep *> fmap Just (ReadP.munch1 Char.isDigit) <* ReadP.eof) <|>
      (ReadP.eof $> Nothing)
    pure $! sig $ case yfpart of
      Nothing -> fromInteger (read ipart)

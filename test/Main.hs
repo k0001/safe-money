@@ -110,7 +110,8 @@ genDecimal = do
   digs :: Word8 <- QC.arbitrary
   r :: Rational <- (%) <$> QC.arbitrary <*> QC.suchThat QC.arbitrary (/= 0)
   (yts, ds) <- genDecimalSeps
-  pure (Money.rationalToDecimal aprox plus yts ds digs r, yts, ds)
+  Just dec <- pure (Money.rationalToDecimal aprox plus yts ds digs r)
+  pure (dec, yts, ds)
 
 -- | Generates valid separators for decimal representations (see genDecimal).
 genDecimalSeps :: QC.Gen (Maybe Char, Char)
@@ -394,14 +395,14 @@ testRationalToDecimal =
 
     render :: Money.Approximation -> Rational -> [String]
     render a r =
-      [ Money.rationalToDecimal a False Nothing    '.' 2 r  --  0
-      , Money.rationalToDecimal a False (Just ',') '.' 2 r  --  1
-      , Money.rationalToDecimal a True  Nothing    '.' 2 r  --  2
-      , Money.rationalToDecimal a True  (Just ',') '.' 2 r  --  3
-      , Money.rationalToDecimal a False Nothing    '.' 0 r  --  8
-      , Money.rationalToDecimal a False (Just ',') '.' 0 r  --  9
-      , Money.rationalToDecimal a True  Nothing    '.' 0 r  -- 10
-      , Money.rationalToDecimal a True  (Just ',') '.' 0 r  -- 11
+      [ fromJust $ Money.rationalToDecimal a False Nothing    '.' 2 r  --  0
+      , fromJust $ Money.rationalToDecimal a False (Just ',') '.' 2 r  --  1
+      , fromJust $ Money.rationalToDecimal a True  Nothing    '.' 2 r  --  2
+      , fromJust $ Money.rationalToDecimal a True  (Just ',') '.' 2 r  --  3
+      , fromJust $ Money.rationalToDecimal a False Nothing    '.' 0 r  --  8
+      , fromJust $ Money.rationalToDecimal a False (Just ',') '.' 0 r  --  9
+      , fromJust $ Money.rationalToDecimal a True  Nothing    '.' 0 r  -- 10
+      , fromJust $ Money.rationalToDecimal a True  (Just ',') '.' 0 r  -- 11
       ]
 
 testRationalFromDecimal :: Tasty.TestTree
@@ -425,7 +426,7 @@ testRationalFromDecimal =
       in QC.forAll gen $ \( (yst :: Maybe Char, sd :: Char)
                        , (r :: Rational, plus :: Bool, digs :: Word8,
                           aprox :: Money.Approximation) ) ->
-           let dec = Money.rationalToDecimal aprox plus yst sd digs r
+           let Just dec = Money.rationalToDecimal aprox plus yst sd digs r
                Just r' = Money.rationalFromDecimal yst sd dec
            in 1 > abs (abs r - abs r')
   ]
@@ -470,15 +471,11 @@ testDense pc =
       in QC.forAll gen $ \( (yst :: Maybe Char, sd :: Char)
                           , (dns :: Money.Dense currency, plus :: Bool,
                              digs :: Word8, aprox :: Money.Approximation) ) ->
-            let dnsd1 = Money.denseToDecimal aprox plus yst sd digs
-                         (Proxy :: Proxy '(1,1)) dns
-                dnsd100 = Money.denseToDecimal aprox plus yst sd digs
-                             (Proxy :: Proxy '(100,1)) dns
-                rd1 = Money.rationalToDecimal aprox plus yst sd digs
-                        (toRational dns)
-                rd100 = Money.rationalToDecimal aprox plus yst sd digs
-                          (toRational dns * 100)
-            in (dnsd1 === rd1) .&&. (dnsd100 === rd100)
+            let ydnsd1 = Money.denseToDecimal aprox plus yst sd digs (Proxy :: Proxy '(1,1)) dns
+                ydnsd100 = Money.denseToDecimal aprox plus yst sd digs (Proxy :: Proxy '(100,1)) dns
+                yrd1 = Money.rationalToDecimal aprox plus yst sd digs (toRational dns)
+                yrd100 = Money.rationalToDecimal aprox plus yst sd digs (toRational dns * 100)
+            in (ydnsd1 === yrd1) .&&. (ydnsd100 === yrd100)
 
   , QC.testProperty "denseFromDecimal: Same as rationalFromDecimal" $
       QC.forAll genDecimal $ \(dec :: String, yts :: Maybe Char, ds :: Char) ->
