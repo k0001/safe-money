@@ -364,7 +364,7 @@ deriving instance GoodScale scale => GHC.Generic (Discrete' currency scale)
 -- That is:
 --
 -- @
--- 'discrete' (1 '%' 4) '*' 'discrete' (1 '%' 2)  ==  'discrete' (1 '%' 8)
+-- 'discrete' 2 '*' 'discrete' 4  ==  'discrete' 8
 -- @
 --
 -- In fact, if you compiled this library with support for
