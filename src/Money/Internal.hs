@@ -1658,15 +1658,13 @@ storeContramapSize f = \case
 -- manner.
 --
 -- @
--- > 'denseToDecimal' 'Round' 'True' ('Just' \',\') \'.\' 2
---      ('Proxy' :: 'Proxy' ('Scale' \"USD\" \"dollar\"))
+-- > 'denseToDecimal' 'Round' 'True' ('Just' \',\') \'.\' 2 1
 --      ('dense'' (123456 '%' 100) :: 'Dense' \"USD\")
 -- Just \"+1,234.56\"
 -- @
 --
 -- @
--- > 'denseToDecimal' 'Round' 'True' ('Just' \',\') \'.\' 2
---      ('Proxy' :: 'Proxy' ('Scale' \"USD\" \"cent\"))
+-- > 'denseToDecimal' 'Round' 'True' ('Just' \',\') \'.\' 2 100
 --      ('dense'' (123456 '%' 100) :: 'Dense' \"USD\")
 -- Just \"+123,456.00\"
 -- @
@@ -1675,8 +1673,7 @@ storeContramapSize f = \case
 -- decimal string due to a bad choice of separators. That is, if the separators
 -- are digits or equal among themselves, this function returns 'Nothing'.
 denseToDecimal
-  :: GoodScale scale
-  => Approximation
+  :: Approximation
   -- ^ Approximation to use if necesary in order to fit the 'Dense' amount in
   -- as many decimal numbers as requested.
   -> Bool
@@ -1684,26 +1681,42 @@ denseToDecimal
   -> Maybe Char
   -- ^ Thousands separator for the integer part, if any (i.e., the @\',\'@ in
   -- @1,234.56789@).
+  --
+  -- If the given separator is a digit, or if it is equal to the decimal
+  -- separator, then this functions returns 'Nothing'.
   -> Char
-  -- ^ Decimal separator (i.e., the @\'.\'@ in @1,234.56789@)
+  -- ^ Decimal separator (i.e., the @\'.\'@ in @1,234.56789@).
+  --
+  -- If the given separator is a digit, or if it is equal to the thousands
+  -- separator, then this functions returns 'Nothing'.
   -> Word8
   -- ^ Number of decimal numbers to render, if any.
-  -> Proxy scale
-  -- ^ Scale used by the integer part of the decimal number. For example, a when
-  -- rendering render @'dense'' (123 '%' 100) :: 'Dense' "USD"@ as a decimal
-  -- number with three decimal places, a scale of @1@ (i.e. @'Scale' \"USD\"
-  -- \"dollar\"@) would render @1@ as the integer part and @230@ as the
-  -- fractional part, whereas a scale of @100@ (i.e., @'Scale' \"USD\"
-  -- \"cent\"@) would render @123@ as the integer part and @000@ as the
+  -> Rational
+  -- ^ Scale used by the integer part of the decimal number. This is useful if
+  -- you want to render a “number of cents” rather than a “number of dollars”,
+  -- for example. Set this to @1@ if you don't care.
+  --
+  -- For example, when rendering render @'dense'' (123 '%' 100) :: 'Dense'
+  -- "USD"@ as a decimal number with three decimal places, a scale of @1@ (i.e.
+  -- @'Scale' \"USD\" \"dollar\"@) would render @1@ as the integer part and
+  -- @230@ as the fractional part, whereas a scale of @100@ (i.e., @'Scale'
+  -- \"USD\" \"cent\"@) would render @123@ as the integer part and @000@ as the
   -- fractional part.
+  --
+  -- You can easily obtain the scale for a particular currency and unit
+  -- combination using the 'scale' function. Otherwise, you are free to pass in
+  -- any other /positive/ 'Rational' number.
+  --
+  -- If a zero or negative scale is given, then this function returns 'Nothing'.
   -> Dense currency
   -- ^ The dense monetary amount to render.
   -> Maybe String
   -- ^ Returns 'Nothing' is the given separators are not acceptable (i.e., they
   -- are digits, or they are equal).
 {-# INLINABLE denseToDecimal #-}
-denseToDecimal a plus ytsep dsep fdigs0 ps = \(Dense r0) ->
-  rationalToDecimal a plus ytsep dsep fdigs0 (scale ps * r0)
+denseToDecimal a plus ytsep dsep fdigs0 scal = \(Dense r0) -> do
+  guard (scal > 0)
+  rationalToDecimal a plus ytsep dsep fdigs0 (scal * r0)
 
 -- | Render a 'ExchangeRate' as a decimal number in a potentially lossy manner.
 --
