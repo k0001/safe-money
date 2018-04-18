@@ -1,20 +1,20 @@
 # Version 0.5
 
-* /COMPILER ASSISTED BREAKING CHANGE/ The `round`, `floor`, `ceiling` and
+* _COMPILER ASSISTED BREAKING CHANGE_ The `round`, `floor`, `ceiling` and
   `truncate` functions were replaced by a single `discreteFromDense` function
   taking an argument of type `Approximation` (`Round`, `Floor`, `Ceiling` or
   `Truncate`) as an argument.
 
-* /COMPILER ASSISTED BREAKING CHANGE/ The `fromDiscrete` function was
+* _COMPILER ASSISTED BREAKING CHANGE_ The `fromDiscrete` function was
   renamed to `denseFromDiscrete`.
 
-* /COMPILER ASSISTED BREAKING CHANGE/ The `fromExchangeRate` function was
+* _COMPILER ASSISTED BREAKING CHANGE_ The `fromExchangeRate` function was
   renamed to `exchangeRateToRational`.
 
-* /COMPILER ASSISTED BREAKING CHANGE/ The `flipExchangeRate` function was
+* _COMPILER ASSISTED BREAKING CHANGE_ The `flipExchangeRate` function was
   renamed to `exchangeRateRecip`.
 
-* /COMPILER ASSISTED BREAKING CHANGE/ The `Dense` is not an instance of
+* _COMPILER ASSISTED BREAKING CHANGE_ The `Dense` is not an instance of
   `Fractional` anymore because `recip` and `/` could potentially crash.
 
 * Introduced new functions for rendering and parsing decimal reperesentations
@@ -58,16 +58,16 @@
   the rendered JSON array anymore. So, if you were manually relying on the
   `ToJSON` instance, please update your code.
 
-* /COMPILER ASSISTED BREAKING CHANGE/ Changed the `Rep` suffix for a `Some`
+* _COMPILER ASSISTED BREAKING CHANGE_ Changed the `Rep` suffix for a `Some`
   prefix Everywhere.  For example, `DenseRep` was renamed to `SomeDense`.
 
-* /COMPILER ASSISTED BREAKING CHANGE/ Replaced the
+* _COMPILER ASSISTED BREAKING CHANGE_ Replaced the
   `someDenseAmountNumerator` and `someDenseAmountDenominator` `Integers` with a
   single `someDenseAmount` `Rational` number. Similarly for `someDiscreteScale`
   and `someExchangeRateRate`. The `mkSomeDense`, `someDiscreteScale` and
   `mkSomeDense` also take a `Rational` now.
 
-* /COMPILER ASSISTED BREAKING CHANGE/ The `truncate`, `floor`, `celing` and
+* _COMPILER ASSISTED BREAKING CHANGE_ The `truncate`, `floor`, `celing` and
   `round` functions now return just `0` as a reminder if there's no significant
   reminder, instead of `Nothing`.
 
@@ -83,21 +83,21 @@
 
 # Version 0.3
 
-* /COMPILER ASSISTED BREAKING CHANGE/ The `Data.Money` module was renamed to
+* _COMPILER ASSISTED BREAKING CHANGE_ The `Data.Money` module was renamed to
   `Money`.
 
-* /COMPILER ASSISTED BREAKING CHANGE/ The `Data.Money.Internal` module is not
+* _COMPILER ASSISTED BREAKING CHANGE_ The `Data.Money.Internal` module is not
   exposed anymore. All of its contents are now exported from the `Money` module.
 
-* /COMPILER ASSISTED BREAKING CHANGE/ Renamed `discreteRep` to
+* _COMPILER ASSISTED BREAKING CHANGE_ Renamed `discreteRep` to
   `toDiscreteRep`.
 
-* /COMPILER ASSISTED BREAKING CHANGE/ Renamed `denseRep` to `toDenseRep`.
+* _COMPILER ASSISTED BREAKING CHANGE_ Renamed `denseRep` to `toDenseRep`.
 
-* /COMPILER ASSISTED BREAKING CHANGE/ Renamed `exchangeRateRep` to
+* _COMPILER ASSISTED BREAKING CHANGE_ Renamed `exchangeRateRep` to
   `toExchangeRateRep`.
 
-* /COMPILER ASSISTED BREAKING CHANGE/ Renamed Iceleandic currency `"eyir"` to
+* _COMPILER ASSISTED BREAKING CHANGE_ Renamed Iceleandic currency `"eyir"` to
   `"eyrir"`
 
 * Remove upper bound constraints from all dependencies except `base`.
