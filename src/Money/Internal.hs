@@ -142,6 +142,7 @@ import qualified Data.VectorSpace as VS
 
 #ifdef HAS_xmlbf
 import qualified Xmlbf
+import qualified Data.Text as T
 #endif
 
 --------------------------------------------------------------------------------

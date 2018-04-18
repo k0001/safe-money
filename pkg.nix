@@ -19,7 +19,7 @@ flags' =
     xmlbf = true;
   } // flags;
 extraDeps =
-  lib.optionals (flags'.aeson) [ aeson ] ++
+  lib.optionals (flags'.aeson) [ aeson text ] ++
   lib.optionals (flags'.binary) [ binary ] ++
   lib.optionals (flags'.cereal) [ cereal ] ++
   lib.optionals (flags'.deepseq) [ deepseq ] ++

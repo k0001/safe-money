@@ -39,7 +39,7 @@ library
     Money.Internal
 
   if flag(aeson)
-    build-depends: aeson (>=0.9)
+    build-depends: aeson (>=0.9), text
     cpp-options: -DHAS_aeson
   if flag(binary)
     build-depends: binary (>=0.7)
@@ -81,7 +81,7 @@ test-suite test
     tasty-quickcheck
 
   if flag(aeson)
-    build-depends: aeson
+    build-depends: aeson, text
     cpp-options: -DHAS_aeson
   if flag(binary)
     build-depends: binary
