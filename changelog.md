@@ -1,20 +1,20 @@
 # Version 0.5
 
-* _COMPILER ASSISTED BREAKING CHANGE_ The `round`, `floor`, `ceiling` and
+* _COMPILER ASSISTED BREAKING CHANGE_. The `round`, `floor`, `ceiling` and
   `truncate` functions were replaced by a single `discreteFromDense` function
   taking an argument of type `Approximation` (`Round`, `Floor`, `Ceiling` or
   `Truncate`) as an argument.
 
-* _COMPILER ASSISTED BREAKING CHANGE_ The `fromDiscrete` function was
+* _COMPILER ASSISTED BREAKING CHANGE_. The `fromDiscrete` function was
   renamed to `denseFromDiscrete`.
 
-* _COMPILER ASSISTED BREAKING CHANGE_ The `fromExchangeRate` function was
+* _COMPILER ASSISTED BREAKING CHANGE_. The `fromExchangeRate` function was
   renamed to `exchangeRateToRational`.
 
-* _COMPILER ASSISTED BREAKING CHANGE_ The `flipExchangeRate` function was
+* _COMPILER ASSISTED BREAKING CHANGE_. The `flipExchangeRate` function was
   renamed to `exchangeRateRecip`.
 
-* _COMPILER ASSISTED BREAKING CHANGE_ The `Dense` is not an instance of
+* _COMPILER ASSISTED BREAKING CHANGE_. The `Dense` is not an instance of
   `Fractional` anymore because `recip` and `/` could potentially crash.
 
 * Introduced new functions for rendering and parsing decimal reperesentations
@@ -49,7 +49,7 @@
 
 # Version 0.4
 
-* **BREAKING CHANGE REQUIRING HUMAN INTERVENTION** The JSON serializations for
+* **BREAKING CHANGE REQUIRING HUMAN INTERVENTION**. The JSON serializations for
   all of `Dense`, `SomeDense`, `Discrete`, `SomeDiscrete`, `ExchangeRate` and
   `SomeExchangeRate` changed. The `FromJSON` instances are backwards compatible
   with the old serializations, but the `ToJSON` instances will only generate the
@@ -58,16 +58,16 @@
   the rendered JSON array anymore. So, if you were manually relying on the
   `ToJSON` instance, please update your code.
 
-* _COMPILER ASSISTED BREAKING CHANGE_ Changed the `Rep` suffix for a `Some`
+* _COMPILER ASSISTED BREAKING CHANGE_. Changed the `Rep` suffix for a `Some`
   prefix Everywhere.  For example, `DenseRep` was renamed to `SomeDense`.
 
-* _COMPILER ASSISTED BREAKING CHANGE_ Replaced the
+* _COMPILER ASSISTED BREAKING CHANGE_. Replaced the
   `someDenseAmountNumerator` and `someDenseAmountDenominator` `Integers` with a
   single `someDenseAmount` `Rational` number. Similarly for `someDiscreteScale`
   and `someExchangeRateRate`. The `mkSomeDense`, `someDiscreteScale` and
   `mkSomeDense` also take a `Rational` now.
 
-* _COMPILER ASSISTED BREAKING CHANGE_ The `truncate`, `floor`, `celing` and
+* _COMPILER ASSISTED BREAKING CHANGE_. The `truncate`, `floor`, `celing` and
   `round` functions now return just `0` as a reminder if there's no significant
   reminder, instead of `Nothing`.
 
@@ -83,21 +83,21 @@
 
 # Version 0.3
 
-* _COMPILER ASSISTED BREAKING CHANGE_ The `Data.Money` module was renamed to
+* _COMPILER ASSISTED BREAKING CHANGE_. The `Data.Money` module was renamed to
   `Money`.
 
-* _COMPILER ASSISTED BREAKING CHANGE_ The `Data.Money.Internal` module is not
+* _COMPILER ASSISTED BREAKING CHANGE_. The `Data.Money.Internal` module is not
   exposed anymore. All of its contents are now exported from the `Money` module.
 
-* _COMPILER ASSISTED BREAKING CHANGE_ Renamed `discreteRep` to
+* _COMPILER ASSISTED BREAKING CHANGE_. Renamed `discreteRep` to
   `toDiscreteRep`.
 
-* _COMPILER ASSISTED BREAKING CHANGE_ Renamed `denseRep` to `toDenseRep`.
+* _COMPILER ASSISTED BREAKING CHANGE_. Renamed `denseRep` to `toDenseRep`.
 
-* _COMPILER ASSISTED BREAKING CHANGE_ Renamed `exchangeRateRep` to
+* _COMPILER ASSISTED BREAKING CHANGE_. Renamed `exchangeRateRep` to
   `toExchangeRateRep`.
 
-* _COMPILER ASSISTED BREAKING CHANGE_ Renamed Iceleandic currency `"eyir"` to
+* _COMPILER ASSISTED BREAKING CHANGE_. Renamed Iceleandic currency `"eyir"` to
   `"eyrir"`
 
 * Remove upper bound constraints from all dependencies except `base`.
