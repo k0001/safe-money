@@ -392,7 +392,15 @@ data Approximation
   -- ^ Approximate @x@ to the nearest integer greater than or equal to @x@.
   | Truncate
   -- ^ Approximate @x@ to the nearest integer betwen @0@ and @x@, inclusive.
-  deriving (Eq, Show)
+  deriving (Eq, Ord, Show, Read, GHC.Generic)
+
+#ifdef HAS_deepseq
+instance NFData Approximation
+#endif
+
+#ifdef HAS_hashable
+instance Hashable Approximation
+#endif
 
 approximate :: Approximation -> Rational -> Integer
 {-# INLINE approximate #-}
@@ -537,12 +545,12 @@ mkGoodScale =
 --
 -- @
 -- > 'scale' ('Proxy' :: 'Proxy' ('Scale' \"USD\" \"cent\"))
--- 100 % 1
+-- 100 '%' 1
 -- @
 --
 -- @
 -- > 'scale' (x :: 'Discrete' \"USD\" \"cent\")
--- 100 % 1
+-- 100 '%' 1
 -- @
 --
 -- The returned 'Rational' is statically guaranteed to be a positive number.
@@ -560,7 +568,7 @@ scale = \_ -> natVal (Proxy :: Proxy (Fst scale)) %
 -- then we can represent this situaion using:
 --
 -- @
--- 'exchangeRate' (12345 % 10000) :: 'Maybe' ('ExchangeRate' \"USD\" \"GBP\")
+-- 'exchangeRate' (12345 '%' 10000) :: 'Maybe' ('ExchangeRate' \"USD\" \"GBP\")
 -- @
 newtype ExchangeRate (src :: Symbol) (dst :: Symbol) = ExchangeRate Rational
   deriving (Eq, Ord, GHC.Generic)
@@ -603,7 +611,7 @@ instance Category ExchangeRate where
 
 -- |
 -- @
--- > 'show' ('exchangeRate' (5 % 7) :: 'Maybe' ('ExchangeRate' \"USD\" \"JPY\"))@
+-- > 'show' ('exchangeRate' (5 '%' 7) :: 'Maybe' ('ExchangeRate' \"USD\" \"JPY\"))@
 -- 'Just' \"ExchangeRate \\\"USD\\\" \\\"JPY\\\" 5%7\"
 -- @
 instance forall src dst.
@@ -1212,7 +1220,7 @@ instance Ser.Serialise SomeExchangeRate where
 #ifdef HAS_aeson
 -- | Compatible with 'SomeDense'
 --
--- Example rendering @'dense' (2 % 3) :: 'Dense' \"BTC\"@:
+-- Example rendering @'dense'' (2 '%' 3) :: 'Dense' \"BTC\"@:
 --
 -- @
 -- [\"BTC\", 2, 3]
@@ -1253,7 +1261,7 @@ instance Ae.FromJSON SomeDense where
 
 -- | Compatible with 'SomeDiscrete'
 --
--- Example rendering @43 :: 'Discrete' \"BTC\" \"satoshi\"@:
+-- Example rendering @'discrete' 43 :: 'Discrete' \"BTC\" \"satoshi\"@:
 --
 -- @
 -- [\"BTC\", 100000000, 1, 43]
@@ -1299,7 +1307,7 @@ instance Ae.FromJSON SomeDiscrete where
 -- | Compatible with 'SomeExchangeRate'
 --
 -- Example rendering an 'ExchangeRate' constructed with
--- @'exchangeRate' (5 % 7) :: 'ExchangeRate' \"USD\" \"JPY\"@
+-- @'exchangeRate' (5 '%' 7) :: 'ExchangeRate' \"USD\" \"JPY\"@
 --
 -- @
 -- [\"USD\", \"JPY\", 5, 7]
@@ -1349,7 +1357,7 @@ instance Ae.FromJSON SomeExchangeRate where
 
 -- | Compatible with 'SomeDense'
 --
--- Example rendering @'dense' (2 % 3) :: 'Dense' \"BTC\"@:
+-- Example rendering @'dense' (2 '%' 3) :: 'Dense' \"BTC\"@:
 --
 -- @
 -- \<money-dense c=\"BTC\" n=\"2\" d=\"3\"/>
@@ -1381,7 +1389,7 @@ instance Xmlbf.FromXml SomeDense where
 
 -- | Compatible with 'SomeDiscrete'
 --
--- Example rendering @43 :: 'Discrete' \"BTC\" \"satoshi\"@:
+-- Example rendering @'discrete' 43 :: 'Discrete' \"BTC\" \"satoshi\"@:
 --
 -- @
 -- \<money-discrete c=\"BTC\" n=\"100000000\" d=\"1\" a=\"43\"/>
@@ -1420,7 +1428,7 @@ instance Xmlbf.FromXml SomeDiscrete where
 -- | Compatible with 'SomeExchangeRate'
 --
 -- Example rendering an 'ExchangeRate' constructed with
--- @'exchangeRate' (5 % 7) :: 'ExchangeRate' \"USD\" \"JPY\"@
+-- @'exchangeRate' (5 '%' 7) :: 'ExchangeRate' \"USD\" \"JPY\"@
 --
 -- @
 -- \<exchange-rate src=\"USD\" dst=\"JPY\" n=\"5\" d=\"7\"/>
@@ -1537,14 +1545,14 @@ storeContramapSize f = \case
 -- @
 -- > 'denseToDecimal' 'Round' 'True' ('Just' \',\') \'.\' 2
 --      ('Proxy' :: 'Proxy' ('Scale' \"USD\" \"dollar\"))
---      ('dense' (123456 % 100) :: 'Dense' \"USD\")
+--      ('dense'' (123456 '%' 100) :: 'Dense' \"USD\")
 -- 'Just' \"+1,234.56\"
 -- @
 --
 -- @
 -- > 'denseToDecimal' 'Round' 'True' ('Just' \',\') \'.\' 2
 --      ('Proxy' :: 'Proxy' ('Scale' \"USD\" \"cent\"))
---      ('dense' (123456 % 100) :: 'Dense' \"USD\")
+--      ('dense'' (123456 '%' 100) :: 'Dense' \"USD\")
 -- 'Just' \"+123,456.00\"
 -- @
 --
@@ -1567,8 +1575,8 @@ denseToDecimal
   -- ^ Number of decimal numbers to render, if any.
   -> Proxy scale
   -- ^ Scale used by the integer part of the decimal number. For example, a when
-  -- rendering render @'dense' (123 % 100) :: 'Dense' "USD"@ as a decimal number
-  -- with three decimal places, a scale of @1@ (i.e. @'Scale' \"USD\"
+  -- rendering render @'dense'' (123 '%' 100) :: 'Dense' "USD"@ as a decimal
+  -- number with three decimal places, a scale of @1@ (i.e. @'Scale' \"USD\"
   -- \"dollar\"@) would render @1@ as the integer part and @230@ as the
   -- fractional part, whereas a scale of @100@ (i.e., @'Scale' \"USD\"
   -- \"cent\"@) would render @123@ as the integer part and @000@ as the
@@ -1586,7 +1594,7 @@ denseToDecimal a plus ytsep dsep fdigs0 ps = \(Dense r0) ->
 --
 -- @
 -- > 'exchangeRateToDecimal' 'Round' 'True' ('Just' \',\') \'.\' 2
---       '=<<' ('exchangeRate' (123456 % 100) :: 'Maybe' ('ExchangeRate' \"USD\" \"EUR\"))
+--       '=<<' ('exchangeRate' (123456 '%' 100) :: 'Maybe' ('ExchangeRate' \"USD\" \"EUR\"))
 -- 'Just' \"1,234.56\"
 -- @
 --

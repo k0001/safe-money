@@ -17,7 +17,10 @@
 --
 -- This module offers plenty of documentation, but for a deep explanation of
 -- how all of the pieces fit together, please read
--- https://ren.zone/articles/safe-money
+-- <https://ren.zone/articles/safe-money>. Notice, however, that this library
+-- has changed a bit since that article was written. You can always see the
+-- [change log](https://github.com/k0001/safe-money/blob/master/changelog.md) to
+-- understand what has changed.
 module Money
  ( -- * Dense monetary values
    I.Dense
