@@ -45,6 +45,11 @@ import qualified Codec.Serialise as Ser
 import qualified Data.Store as Store
 #endif
 
+#ifdef HAS_vector_space
+import qualified Data.AdditiveGroup as AG
+import qualified Data.VectorSpace as VS
+#endif
+
 #ifdef HAS_xmlbf
 import qualified Xmlbf
 import qualified Data.Text as Text
@@ -483,6 +488,24 @@ testDense pc =
              Just dns = Money.denseFromDecimal yts ds dec
          in r === toRational (dns :: Money.Dense currency)
 
+#ifdef HAS_vector_space
+  , HU.testCase "AdditiveGroup: zeroV" $
+      (AG.zeroV :: Money.Dense currency) @?= Money.dense' (0%1)
+  , QC.testProperty "AdditiveGroup: negateV" $
+      QC.forAll QC.arbitrary $ \(x :: Money.Dense currency) ->
+         AG.negateV x === negate x
+  , QC.testProperty "AdditiveGroup: ^+^" $
+      QC.forAll QC.arbitrary $ \(x :: Money.Dense currency, y) ->
+         x AG.^+^ y === x + y
+  , QC.testProperty "AdditiveGroup: ^-^" $
+      QC.forAll QC.arbitrary $ \(x :: Money.Dense currency, y) ->
+         x AG.^-^ y === x - y
+  , QC.testProperty "VectorSpace: *^" $
+      QC.forAll QC.arbitrary $ \(x :: Money.Dense currency, y) ->
+         (toRational x VS.*^ y === x * y) .&&.
+         (toRational y VS.*^ x === x * y)
+#endif
+
 #ifdef HAS_aeson
   , QC.testProperty "Aeson encoding roundtrip" $
       QC.forAll QC.arbitrary $ \(x :: Money.Dense currency) ->
@@ -655,6 +678,24 @@ testDiscrete pc pu =
   , QC.testProperty "discreteCurrency" $
       QC.forAll QC.arbitrary $ \(x :: Money.Discrete currency unit) ->
         Money.discreteCurrency x === symbolVal pc
+
+#ifdef HAS_vector_space
+  , HU.testCase "AdditiveGroup: zeroV" $
+      (AG.zeroV :: Money.Discrete currency unit) @?= Money.discrete 0
+  , QC.testProperty "AdditiveGroup: negateV" $
+      QC.forAll QC.arbitrary $ \(x :: Money.Discrete currency unit) ->
+         AG.negateV x === negate x
+  , QC.testProperty "AdditiveGroup: ^+^" $
+      QC.forAll QC.arbitrary $ \(x :: Money.Discrete currency unit, y) ->
+         x AG.^+^ y === x + y
+  , QC.testProperty "AdditiveGroup: ^-^" $
+      QC.forAll QC.arbitrary $ \(x :: Money.Discrete currency unit, y) ->
+         x AG.^-^ y === x - y
+  , QC.testProperty "VectorSpace: *^" $
+      QC.forAll QC.arbitrary $ \(x :: Money.Discrete currency unit, y) ->
+         (toInteger x VS.*^ y === x * y) .&&.
+         (toInteger y VS.*^ x === x * y)
+#endif
 
 #ifdef HAS_aeson
   , QC.testProperty "Aeson encoding roundtrip" $

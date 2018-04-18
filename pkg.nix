@@ -1,6 +1,7 @@
 { mkDerivation, stdenv, ghc
 , base, bytestring, constraints, tasty, tasty-hunit, tasty-quickcheck
 , binary, aeson, cereal, deepseq, hashable, serialise, store, xmlbf, text
+, vector-space
 , flags ? {}
 }:
 
@@ -14,6 +15,7 @@ flags' =
     hashable = true;
     serialise = true;
     store = true;
+    vector-space = true;
     xmlbf = true;
   } // flags;
 extraDeps =
@@ -24,6 +26,7 @@ extraDeps =
   lib.optionals (flags'.hashable) [ hashable ] ++
   lib.optionals (flags'.serialise) [ serialise ] ++
   lib.optionals (flags'.store) [ store ] ++
+  lib.optionals (flags'.vector-space) [ vector-space ] ++
   lib.optionals (flags'.xmlbf) [ xmlbf text ];
 
 in mkDerivation rec {

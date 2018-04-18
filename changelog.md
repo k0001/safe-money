@@ -22,6 +22,11 @@
   `denseToDecimal`, `discreteFromDecimal`, `exchangeRateFromDecimal`,
   `exchangeRateToDecimal`.
 
+* Introduced optional `AdditiveGroup` and `VectorSpace` group instances for
+  `Dense` and `Discrete`. These type-classes come from the `vector-space`
+  library and they can be enabled or disabled via the `vector-space` Cabal flag,
+  which is enabled by default.
+
 * Introduced `discrete` constructor which behaves just like `fromInteger`.
 
 * Introduced the `dense'` constructor as an unsafe but convenient version of

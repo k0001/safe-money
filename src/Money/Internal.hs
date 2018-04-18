@@ -135,6 +135,11 @@ import qualified Codec.Serialise as Ser
 import qualified Data.Store as Store
 #endif
 
+#ifdef HAS_vector_space
+import qualified Data.AdditiveGroup as AG
+import qualified Data.VectorSpace as VS
+#endif
+
 #ifdef HAS_xmlbf
 import qualified Xmlbf
 #endif
@@ -158,7 +163,8 @@ import qualified Xmlbf
 -- 'discreteFromDense'. Otherwise, using 'toRational' you can obtain a
 -- precise 'Rational' representation.
 
--- Construct 'Dense' monetary values using 'dense'.
+-- Construct 'Dense' monetary values using 'dense', 'dense'',
+-- 'denseFromDiscrete', 'denseFromDecimal'.
 --
 -- /WARNING/ if you want to treat a dense monetary value as a /Real/ number
 -- like 'Float' or 'Double', then you are on your own. We can only
@@ -166,7 +172,44 @@ import qualified Xmlbf
 -- convert back and forth betwen the 'Rational' representation for 'Dense'
 -- and your (likely lossy) representation for /Real/ numbers.
 newtype Dense (currency :: Symbol) = Dense Rational
-  deriving (Eq, Ord, Num, Real, GHC.Generic)
+  deriving (Eq, Ord, Real, GHC.Generic)
+
+-- | Notice that multiplication of 'Dense' values doesn't make sense:
+--
+-- @
+-- ('*') :: 'Dense' currency -> 'Dense' currency -> 'Dense' currency
+-- @
+--
+-- How is '*' implemented, then? It behaves as the /scalar multiplication/ of a
+-- 'Dense' amount by a 'Rational' scalar. That is, you can think of '*' as
+-- having one of the the following types:
+--
+-- @
+-- ('*') :: 'Rational' -> 'Dense' currency -> 'Dense' currency
+-- @
+--
+-- @
+-- ('*') :: 'Dense' currency -> 'Rational' -> 'Dense' currency@
+-- @
+--
+-- That is:
+--
+-- @
+-- 'dense'' (1 '%' 4) '*' 'dense'' (1 '%' 2)  ==  'dense'' (1 '%' 8)
+-- @
+--
+-- In fact, if you compiled this library with support for
+-- 'Data.VectorSpace.VectorSpace', then '*' functions exactly as
+-- 'Data.VectorSpace.*^'.
+--
+-- @
+-- ('*')  ==  ('Data.VectorSpace.*^')
+-- @
+--
+-- @
+-- ('*')  ==  'flip' ('Data.VectorSpace.*^')
+-- @
+deriving instance Num (Dense currency)
 
 type family ErrFractionalDense :: Constraint where
   ErrFractionalDense
@@ -267,7 +310,8 @@ denseCurrency = symbolVal
 --
 -- @currency@ is usually a ISO-4217 currency code, but not necessarily.
 --
--- Construct 'Discrete' values using 'discrete'.
+-- Construct 'Discrete' values using 'discrete', 'fromIntegral', 'fromInteger',
+-- 'discreteFromDense', 'discreteFromDecimal'.
 --
 -- For example, if you want to represent @GBP 21.05@, where the smallest
 -- represetable unit for a GBP (United Kingdom Pound) is the /penny/, and 100
@@ -295,10 +339,46 @@ newtype Discrete' (currency :: Symbol) (scale :: (Nat, Nat))
 deriving instance GoodScale scale => Eq (Discrete' currency scale)
 deriving instance GoodScale scale => Ord (Discrete' currency scale)
 deriving instance GoodScale scale => Enum (Discrete' currency scale)
-deriving instance GoodScale scale => Num (Discrete' currency scale)
 deriving instance GoodScale scale => Real (Discrete' currency scale)
 deriving instance GoodScale scale => Integral (Discrete' currency scale)
 deriving instance GoodScale scale => GHC.Generic (Discrete' currency scale)
+
+-- | Notice that multiplication of 'Discrete'' values doesn't make sense:
+--
+-- @
+-- ('*') :: 'Discrete'' currency scale -> 'Discrete'' currency scale -> 'Discrete'' currency scale
+-- @
+--
+-- How is '*' implemented, then? It behaves as the /scalar multiplication/ of a
+-- 'Discrete'' amount by an 'Integer' scalar. That is, you can think of '*' as
+-- having one of the the following types:
+--
+-- @
+-- ('*') :: 'Integer' -> 'Discrete'' currency scale -> 'Discrete'' currency scale
+-- @
+--
+-- @
+-- ('*') :: 'Discrete'' currency scale -> 'Integer' -> 'Discrete'' currency scale@
+-- @
+--
+-- That is:
+--
+-- @
+-- 'discrete' (1 '%' 4) '*' 'discrete' (1 '%' 2)  ==  'discrete' (1 '%' 8)
+-- @
+--
+-- In fact, if you compiled this library with support for
+-- 'Data.VectorSpace.VectorSpace', then '*' functions exactly as
+-- 'Data.VectorSpace.*^'.
+--
+-- @
+-- ('*')  ==  ('Data.VectorSpace.*^')
+-- @
+--
+-- @
+-- ('*')  ==  'flip' ('Data.VectorSpace.*^')
+-- @
+deriving instance GoodScale scale => Num (Discrete' currency scale)
 
 -- |
 -- @
@@ -394,13 +474,6 @@ data Approximation
   -- ^ Approximate @x@ to the nearest integer betwen @0@ and @x@, inclusive.
   deriving (Eq, Ord, Show, Read, GHC.Generic)
 
-#ifdef HAS_deepseq
-instance NFData Approximation
-#endif
-
-#ifdef HAS_hashable
-instance Hashable Approximation
-#endif
 
 approximate :: Approximation -> Rational -> Integer
 {-# INLINE approximate #-}
@@ -475,7 +548,7 @@ discreteFromDense a = \c0 ->
 -- currency@ exists.
 --
 -- @
--- type instance 'Scale' \"USD\" \"USD\" = Scale \"USD\" \"cent\"
+-- type instance 'Scale' \"USD\" \"USD\" = 'Scale' \"USD\" \"cent\"
 -- @
 --
 -- For some monetary values, such as precious metals, there is no smallest
@@ -612,7 +685,7 @@ instance Category ExchangeRate where
 -- |
 -- @
 -- > 'show' ('exchangeRate' (5 '%' 7) :: 'Maybe' ('ExchangeRate' \"USD\" \"JPY\"))@
--- 'Just' \"ExchangeRate \\\"USD\\\" \\\"JPY\\\" 5%7\"
+-- Just \"ExchangeRate \\\"USD\\\" \\\"JPY\\\" 5%7\"
 -- @
 instance forall src dst.
   ( KnownSymbol src, KnownSymbol dst
@@ -703,9 +776,9 @@ data SomeDense = SomeDense
   , _someDenseAmount            :: !Rational
   } deriving (Eq, Show, GHC.Generic)
 
--- | WARNING: This instance does not compare monetary amounts, it just helps you
--- sort 'SomeDense' values in case you need to put them in a 'Data.Set.Set' or
--- similar.
+-- | __WARNING__ This instance does not compare monetary amounts, it just helps
+-- you sort 'SomeDense' values in case you need to put them in a 'Data.Set.Set'
+-- or similar.
 deriving instance Ord SomeDense
 
 -- | Currency name.
@@ -790,9 +863,9 @@ data SomeDiscrete = SomeDiscrete
   , _someDiscreteAmount   :: !Integer  -- ^ Amount of unit.
   } deriving (Eq, Show, GHC.Generic)
 
--- | WARNING: This instance does not compare monetary amounts, it just helps you
--- sort 'SomeDiscrete' values in case you need to put them in a 'Data.Set.Set' or
--- similar.
+-- | __WARNING__ This instance does not compare monetary amounts, it just helps
+-- you sort 'SomeDiscrete' values in case you need to put them in a
+-- 'Data.Set.Set' or similar.
 deriving instance Ord SomeDiscrete
 
 -- | Currency name.
@@ -909,8 +982,8 @@ data SomeExchangeRate = SomeExchangeRate
   , _someExchangeRateRate            :: !Rational -- ^ Positive, non-zero.
   } deriving (Eq, Show, GHC.Generic)
 
--- | WARNING: This instance does not compare monetary amounts, it just helps you
--- sort 'SomeExchangeRate' values in case you need to put them in a
+-- | __WARNING__ This instance does not compare monetary amounts, it just helps
+-- you sort 'SomeExchangeRate' values in case you need to put them in a
 -- 'Data.Set.Set' or similar.
 deriving instance Ord SomeExchangeRate
 
@@ -999,8 +1072,48 @@ type family Fst (ab :: (ka, kb)) :: ka where Fst '(a,b) = a
 type family Snd (ab :: (ka, kb)) :: ka where Snd '(a,b) = b
 
 --------------------------------------------------------------------------------
+-- vector-space instances
+
+#ifdef HAS_vector_space
+instance AG.AdditiveGroup (Dense currency) where
+  zeroV = Dense AG.zeroV
+  {-# INLINE zeroV #-}
+  Dense a ^+^ Dense b = Dense $! (a AG.^+^ b)
+  {-# INLINE (^+^) #-}
+  negateV (Dense a) = Dense $! (AG.negateV a)
+  {-# INLINE negateV #-}
+  Dense a ^-^ Dense b = Dense $! (a AG.^-^ b)
+  {-# INLINE (^-^) #-}
+
+-- | __WARNING__ a scalar with a zero denominator will cause 'VS.*^' to crash.
+instance VS.VectorSpace (Dense currency) where
+  type Scalar (Dense currency) = Rational
+  s *^ Dense a =
+    if denominator s /= 0
+    then Dense $! s VS.*^ a
+    else error "(*^)': malformed Rational given (denominator is zero)."
+  {-# INLINE (*^) #-}
+
+instance GoodScale scale => AG.AdditiveGroup (Discrete' currency scale) where
+  zeroV = Discrete AG.zeroV
+  {-# INLINE zeroV #-}
+  Discrete a ^+^ Discrete b = Discrete $! (a AG.^+^ b)
+  {-# INLINE (^+^) #-}
+  negateV (Discrete a) = Discrete $! (AG.negateV a)
+  {-# INLINE negateV #-}
+  Discrete a ^-^ Discrete b = Discrete $! (a AG.^-^ b)
+  {-# INLINE (^-^) #-}
+
+instance GoodScale scale => VS.VectorSpace (Discrete' currency scale) where
+  type Scalar (Discrete' currency scale) = Integer
+  s *^ Discrete a = Discrete $! (s VS.*^ a)
+  {-# INLINE (*^) #-}
+#endif
+
+--------------------------------------------------------------------------------
 -- Extra instances: hashable
 #ifdef HAS_hashable
+instance Hashable Approximation
 instance Hashable (Dense currency)
 instance Hashable SomeDense
 instance GoodScale scale => Hashable (Discrete' currency scale)
@@ -1012,6 +1125,7 @@ instance Hashable SomeExchangeRate
 --------------------------------------------------------------------------------
 -- Extra instances: deepseq
 #ifdef HAS_deepseq
+instance NFData Approximation
 instance NFData (Dense currency)
 instance NFData SomeDense
 instance GoodScale scale => NFData (Discrete' currency scale)
@@ -1546,14 +1660,14 @@ storeContramapSize f = \case
 -- > 'denseToDecimal' 'Round' 'True' ('Just' \',\') \'.\' 2
 --      ('Proxy' :: 'Proxy' ('Scale' \"USD\" \"dollar\"))
 --      ('dense'' (123456 '%' 100) :: 'Dense' \"USD\")
--- 'Just' \"+1,234.56\"
+-- Just \"+1,234.56\"
 -- @
 --
 -- @
 -- > 'denseToDecimal' 'Round' 'True' ('Just' \',\') \'.\' 2
 --      ('Proxy' :: 'Proxy' ('Scale' \"USD\" \"cent\"))
 --      ('dense'' (123456 '%' 100) :: 'Dense' \"USD\")
--- 'Just' \"+123,456.00\"
+-- Just \"+123,456.00\"
 -- @
 --
 -- This function returns 'Nothing' if it is not possible to reliably render the
@@ -1595,7 +1709,7 @@ denseToDecimal a plus ytsep dsep fdigs0 ps = \(Dense r0) ->
 -- @
 -- > 'exchangeRateToDecimal' 'Round' 'True' ('Just' \',\') \'.\' 2
 --       '=<<' ('exchangeRate' (123456 '%' 100) :: 'Maybe' ('ExchangeRate' \"USD\" \"EUR\"))
--- 'Just' \"1,234.56\"
+-- Just \"1,234.56\"
 -- @
 --
 -- This function returns 'Nothing' if it is not possible to reliably render the

@@ -59,6 +59,9 @@ library
   if (flag(store) && !impl(ghcjs))
     build-depends: store (>=0.2)
     cpp-options: -DHAS_store
+  if flag(vector-space)
+    build-depends: vector-space (>=0.12)
+    cpp-options: -DHAS_vector_space
   if flag(xmlbf)
     build-depends: xmlbf (>=0.2), text
     cpp-options: -DHAS_xmlbf
@@ -98,6 +101,9 @@ test-suite test
   if (flag(store) && !impl(ghcjs))
     build-depends: store
     cpp-options: -DHAS_store
+  if flag(vector-space)
+    build-depends: vector-space
+    cpp-options: -DHAS_vector_space
   if flag(xmlbf)
     build-depends: xmlbf, text
     cpp-options: -DHAS_xmlbf
@@ -128,6 +134,10 @@ flag hashable
   manual: True
 flag serialise
   description: Provide instances for @serialise@
+  default: True
+  manual: True
+flag vector-space
+  description: Provide instances for @vector-space@
   default: True
   manual: True
 flag xmlbf

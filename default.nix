@@ -22,6 +22,7 @@ packageSetConfig = self: super: {
       hashable = false;
       serialise = false;
       store = false;
+      vector-space = false;
       xmlbf = false;
     };
   };
