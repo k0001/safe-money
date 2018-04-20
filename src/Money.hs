@@ -37,6 +37,7 @@ module Money
  , I.discreteCurrency
  , I.discreteFromDense
  , I.discreteFromDecimal
+ , I.discreteToDecimal
    -- * Currency scales
  , I.Scale
  , I.GoodScale

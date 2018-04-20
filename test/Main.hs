@@ -137,7 +137,7 @@ main :: IO ()
 main =  Tasty.defaultMainWithIngredients
   [ Tasty.consoleTestReporter
   , Tasty.listingTests
-  ] (Tasty.localOption (QC.QuickCheckTests 500) tests)
+  ] (Tasty.localOption (QC.QuickCheckTests 100) tests)
 
 tests :: Tasty.TestTree
 tests =
@@ -425,13 +425,14 @@ testRationalFromDecimal =
                  (f (Just s1) s1 (error "untouched") === Nothing) .&&.
                  (f (Just s3) s3 (error "untouched") === Nothing)
 
-  , QC.testProperty "Lossy roundtrip" $
+  , Tasty.localOption (QC.QuickCheckTests 1000) $
+    QC.testProperty "Lossy roundtrip" $
       -- We check that the roundtrip results in a close amount with a fractional
       -- difference of up to one.
       let gen = (,) <$> genDecimalSeps <*> QC.arbitrary
       in QC.forAll gen $ \( (yst :: Maybe Char, sd :: Char)
-                       , (r :: Rational, plus :: Bool, digs :: Word8,
-                          aprox :: Money.Approximation) ) ->
+                          , (r :: Rational, plus :: Bool, digs :: Word8,
+                             aprox :: Money.Approximation) ) ->
            let Just dec = Money.rationalToDecimal aprox plus yst sd digs r
                Just r' = Money.rationalFromDecimal yst sd dec
            in 1 > abs (abs r - abs r')
@@ -477,8 +478,8 @@ testDense pc =
       in QC.forAll gen $ \( (yst :: Maybe Char, sd :: Char)
                           , (dns :: Money.Dense currency, plus :: Bool,
                              digs :: Word8, aprox :: Money.Approximation) ) ->
-            let ydnsd1 = Money.denseToDecimal aprox plus yst sd digs (Proxy :: Proxy '(1,1)) dns
-                ydnsd100 = Money.denseToDecimal aprox plus yst sd digs (Proxy :: Proxy '(100,1)) dns
+            let ydnsd1 = Money.denseToDecimal aprox plus yst sd digs 1 dns
+                ydnsd100 = Money.denseToDecimal aprox plus yst sd digs 100 dns
                 yrd1 = Money.rationalToDecimal aprox plus yst sd digs (toRational dns)
                 yrd100 = Money.rationalToDecimal aprox plus yst sd digs (toRational dns * 100)
             in (ydnsd1 === yrd1) .&&. (ydnsd100 === yrd100)
@@ -486,8 +487,29 @@ testDense pc =
   , QC.testProperty "denseFromDecimal: Same as rationalFromDecimal" $
       QC.forAll genDecimal $ \(dec :: String, yts :: Maybe Char, ds :: Char) ->
          let Just r = Money.rationalFromDecimal yts ds dec
-             Just dns = Money.denseFromDecimal yts ds dec
+             Just dns = Money.denseFromDecimal yts ds 1 dec
          in r === toRational (dns :: Money.Dense currency)
+
+  , QC.testProperty "denseFromDecimal: Same as rationalFromDecimal" $
+      QC.forAll genDecimal $ \(dec :: String, yts :: Maybe Char, ds :: Char) ->
+         let Just r = Money.rationalFromDecimal yts ds dec
+             Just dns = Money.denseFromDecimal yts ds 1 dec
+         in r === toRational (dns :: Money.Dense currency)
+
+
+  , Tasty.localOption (QC.QuickCheckTests 1000) $
+    QC.testProperty "denseToDecimal/denseFromDiscrete: Lossy roundtrip" $
+      -- We check that the roundtrip results in a close amount with a fractional
+      -- difference of up to one.
+      let gen = (,) <$> genDecimalSeps <*> QC.arbitrary
+      in QC.forAll gen $ \( (yst :: Maybe Char, sd :: Char)
+                          , (sc0 :: Rational, plus :: Bool,
+                             digs :: Word8, aprox :: Money.Approximation,
+                             dns :: Money.Dense currency) ) ->
+           let sc = abs sc0 + 1 -- smaller scales can't reliably be parsed back
+               Just dec = Money.denseToDecimal aprox plus yst sd digs sc dns
+               Just dns' = Money.denseFromDecimal yst sd sc dec
+           in Money.dense' 1 > abs (abs dns - abs dns')
 
 #ifdef HAS_vector_space
   , HU.testCase "AdditiveGroup: zeroV" $
@@ -679,6 +701,20 @@ testDiscrete pc pu =
   , QC.testProperty "discreteCurrency" $
       QC.forAll QC.arbitrary $ \(x :: Money.Discrete currency unit) ->
         Money.discreteCurrency x === symbolVal pc
+
+  , QC.testProperty "discreteToDecimal/discreteFromDecimal: Same as denseToDecimal/denseFromDecimal" $
+      -- We check that the roundtrip results in a close amount with a fractional
+      -- difference of up to one.
+      let gen = (,) <$> genDecimalSeps <*> QC.arbitrary
+      in QC.forAll gen $ \( (yst :: Maybe Char, sd :: Char)
+                          , (sc0 :: Rational, plus :: Bool,
+                             digs :: Word8, aprox :: Money.Approximation,
+                             dis :: Money.Discrete currency unit) ) ->
+           let sc = abs sc0 + 1  -- scale can't be less than 1
+               dns = Money.denseFromDiscrete dis
+               ydec = Money.discreteToDecimal aprox plus yst sd digs sc dis
+               ydec' = Money.denseToDecimal aprox plus yst sd digs sc dns
+           in ydec === ydec'
 
 #ifdef HAS_vector_space
   , HU.testCase "AdditiveGroup: zeroV" $
@@ -1013,52 +1049,52 @@ testDiscreteFromDecimal :: Tasty.TestTree
 testDiscreteFromDecimal =
   Tasty.testGroup "discreteFromDecimal"
   [ HU.testCase "Too large" $ do
-      Money.discreteFromDecimal Nothing '.' "0.053"
+      Money.discreteFromDecimal Nothing '.' 1 "0.053"
         @?= (Nothing :: Maybe (Money.Discrete "USD" "cent"))
-      Money.discreteFromDecimal (Just ',') '.' "0.253"
+      Money.discreteFromDecimal (Just ',') '.' 1 "0.253"
         @?= (Nothing :: Maybe (Money.Discrete "USD" "cent"))
 
   , HU.testCase "USD cent, small, zero" $ do
       let dis = 0 :: Money.Discrete "USD" "cent"
           f = Money.discreteFromDecimal
-      f Nothing '.' "0" @?= Just dis
-      f Nothing '.' "+0" @?= Just dis
-      f Nothing '.' "-0" @?= Just dis
-      f (Just ',') '.' "0" @?= Just dis
-      f (Just ',') '.' "+0" @?= Just dis
-      f (Just ',') '.' "-0" @?= Just dis
+      f Nothing '.' 1 "0" @?= Just dis
+      f Nothing '.' 1 "+0" @?= Just dis
+      f Nothing '.' 1 "-0" @?= Just dis
+      f (Just ',') '.' 1 "0" @?= Just dis
+      f (Just ',') '.' 1 "+0" @?= Just dis
+      f (Just ',') '.' 1 "-0" @?= Just dis
 
   , HU.testCase "USD cent, small, positive" $ do
       let dis = 25 :: Money.Discrete "USD" "cent"
           f = Money.discreteFromDecimal
-      f Nothing '.' "0.25" @?= Just dis
-      f Nothing '.' "+0.25" @?= Just dis
-      f (Just ',') '.' "0.25" @?= Just dis
-      f (Just ',') '.' "+0.25" @?= Just dis
+      f Nothing '.' 1 "0.25" @?= Just dis
+      f Nothing '.' 1 "+0.25" @?= Just dis
+      f (Just ',') '.' 1 "0.25" @?= Just dis
+      f (Just ',') '.' 1 "+0.25" @?= Just dis
 
   , HU.testCase "USD cent, small, negative" $ do
       let dis = -25 :: Money.Discrete "USD" "cent"
           f = Money.discreteFromDecimal
-      f Nothing '.' "-0.25" @?= Just dis
-      f Nothing '.' "-0.25" @?= Just dis
-      f (Just ',') '.' "-0.25" @?= Just dis
-      f (Just ',') '.' "-0.25" @?= Just dis
+      f Nothing '.' 1 "-0.25" @?= Just dis
+      f Nothing '.' 1 "-0.25" @?= Just dis
+      f (Just ',') '.' 1 "-0.25" @?= Just dis
+      f (Just ',') '.' 1 "-0.25" @?= Just dis
 
   , HU.testCase "USD cent, big, positive" $ do
       let dis = 102300456789 :: Money.Discrete "USD" "cent"
           f = Money.discreteFromDecimal
-      f Nothing '.' "1023004567.89" @?= Just dis
-      f Nothing '.' "+1023004567.89" @?= Just dis
-      f (Just ',') '.' "1,023,004,567.89" @?= Just dis
-      f (Just ',') '.' "+1,023,004,567.89" @?= Just dis
+      f Nothing '.' 1 "1023004567.89" @?= Just dis
+      f Nothing '.' 1 "+1023004567.89" @?= Just dis
+      f (Just ',') '.' 1 "1,023,004,567.89" @?= Just dis
+      f (Just ',') '.' 1 "+1,023,004,567.89" @?= Just dis
 
   , HU.testCase "USD cent, big, negative" $ do
       let dis = -102300456789 :: Money.Discrete "USD" "cent"
           f = Money.discreteFromDecimal
-      f Nothing '.' "-1023004567.89" @?= Just dis
-      f Nothing '.' "-1023004567.89" @?= Just dis
-      f (Just ',') '.' "-1,023,004,567.89" @?= Just dis
-      f (Just ',') '.' "-1,023,004,567.89" @?= Just dis
+      f Nothing '.' 1 "-1023004567.89" @?= Just dis
+      f Nothing '.' 1 "-1023004567.89" @?= Just dis
+      f (Just ',') '.' 1 "-1,023,004,567.89" @?= Just dis
+      f (Just ',') '.' 1 "-1,023,004,567.89" @?= Just dis
   ]
 
 testRounding
