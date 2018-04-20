@@ -10,11 +10,14 @@
 module Main where
 
 import Control.Category (Category((.), id))
+import Control.DeepSeq (rnf)
+import qualified Data.Binary as Binary
 import qualified Data.ByteString.Lazy as BSL
 import qualified Data.Char as Char
 import Data.Maybe (catMaybes, isJust, isNothing, fromJust)
 import Data.Proxy (Proxy(Proxy))
 import Data.Ratio ((%), numerator, denominator)
+import qualified Data.Text as Text
 import Data.Word (Word8)
 import GHC.TypeLits (Nat, Symbol, KnownSymbol, symbolVal)
 import Prelude hiding ((.), id)
@@ -27,10 +30,6 @@ import qualified Test.Tasty.QuickCheck as QC
 
 #ifdef HAS_aeson
 import qualified Data.Aeson as Ae
-#endif
-
-#ifdef HAS_binary
-import qualified Data.Binary as Binary
 #endif
 
 #ifdef HAS_cereal
@@ -52,7 +51,6 @@ import qualified Data.VectorSpace as VS
 
 #ifdef HAS_xmlbf
 import qualified Xmlbf
-import qualified Data.Text as Text
 #endif
 
 import qualified Money
@@ -445,7 +443,11 @@ testDense
   -> Tasty.TestTree
 testDense pc =
   Tasty.testGroup ("Dense " ++ show (symbolVal pc))
-  [ QC.testProperty "read . show == id" $
+  [ QC.testProperty "rnf" $
+      QC.forAll QC.arbitrary $ \(x :: Money.Dense currency) ->
+         () === rnf x
+
+  , QC.testProperty "read . show == id" $
       QC.forAll QC.arbitrary $ \(x :: Money.Dense currency) ->
          x === read (show x)
 
@@ -553,7 +555,6 @@ testDense pc =
            (Just sx === Ae.decode bs)
 #endif
 
-#ifdef HAS_binary
   , QC.testProperty "Binary encoding roundtrip" $
       QC.forAll QC.arbitrary $ \(x :: Money.Dense currency) ->
          let Right (_,_,y) = Binary.decodeOrFail (Binary.encode x)
@@ -573,7 +574,6 @@ testDense pc =
          let x' = Money.toSomeDense x
              bs = Binary.encode x
          in Right (mempty, BSL.length bs, x') === Binary.decodeOrFail bs
-#endif
 
 #ifdef HAS_cereal
   , QC.testProperty "Cereal encoding roundtrip" $
@@ -674,6 +674,11 @@ testDiscrete pc pu =
   Tasty.testGroup ("Discrete " ++ show (symbolVal pc) ++ " "
                                ++ show (symbolVal pu))
   [ testRounding pc pu
+
+  , QC.testProperty "rnf" $
+      QC.forAll QC.arbitrary $ \(x :: Money.Discrete currency unit) ->
+         () === rnf x
+
   , QC.testProperty "read . show == id" $
       QC.forAll QC.arbitrary $ \(x :: Money.Discrete currency unit) ->
          x === read (show x)
@@ -759,7 +764,6 @@ testDiscrete pc pu =
            (Just sx === Ae.decode bs)
 #endif
 
-#ifdef HAS_binary
   , QC.testProperty "Binary encoding roundtrip" $
       QC.forAll QC.arbitrary $ \(x :: Money.Discrete currency unit) ->
          let Right (_,_,y) = Binary.decodeOrFail (Binary.encode x)
@@ -779,7 +783,6 @@ testDiscrete pc pu =
          let x' = Money.toSomeDiscrete x
              bs = Binary.encode x
          in Right (mempty, BSL.length bs, x') === Binary.decodeOrFail bs
-#endif
 
 #ifdef HAS_cereal
   , QC.testProperty "Cereal encoding roundtrip" $
@@ -957,7 +960,6 @@ testExchangeRate ps pd =
            (Just sx === Ae.decode bs)
 #endif
 
-#ifdef HAS_binary
   , QC.testProperty "Binary encoding roundtrip" $
       QC.forAll QC.arbitrary $ \(x :: Money.ExchangeRate src dst) ->
          let Right (_,_,y) = Binary.decodeOrFail (Binary.encode x)
@@ -977,7 +979,6 @@ testExchangeRate ps pd =
          let x' = Money.toSomeExchangeRate x
              bs = Binary.encode x
          in Right (mempty, BSL.length bs, x') === Binary.decodeOrFail bs
-#endif
 
 #ifdef HAS_cereal
   , QC.testProperty "Cereal encoding roundtrip" $

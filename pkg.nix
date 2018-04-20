@@ -1,7 +1,7 @@
 { mkDerivation, stdenv, ghc
 , base, bytestring, constraints, tasty, tasty-hunit, tasty-quickcheck
 , binary, aeson, cereal, deepseq, hashable, serialise, store, xmlbf, text
-, vector-space
+, vector-space, parsec
 , flags ? {}
 }:
 
@@ -9,9 +9,7 @@ let
 lib = stdenv.lib;
 flags' =
   { aeson = true;
-    binary = true;
     cereal = true;
-    deepseq = true;
     hashable = true;
     serialise = true;
     store = true;
@@ -19,25 +17,23 @@ flags' =
     xmlbf = true;
   } // flags;
 extraDeps =
-  lib.optionals (flags'.aeson) [ aeson text ] ++
-  lib.optionals (flags'.binary) [ binary ] ++
+  lib.optionals (flags'.aeson) [ aeson ] ++
   lib.optionals (flags'.cereal) [ cereal ] ++
-  lib.optionals (flags'.deepseq) [ deepseq ] ++
   lib.optionals (flags'.hashable) [ hashable ] ++
   lib.optionals (flags'.serialise) [ serialise ] ++
   lib.optionals (flags'.store) [ store ] ++
   lib.optionals (flags'.vector-space) [ vector-space ] ++
-  lib.optionals (flags'.xmlbf) [ xmlbf text ];
+  lib.optionals (flags'.xmlbf) [ xmlbf ];
 
 in mkDerivation rec {
   pname = "safe-money";
-  version = "0.5";
+  version = "0.6";
   homepage = "https://github.com/k0001/safe-money";
-  description = "Type-safe and lossless encoding and manipulation of money, currencies and precious metals";
+  description = "Type-safe and lossless encoding and manipulation of money, fiat currencies, crypto currencies and precious metals.";
   license = stdenv.lib.licenses.bsd3;
   src = ./.;
   libraryHaskellDepends =
-    [ base constraints ] ++ extraDeps;
+    [ base binary constraints deepseq parsec text ] ++ extraDeps;
   testHaskellDepends = libraryHaskellDepends ++
     [ bytestring tasty tasty-hunit tasty-quickcheck ];
   configureFlags =

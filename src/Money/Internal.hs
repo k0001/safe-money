@@ -84,7 +84,9 @@ module Money.Internal
 
 import Control.Applicative ((<|>), empty)
 import Control.Category (Category((.), id))
+import Control.DeepSeq (NFData)
 import Control.Monad ((<=<), guard, when)
+import qualified Data.Binary as Binary
 import qualified Data.Char as Char
 import Data.Constraint (Dict(Dict))
 import Data.Functor (($>))
@@ -93,6 +95,7 @@ import qualified Data.List as List
 import Data.Monoid ((<>))
 import Data.Proxy (Proxy(..))
 import Data.Ratio ((%), numerator, denominator)
+import qualified Data.Text as T
 import Data.Word (Word8)
 import GHC.Exts (Constraint, fromList)
 import qualified GHC.Generics as GHC
@@ -109,19 +112,10 @@ import Unsafe.Coerce (unsafeCoerce)
 
 #ifdef HAS_aeson
 import qualified Data.Aeson as Ae
-import qualified Data.Text as T
-#endif
-
-#ifdef HAS_binary
-import qualified Data.Binary as Binary
 #endif
 
 #ifdef HAS_cereal
 import qualified Data.Serialize as Cereal
-#endif
-
-#ifdef HAS_deepseq
-import Control.DeepSeq (NFData)
 #endif
 
 #ifdef HAS_hashable
@@ -143,7 +137,6 @@ import qualified Data.VectorSpace as VS
 
 #ifdef HAS_xmlbf
 import qualified Xmlbf
-import qualified Data.Text as T
 #endif
 
 --------------------------------------------------------------------------------
@@ -1126,7 +1119,6 @@ instance Hashable SomeExchangeRate
 
 --------------------------------------------------------------------------------
 -- Extra instances: deepseq
-#ifdef HAS_deepseq
 instance NFData Approximation
 instance NFData (Dense currency)
 instance NFData SomeDense
@@ -1134,7 +1126,6 @@ instance GoodScale scale => NFData (Discrete' currency scale)
 instance NFData SomeDiscrete
 instance NFData (ExchangeRate src dst)
 instance NFData SomeExchangeRate
-#endif
 
 --------------------------------------------------------------------------------
 -- Extra instances: cereal
@@ -1204,7 +1195,7 @@ instance Cereal.Serialize SomeExchangeRate where
 
 ------------------------------------------------------------------------------
 -- Extra instances: binary
-#ifdef HAS_binary
+
 -- | Compatible with 'SomeDense'.
 instance (KnownSymbol currency) => Binary.Binary (Dense currency) where
   put = Binary.put . toSomeDense
@@ -1264,7 +1255,6 @@ instance Binary.Binary SomeExchangeRate where
     d :: Integer <- Binary.get
     when (d == 0) (fail "denominator is zero")
     pure (mkSomeExchangeRate src dst (n % d))
-#endif
 
 --------------------------------------------------------------------------------
 -- Extra instances: serialise
