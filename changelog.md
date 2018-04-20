@@ -1,3 +1,15 @@
+# Version 0.6
+
+* _COMPILER ASSISTED BREAKING CHANGE_. `denseToDecimal` now takes a positive
+  `Rational` rather than a `Proxy scale`.
+
+* _COMPILER ASSISTED BREAKING CHANGE_. `denseFromDecimal` and
+  `discreteFromDecimal` now take a positive `Rational` scale, like their
+  `xxxToDecimal` counterparts.
+
+* Introduced a new function `discreteToDecimal`.
+
+
 # Version 0.5
 
 * _COMPILER ASSISTED BREAKING CHANGE_. The `round`, `floor`, `ceiling` and

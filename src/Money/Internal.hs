@@ -38,6 +38,7 @@ module Money.Internal
  , discreteCurrency
  , discreteFromDense
  , discreteFromDecimal
+ , discreteToDecimal
    -- * Currency scales
  , Scale
  , GoodScale
@@ -1658,25 +1659,23 @@ storeContramapSize f = \case
 -- manner.
 --
 -- @
--- > 'denseToDecimal' 'Round' 'True' ('Just' \',\') \'.\' 2
---      ('Proxy' :: 'Proxy' ('Scale' \"USD\" \"dollar\"))
+-- > 'denseToDecimal' 'Round' 'True' ('Just' \',\') \'.\' 2 (1 '%' 1)
 --      ('dense'' (123456 '%' 100) :: 'Dense' \"USD\")
 -- Just \"+1,234.56\"
 -- @
 --
 -- @
--- > 'denseToDecimal' 'Round' 'True' ('Just' \',\') \'.\' 2
---      ('Proxy' :: 'Proxy' ('Scale' \"USD\" \"cent\"))
+-- > 'denseToDecimal' 'Round' 'True' ('Just' \',\') \'.\' 2 (100 '%' 1)
 --      ('dense'' (123456 '%' 100) :: 'Dense' \"USD\")
 -- Just \"+123,456.00\"
 -- @
 --
--- This function returns 'Nothing' if it is not possible to reliably render the
--- decimal string due to a bad choice of separators. That is, if the separators
--- are digits or equal among themselves, this function returns 'Nothing'.
+-- This function returns 'Nothing' if the scale is less than @1@, or if it's not
+-- possible to reliably render the decimal string due to a bad choice of
+-- separators. That is, if the separators are digits or equal among themselves,
+-- this function returns 'Nothing'.
 denseToDecimal
-  :: GoodScale scale
-  => Approximation
+  :: Approximation
   -- ^ Approximation to use if necesary in order to fit the 'Dense' amount in
   -- as many decimal numbers as requested.
   -> Bool
@@ -1684,26 +1683,130 @@ denseToDecimal
   -> Maybe Char
   -- ^ Thousands separator for the integer part, if any (i.e., the @\',\'@ in
   -- @1,234.56789@).
+  --
+  -- If the given separator is a digit, or if it is equal to the decimal
+  -- separator, then this functions returns 'Nothing'.
   -> Char
-  -- ^ Decimal separator (i.e., the @\'.\'@ in @1,234.56789@)
+  -- ^ Decimal separator (i.e., the @\'.\'@ in @1,234.56789@).
+  --
+  -- If the given separator is a digit, or if it is equal to the thousands
+  -- separator, then this functions returns 'Nothing'.
   -> Word8
   -- ^ Number of decimal numbers to render, if any.
-  -> Proxy scale
-  -- ^ Scale used by the integer part of the decimal number. For example, a when
-  -- rendering render @'dense'' (123 '%' 100) :: 'Dense' "USD"@ as a decimal
-  -- number with three decimal places, a scale of @1@ (i.e. @'Scale' \"USD\"
-  -- \"dollar\"@) would render @1@ as the integer part and @230@ as the
-  -- fractional part, whereas a scale of @100@ (i.e., @'Scale' \"USD\"
-  -- \"cent\"@) would render @123@ as the integer part and @000@ as the
-  -- fractional part.
+  -> Rational
+  -- ^ Scale used to when rendering the decimal number. This is useful if you
+  -- want to render a “number of cents” rather than a “number of dollars” when
+  -- rendering a USD amount, for example.
+  --
+  -- Set this to @1 '%' 1@ if you don't care.
+  --
+  -- For example, when rendering render @'dense'' (123 '%' 100) :: 'Dense'
+  -- "USD"@ as a decimal number with three decimal places, a scale of @1 '%' 1@
+  -- (analogous to  @'Scale' \"USD\" \"dollar\"@) would render @1@ as the
+  -- integer part and @230@ as the fractional part, whereas a scale of @100 '%'
+  -- 1@ (analogous @'Scale' \"USD\" \"cent\"@) would render @123@ as the integer
+  -- part and @000@ as the fractional part.
+  --
+  -- You can easily obtain the scale for a particular currency and unit
+  -- combination using the 'scale' function. Otherwise, you are free to pass in
+  -- any other /positive/ 'Rational' number. If a non-positive scale is given,
+  -- then this function returns 'Nothing'.
+  --
+  -- Specifying scales other than @1 '%' 1@ is particularly useful for
+  -- currencies whose main unit is too big. For example, the main unit of gold
+  -- (XAU) is the troy-ounce, which is too big for day to day accounting, so
+  -- using the gram or the grain as the unit when rendering decimal amounts
+  -- could be useful.
+  --
+  -- Be careful when using a scale smaller than @1 '%' 1@, since it may become
+  -- impossible to parse back a meaningful amount from the rendered decimal
+  -- representation unless a big number of fractional digits is used.
   -> Dense currency
   -- ^ The dense monetary amount to render.
   -> Maybe String
   -- ^ Returns 'Nothing' is the given separators are not acceptable (i.e., they
   -- are digits, or they are equal).
 {-# INLINABLE denseToDecimal #-}
-denseToDecimal a plus ytsep dsep fdigs0 ps = \(Dense r0) ->
-  rationalToDecimal a plus ytsep dsep fdigs0 (scale ps * r0)
+denseToDecimal a plus ytsep dsep fdigs scal = \(Dense r0) -> do
+  guard (scal > 0)
+  rationalToDecimal a plus ytsep dsep fdigs (r0 * scal)
+
+-- | Render a 'Discrete'' monetary amount as a decimal number in a potentially
+-- lossy manner.
+--
+-- This is simply a convenient wrapper around 'denseToDecimal':
+--
+-- @
+-- 'discreteToDecimal' a b c d e f (dis :: 'Discrete'' currency scale)
+--     == 'denseToDecimal' a b c d e f ('denseFromDiscrete' dis :: 'Dense' currency)
+-- @
+--
+-- In particular, the @scale@ in @'Discrete'' currency scale@ has no influence
+-- over the scale in which the decimal number is rendered. Use the 'Rational'
+-- parameter to this function for modifying that behavior.
+--
+-- Please refer to 'denseToDecimal' for further documentation.
+--
+-- This function returns 'Nothing' if the scale is less than @1@, or if it's not
+-- possible to reliably render the decimal string due to a bad choice of
+-- separators. That is, if the separators are digits or equal among themselves,
+-- this function returns 'Nothing'.
+discreteToDecimal
+  :: GoodScale scale
+  => Approximation
+  -- ^ Approximation to use if necesary in order to fit the 'Discrete' amount in
+  -- as many decimal numbers as requested.
+  -> Bool
+  -- ^ Whether to render a leading @\'+\'@ sign in case the amount is positive.
+  -> Maybe Char
+  -- ^ Thousands separator for the integer part, if any (i.e., the @\',\'@ in
+  -- @1,234.56789@).
+  --
+  -- If the given separator is a digit, or if it is equal to the decimal
+  -- separator, then this functions returns 'Nothing'.
+  -> Char
+  -- ^ Decimal separator (i.e., the @\'.\'@ in @1,234.56789@).
+  --
+  -- If the given separator is a digit, or if it is equal to the thousands
+  -- separator, then this functions returns 'Nothing'.
+  -> Word8
+  -- ^ Number of decimal numbers to render, if any.
+  -> Rational
+  -- ^ Scale used to when rendering the decimal number. This is useful if you
+  -- want to render a “number of cents” rather than a “number of dollars” when
+  -- rendering a USD amount, for example.
+  --
+  -- Set this to @1 '%' 1@ if you don't care.
+  --
+  -- For example, when rendering render @'discrete' 123 :: 'Dense' \"USD\"
+  -- \"cent\"@ as a decimal number with three decimal places, a scale of @1 '%'
+  -- 1@ (analogous to  @'Scale' \"USD\" \"dollar\"@) would render @1@ as the
+  -- integer part and @230@ as the fractional part, whereas a scale of @100 '%'
+  -- 1@ (analogous @'Scale' \"USD\" \"cent\"@) would render @123@ as the integer
+  -- part and @000@ as the fractional part.
+  --
+  -- You can easily obtain the scale for a particular currency and unit
+  -- combination using the 'scale' function. Otherwise, you are free to pass in
+  -- any other /positive/ 'Rational' number. If a non-positive scale is
+  -- given, then this function returns 'Nothing'.
+  --
+  -- Specifying scales other than @1 '%' 1@ is particularly useful for
+  -- currencies whose main unit is too big. For example, the main unit of gold
+  -- (XAU) is the troy-ounce, which is too big for day to day accounting, so
+  -- using the gram or the grain as the unit when rendering decimal amounts
+  -- could be useful.
+  --
+  -- Be careful when using a scale smaller than @1 '%' 1@, since it may become
+  -- impossible to parse back a meaningful amount from the rendered decimal
+  -- representation unless a big number of fractional digits is used.
+  -> Discrete' currency scale
+  -- ^ The monetary amount to render.
+  -> Maybe String
+  -- ^ Returns 'Nothing' is the given separators are not acceptable (i.e., they
+  -- are digits, or they are equal).
+{-# INLINABLE discreteToDecimal #-}
+discreteToDecimal a plus ytsep dsep fdigs scal = \dns ->
+  denseToDecimal a plus ytsep dsep fdigs scal (denseFromDiscrete dns)
 
 -- | Render a 'ExchangeRate' as a decimal number in a potentially lossy manner.
 --
@@ -1794,11 +1897,11 @@ renderThousands n0
   | otherwise = \c -> List.foldl' (flip mappend) mempty (List.unfoldr (f c) n0)
       where f :: Char -> Natural -> Maybe (String, Natural)
             f c = \x -> case divMod x 1000 of
-                        (0, 0) -> Nothing
-                        (0, z) -> Just (show z, 0)
-                        (y, z) | z <  10   -> Just (c:'0':'0':show z, y)
-                               | z < 100   -> Just (c:'0':show z, y)
-                               | otherwise -> Just (c:show z, y)
+                           (0, 0) -> Nothing
+                           (0, z) -> Just (show z, 0)
+                           (y, z) | z <  10   -> Just (c:'0':'0':show z, y)
+                                  | z < 100   -> Just (c:'0':show z, y)
+                                  | otherwise -> Just (c:show z, y)
 
 --------------------------------------------------------------------------------
 -- Decimal parsing
@@ -1812,11 +1915,24 @@ denseFromDecimal
   -- @-1,234.56789@).
   -> Char
   -- ^ Decimal separator (i.e., the @\'.\'@ in @-1,234.56789@)
+  -> Rational
+  -- ^ Scale used by the rendered decimal. It is important to get this number
+  -- correctly, otherwise the resulting 'Dense' amount will be wrong. Please
+  -- refer to the documentation for 'denseToDecimal' to understand the meaning
+  -- of this scale.
+  --
+  -- In summary, this scale will have a value of @1@ unless the decimal amount
+  -- represents a unit other than the main unit for the currency (e.g., cents
+  -- rather than dollars for USD, or grams rather than troy-ounces for XAU, or
+  -- millibitcoins rather than bitcoins for BTC).
   -> String
   -- ^ The raw string containing the decimal representation (e.g.,
   -- @"-1,234.56789"@).
   -> Maybe (Dense currency)
-denseFromDecimal yst sf = fmap Dense . rationalFromDecimal yst sf
+denseFromDecimal yst sf scal str = do
+  guard (scal > 0)
+  r <- rationalFromDecimal yst sf str
+  pure (Dense $! (r / scal))
 
 -- | Parses a decimal representation of a 'Discrete'.
 --
@@ -1831,12 +1947,22 @@ discreteFromDecimal
   -- @-1,234.56789@).
   -> Char
   -- ^ Decimal separator (i.e., the @\'.\'@ in @-1,234.56789@)
+  -> Rational
+  -- ^ Scale used by the rendered decimal. It is important to get this number
+  -- correctly, otherwise the resulting 'Dense' amount will be wrong. Please
+  -- refer to the documentation for 'denseToDecimal' to understand the meaning
+  -- of this scale.
+  --
+  -- In summary, this scale will have a value of @1@ unless the decimal amount
+  -- represents a unit other than the main unit for the currency (e.g., cents
+  -- rather than dollars for USD, or grams rather than troy-ounces for XAU, or
+  -- millibitcoins rather than bitcoins for BTC).
   -> String
   -- ^ The raw string containing the decimal representation (e.g.,
   -- @"-1,234.56789"@).
   -> Maybe (Discrete' currency scale)
-discreteFromDecimal yst sf = \s -> do
-  dns <- denseFromDecimal yst sf s
+discreteFromDecimal yst sf scal = \str -> do
+  dns <- denseFromDecimal yst sf scal str
   case discreteFromDense Truncate dns of
     (x, 0) -> Just x
     _ -> Nothing -- We fail for decimals that don't fit exactly in our scale.
