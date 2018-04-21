@@ -7,6 +7,18 @@
   `discreteFromDecimal` now take a positive `Rational` scale, like their
   `xxxToDecimal` counterparts.
 
+* _COMPILE ASSISTED BREAKING CHANGE_. `binary`, `deepseq` and `text` are now
+  mandatory dependencies since they are included with the standard GHC
+  distribution. Thus, the tags for disabling them have been removed.
+
+* _COMPILE ASSISTED BREAKING CHANGE_. `Text` replaced the use of `String` in the
+  public API. For example, `denseCurrency` now returns `Text`, instead of
+  `String`. This change doesn't break backwards compatibilility with binary
+  serializations.
+
+* The `parsec` library is now a mandatory dependency. Note that `parsec` is
+  always included with the standard GHC distribution.
+
 * Introduced a new function `discreteToDecimal`.
 
 * Added tests to ensure backwards compatibility of serializations.

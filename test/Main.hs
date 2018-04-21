@@ -19,7 +19,7 @@ import qualified Data.Char as Char
 import Data.Maybe (catMaybes, isJust, isNothing, fromJust)
 import Data.Proxy (Proxy(Proxy))
 import Data.Ratio ((%), numerator, denominator)
-import qualified Data.Text as Text
+import qualified Data.Text as T
 import Data.Word (Word8)
 import GHC.Exts (fromList)
 import GHC.TypeLits (Nat, Symbol, KnownSymbol, symbolVal)
@@ -108,9 +108,12 @@ instance QC.Arbitrary Money.Approximation where
                        , pure Money.Ceiling
                        , pure Money.Truncate ]
 
+instance QC.Arbitrary T.Text where
+  arbitrary = T.pack <$> QC.arbitrary
+
 -- | Generates a valid 'Money.rationalToDecimal' result. Returns the thousand
 -- and decimal separators as welland decimal separators as well.
-genDecimal :: QC.Gen (String, Maybe Char, Char)
+genDecimal :: QC.Gen (T.Text, Maybe Char, Char)
 genDecimal = do
   aprox :: Money.Approximation <- QC.arbitrary
   plus :: Bool <- QC.arbitrary
@@ -401,7 +404,7 @@ testRationalToDecimal =
     r2 :: Rational = 123 % 100
     r3 :: Rational = 345 % 1000
 
-    render :: Money.Approximation -> Rational -> [String]
+    render :: Money.Approximation -> Rational -> [T.Text]
     render a r =
       [ fromJust $ Money.rationalToDecimal a False Nothing    '.' 2 r  --  0
       , fromJust $ Money.rationalToDecimal a False (Just ',') '.' 2 r  --  1
@@ -465,7 +468,7 @@ testDense pc =
 
   , QC.testProperty "fromSomeDense works only for same currency" $
       QC.forAll QC.arbitrary $ \(dr :: Money.SomeDense) ->
-        (Money.someDenseCurrency dr /= symbolVal pc)
+        (T.unpack (Money.someDenseCurrency dr) /= symbolVal pc)
            ==> isNothing (Money.fromSomeDense dr :: Maybe (Money.Dense currency))
 
   , QC.testProperty "withSomeDense" $
@@ -477,7 +480,7 @@ testDense pc =
 
   , QC.testProperty "denseCurrency" $
       QC.forAll QC.arbitrary $ \(x :: Money.Dense currency) ->
-        Money.denseCurrency x === symbolVal pc
+        T.unpack (Money.denseCurrency x) === symbolVal pc
 
   , QC.testProperty "denseToDecimal: Same as rationalToDecimal" $
       let gen = (,) <$> genDecimalSeps <*> QC.arbitrary
@@ -491,13 +494,13 @@ testDense pc =
             in (ydnsd1 === yrd1) .&&. (ydnsd100 === yrd100)
 
   , QC.testProperty "denseFromDecimal: Same as rationalFromDecimal" $
-      QC.forAll genDecimal $ \(dec :: String, yts :: Maybe Char, ds :: Char) ->
+      QC.forAll genDecimal $ \(dec :: T.Text, yts :: Maybe Char, ds :: Char) ->
          let Just r = Money.rationalFromDecimal yts ds dec
              Just dns = Money.denseFromDecimal yts ds 1 dec
          in r === toRational (dns :: Money.Dense currency)
 
   , QC.testProperty "denseFromDecimal: Same as rationalFromDecimal" $
-      QC.forAll genDecimal $ \(dec :: String, yts :: Maybe Char, ds :: Char) ->
+      QC.forAll genDecimal $ \(dec :: T.Text, yts :: Maybe Char, ds :: Char) ->
          let Just r = Money.rationalFromDecimal yts ds dec
              Just dns = Money.denseFromDecimal yts ds 1 dec
          in r === toRational (dns :: Money.Dense currency)
@@ -552,7 +555,7 @@ testDense pc =
   , QC.testProperty "Aeson decoding of pre-0.4 format (Dense, SomeDense)" $
       QC.forAll QC.arbitrary $ \(x :: Money.Dense currency) ->
         let sx = Money.toSomeDense x
-            c = Money.someDenseCurrency sx
+            c = T.unpack (Money.someDenseCurrency sx)
             r = Money.someDenseAmount sx
             bs = Ae.encode ("Dense" :: String, c, numerator r, denominator r)
         in (Just  x === Ae.decode bs) .&&.
@@ -694,7 +697,7 @@ testDiscrete pc pu =
          Just x === Money.fromSomeDiscrete (Money.toSomeDiscrete x)
   , QC.testProperty "fromSomeDiscrete works only for same currency and scale" $
       QC.forAll QC.arbitrary $ \(dr :: Money.SomeDiscrete) ->
-        ((Money.someDiscreteCurrency dr /= symbolVal pc) &&
+        ((T.unpack (Money.someDiscreteCurrency dr) /= symbolVal pc) &&
          (Money.someDiscreteScale dr /=
              Money.scale (Proxy :: Proxy (Money.Scale currency unit)))
         ) ==> isNothing (Money.fromSomeDiscrete dr
@@ -709,7 +712,7 @@ testDiscrete pc pu =
 
   , QC.testProperty "discreteCurrency" $
       QC.forAll QC.arbitrary $ \(x :: Money.Discrete currency unit) ->
-        Money.discreteCurrency x === symbolVal pc
+        T.unpack (Money.discreteCurrency x) === symbolVal pc
 
   , QC.testProperty "discreteToDecimal/discreteFromDecimal: Same as denseToDecimal/denseFromDecimal" $
       -- We check that the roundtrip results in a close amount with a fractional
@@ -760,7 +763,7 @@ testDiscrete pc pu =
   , QC.testProperty "Aeson decoding of pre-0.4 format (Discrete, SomeDiscrete)" $
       QC.forAll QC.arbitrary $ \(x :: Money.Discrete currency unit) ->
         let sx = Money.toSomeDiscrete x
-            c = Money.someDiscreteCurrency sx
+            c = T.unpack (Money.someDiscreteCurrency sx)
             r = Money.someDiscreteScale sx
             a = Money.someDiscreteAmount sx
             bs = Ae.encode ("Discrete" :: String, c, numerator r, denominator r, a)
@@ -912,8 +915,8 @@ testExchangeRate ps pd =
          Just x === Money.fromSomeExchangeRate (Money.toSomeExchangeRate x)
   , QC.testProperty "fromSomeExchangeRate works only for same currencies" $
       QC.forAll QC.arbitrary $ \(x :: Money.SomeExchangeRate) ->
-        ((Money.someExchangeRateSrcCurrency x /= symbolVal ps) &&
-         (Money.someExchangeRateDstCurrency x /= symbolVal pd))
+        ((T.unpack (Money.someExchangeRateSrcCurrency x) /= symbolVal ps) &&
+         (T.unpack (Money.someExchangeRateDstCurrency x) /= symbolVal pd))
             ==> isNothing (Money.fromSomeExchangeRate x
                             :: Maybe (Money.ExchangeRate src dst))
   , QC.testProperty "withSomeExchangeRate" $
@@ -933,7 +936,7 @@ testExchangeRate ps pd =
            in xrd === rd
 
   , QC.testProperty "exchangeRateFromDecimal: Same as rationalFromDecimal" $
-      QC.forAll genDecimal $ \(dec :: String, yts :: Maybe Char, ds :: Char) ->
+      QC.forAll genDecimal $ \(dec :: T.Text, yts :: Maybe Char, ds :: Char) ->
          let Just r = Money.rationalFromDecimal yts ds dec
              yxr = Money.exchangeRateFromDecimal yts ds dec
                       :: Maybe (Money.ExchangeRate src dst)
@@ -956,8 +959,8 @@ testExchangeRate ps pd =
   , QC.testProperty "Aeson decoding of pre-0.4 format (ExchangeRate, SomeExchangeRate)" $
       QC.forAll QC.arbitrary $ \(x :: Money.ExchangeRate src dst) ->
         let sx = Money.toSomeExchangeRate x
-            src = Money.someExchangeRateSrcCurrency sx
-            dst = Money.someExchangeRateDstCurrency sx
+            src = T.unpack (Money.someExchangeRateSrcCurrency sx)
+            dst = T.unpack (Money.someExchangeRateDstCurrency sx)
             r = Money.someExchangeRateRate sx
             bs = Ae.encode ("ExchangeRate" :: String, src, dst, numerator r, denominator r)
         in (Just  x === Ae.decode bs) .&&.

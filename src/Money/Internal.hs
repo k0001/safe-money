@@ -14,6 +14,7 @@
 {-# LANGUAGE RankNTypes #-}
 {-# LANGUAGE ScopedTypeVariables #-}
 {-# LANGUAGE StandaloneDeriving #-}
+{-# LANGUAGE TypeApplications #-}
 {-# LANGUAGE TypeFamilies #-}
 {-# LANGUAGE TypeOperators #-}
 {-# LANGUAGE UndecidableInstances #-}
@@ -294,8 +295,8 @@ dense' = \r ->
 -- > 'denseCurrency' ('dense'' 4 :: 'Dense' \"USD\")
 -- \"USD\"
 -- @
-denseCurrency :: KnownSymbol currency => Dense currency -> String
-denseCurrency = symbolVal
+denseCurrency :: KnownSymbol currency => Dense currency -> T.Text
+denseCurrency = T.pack . symbolVal
 {-# INLINE denseCurrency #-}
 
 -- | 'Discrete' represents a discrete monetary value for a @currency@ expresed
@@ -452,8 +453,8 @@ discreteCurrency
   :: forall currency scale
   .  (KnownSymbol currency, GoodScale scale)
   => Discrete' currency scale
-  -> String -- ^
-discreteCurrency = \_ -> symbolVal (Proxy :: Proxy currency)
+  -> T.Text -- ^
+discreteCurrency = \_ -> T.pack (symbolVal (Proxy @ currency))
 {-# INLINE discreteCurrency #-}
 
 -- | Method for approximating a fractional number to an integer number.
@@ -768,6 +769,10 @@ exchange (ExchangeRate r) = \(Dense s) -> Dense (r * s)
 -- * 'someDenseAmount'
 data SomeDense = SomeDense
   { _someDenseCurrency          :: !String
+    -- ^ This is a 'String' rather than 'T.Text' because it makes it easier for
+    -- us to derive serialization instances maintaining backwards compatiblity
+    -- with pre-0.6 versions of this library, when 'String' was the prefered
+    -- string type, and not 'T.Text'.
   , _someDenseAmount            :: !Rational
   } deriving (Eq, Show, GHC.Generic)
 
@@ -777,8 +782,8 @@ data SomeDense = SomeDense
 deriving instance Ord SomeDense
 
 -- | Currency name.
-someDenseCurrency :: SomeDense -> String
-someDenseCurrency = _someDenseCurrency
+someDenseCurrency :: SomeDense -> T.Text
+someDenseCurrency = T.pack . _someDenseCurrency
 {-# INLINE someDenseCurrency #-}
 
 -- | Currency unit amount.
@@ -792,20 +797,24 @@ someDenseAmount = _someDenseAmount
 -- this 'SomeDense' value to a 'Dense' value in order to do any arithmetic
 -- operation on the monetary value.
 mkSomeDense
-  :: String   -- ^ Currency. ('someDenseCurrency')
+  :: T.Text   -- ^ Currency. ('someDenseCurrency')
   -> Rational -- ^ Scale. ('someDenseAmount')
   -> Maybe SomeDense
-mkSomeDense = \c r ->
+{-# INLINE mkSomeDense #-}
+mkSomeDense = \c r -> mkSomeDense' (T.unpack c) r
+
+-- | Like 'mkSomeDense' but takes 'String' rather than 'T.Text'.
+mkSomeDense' :: String -> Rational -> Maybe SomeDense
+{-# INLINABLE mkSomeDense' #-}
+mkSomeDense' = \c r ->
   if (denominator r /= 0)
   then Just (SomeDense c r)
   else Nothing
-{-# INLINABLE mkSomeDense #-}
 
 -- | Convert a 'Dense' to a 'SomeDense' for ease of serialization.
 toSomeDense :: KnownSymbol currency => Dense currency -> SomeDense
 toSomeDense = \(Dense r0 :: Dense currency) ->
-  let c = symbolVal (Proxy :: Proxy currency)
-  in SomeDense c r0
+  SomeDense (symbolVal (Proxy @ currency)) r0
 {-# INLINE toSomeDense #-}
 
 -- | Attempt to convert a 'SomeDense' to a 'Dense', provided you know the target
@@ -816,7 +825,7 @@ fromSomeDense
   => SomeDense
   -> Maybe (Dense currency)  -- ^
 fromSomeDense = \dr ->
-  if (someDenseCurrency dr == symbolVal (Proxy :: Proxy currency))
+  if (_someDenseCurrency dr == symbolVal (Proxy :: Proxy currency))
   then Just (Dense (someDenseAmount dr))
   else Nothing
 {-# INLINABLE fromSomeDense #-}
@@ -831,7 +840,7 @@ withSomeDense
   -> (forall currency. KnownSymbol currency => Dense currency -> r)
   -> r  -- ^
 withSomeDense dr = \f ->
-   case someSymbolVal (someDenseCurrency dr) of
+   case someSymbolVal (_someDenseCurrency dr) of
       SomeSymbol (Proxy :: Proxy currency) ->
          f (Dense (someDenseAmount dr) :: Dense currency)
 {-# INLINABLE withSomeDense #-}
@@ -853,7 +862,13 @@ withSomeDense dr = \f ->
 -- * 'someDiscreteScale'
 -- * 'someDiscreteAmount'
 data SomeDiscrete = SomeDiscrete
-  { _someDiscreteCurrency :: !String   -- ^ Currency name.
+  { _someDiscreteCurrency :: !String
+    -- ^ Currency name.
+    --
+    -- This is a 'String' rather than 'T.Text' because it makes it easier for
+    -- us to derive serialization instances maintaining backwards compatiblity
+    -- with pre-0.6 versions of this library, when 'String' was the prefered
+    -- string type, and not 'T.Text'.
   , _someDiscreteScale    :: !Rational -- ^ Positive, non-zero.
   , _someDiscreteAmount   :: !Integer  -- ^ Amount of unit.
   } deriving (Eq, Show, GHC.Generic)
@@ -864,8 +879,8 @@ data SomeDiscrete = SomeDiscrete
 deriving instance Ord SomeDiscrete
 
 -- | Currency name.
-someDiscreteCurrency :: SomeDiscrete -> String
-someDiscreteCurrency = _someDiscreteCurrency
+someDiscreteCurrency :: SomeDiscrete -> T.Text
+someDiscreteCurrency = T.pack . _someDiscreteCurrency
 {-# INLINE someDiscreteCurrency #-}
 
 -- | Positive, non-zero.
@@ -884,15 +899,20 @@ someDiscreteAmount = _someDiscreteAmount
 -- this 'SomeDiscrete' value to a 'Discrete' vallue in order to do any arithmetic
 -- operation on the monetary value.
 mkSomeDiscrete
-  :: String   -- ^ Currency name. ('someDiscreteCurrency')
+  :: T.Text   -- ^ Currency name. ('someDiscreteCurrency')
   -> Rational -- ^ Scale. Positive, non-zero. ('someDiscreteScale')
   -> Integer  -- ^ Amount of unit. ('someDiscreteAmount')
   -> Maybe SomeDiscrete
-mkSomeDiscrete = \c r a ->
+{-# INLINE mkSomeDiscrete #-}
+mkSomeDiscrete = \c r a -> mkSomeDiscrete' (T.unpack c) r a
+
+-- | Like 'mkSomeDiscrete' but takes 'String' rather than 'T.Text'.
+mkSomeDiscrete' :: String -> Rational -> Integer -> Maybe SomeDiscrete
+{-# INLINABLE mkSomeDiscrete' #-}
+mkSomeDiscrete' = \c r a ->
   if (denominator r /= 0) && (r > 0)
   then Just (SomeDiscrete c r a)
   else Nothing
-{-# INLINABLE mkSomeDiscrete #-}
 
 -- | Convert a 'Discrete' to a 'SomeDiscrete' for ease of serialization.
 toSomeDiscrete
@@ -914,8 +934,8 @@ fromSomeDiscrete
   => SomeDiscrete
   -> Maybe (Discrete' currency scale)  -- ^
 fromSomeDiscrete = \dr ->
-   if (someDiscreteCurrency dr == symbolVal (Proxy :: Proxy currency)) &&
-      (someDiscreteScale dr == scale (Proxy :: Proxy scale))
+   if (_someDiscreteCurrency dr == symbolVal (Proxy @ currency)) &&
+      (someDiscreteScale dr == scale (Proxy @ scale))
    then Just (Discrete (someDiscreteAmount dr))
    else Nothing
 {-# INLINABLE fromSomeDiscrete #-}
@@ -939,7 +959,7 @@ withSomeDiscrete
            -> r )
   -> r  -- ^
 withSomeDiscrete dr = \f ->
-  case someSymbolVal (someDiscreteCurrency dr) of
+  case someSymbolVal (_someDiscreteCurrency dr) of
     SomeSymbol (Proxy :: Proxy currency) ->
       case someNatVal (numerator (someDiscreteScale dr)) of
         Nothing -> error "withSomeDiscrete: impossible: numerator < 0"
@@ -973,7 +993,15 @@ withSomeDiscrete dr = \f ->
 -- * 'someExchangeRateRate'
 data SomeExchangeRate = SomeExchangeRate
   { _someExchangeRateSrcCurrency     :: !String
+    -- ^ This is a 'String' rather than 'T.Text' because it makes it easier for
+    -- us to derive serialization instances maintaining backwards compatiblity
+    -- with pre-0.6 versions of this library, when 'String' was the prefered
+    -- string type, and not 'T.Text'.
   , _someExchangeRateDstCurrency     :: !String
+    -- ^ This is a 'String' rather than 'T.Text' because it makes it easier for
+    -- us to derive serialization instances maintaining backwards compatiblity
+    -- with pre-0.6 versions of this library, when 'String' was the prefered
+    -- string type, and not 'T.Text'.
   , _someExchangeRateRate            :: !Rational -- ^ Positive, non-zero.
   } deriving (Eq, Show, GHC.Generic)
 
@@ -983,13 +1011,13 @@ data SomeExchangeRate = SomeExchangeRate
 deriving instance Ord SomeExchangeRate
 
 -- | Source currency name.
-someExchangeRateSrcCurrency :: SomeExchangeRate -> String
-someExchangeRateSrcCurrency = _someExchangeRateSrcCurrency
+someExchangeRateSrcCurrency :: SomeExchangeRate -> T.Text
+someExchangeRateSrcCurrency = T.pack . _someExchangeRateSrcCurrency
 {-# INLINE someExchangeRateSrcCurrency #-}
 
 -- | Destination currency name.
-someExchangeRateDstCurrency :: SomeExchangeRate -> String
-someExchangeRateDstCurrency = _someExchangeRateDstCurrency
+someExchangeRateDstCurrency :: SomeExchangeRate -> T.Text
+someExchangeRateDstCurrency = T.pack . _someExchangeRateDstCurrency
 {-# INLINE someExchangeRateDstCurrency #-}
 
 -- | Exchange rate. Positive, non-zero.
@@ -1003,15 +1031,21 @@ someExchangeRateRate = _someExchangeRateRate
 -- this 'SomeExchangeRate' value to a 'ExchangeRate' value in order to do any
 -- arithmetic operation with the exchange rate.
 mkSomeExchangeRate
-  :: String   -- ^ Source currency name. ('someExchangeRateSrcCurrency')
-  -> String   -- ^ Destination currency name. ('someExchangeRateDstCurrency')
+  :: T.Text   -- ^ Source currency name. ('someExchangeRateSrcCurrency')
+  -> T.Text   -- ^ Destination currency name. ('someExchangeRateDstCurrency')
   -> Rational -- ^ Exchange rate . Positive, non-zero. ('someExchangeRateRate')
   -> Maybe SomeExchangeRate
+{-# INLINE mkSomeExchangeRate #-}
 mkSomeExchangeRate = \src dst r ->
+  mkSomeExchangeRate' (T.unpack src) (T.unpack dst) r
+
+-- | Like 'mkSomeExchangeRate' but takes 'String' rather than 'T.Text'.
+mkSomeExchangeRate' :: String -> String -> Rational -> Maybe SomeExchangeRate
+{-# INLINABLE mkSomeExchangeRate' #-}
+mkSomeExchangeRate' = \src dst r ->
   if (denominator r /= 0) && (r > 0)
   then Just (SomeExchangeRate src dst r)
   else Nothing
-{-# INLINABLE mkSomeExchangeRate #-}
 
 -- | Convert a 'ExchangeRate' to a 'SomeDiscrete' for ease of serialization.
 toSomeExchangeRate
@@ -1032,8 +1066,8 @@ fromSomeExchangeRate
   => SomeExchangeRate
   -> Maybe (ExchangeRate src dst)  -- ^
 fromSomeExchangeRate = \x ->
-   if (someExchangeRateSrcCurrency x == symbolVal (Proxy :: Proxy src)) &&
-      (someExchangeRateDstCurrency x == symbolVal (Proxy :: Proxy dst))
+   if (_someExchangeRateSrcCurrency x == symbolVal (Proxy @ src)) &&
+      (_someExchangeRateDstCurrency x == symbolVal (Proxy @ dst))
    then Just (ExchangeRate (someExchangeRateRate x))
    else Nothing
 {-# INLINABLE fromSomeExchangeRate #-}
@@ -1053,9 +1087,9 @@ withSomeExchangeRate
            -> r )
   -> r  -- ^
 withSomeExchangeRate x = \f ->
-  case someSymbolVal (someExchangeRateSrcCurrency x) of
+  case someSymbolVal (_someExchangeRateSrcCurrency x) of
     SomeSymbol (Proxy :: Proxy src) ->
-      case someSymbolVal (someExchangeRateDstCurrency x) of
+      case someSymbolVal (_someExchangeRateDstCurrency x) of
         SomeSymbol (Proxy :: Proxy dst) ->
           f (ExchangeRate (someExchangeRateRate x) :: ExchangeRate src dst)
 {-# INLINABLE withSomeExchangeRate #-}
@@ -1160,37 +1194,41 @@ instance Cereal.Serialize SomeDense where
     n :: Integer <- Cereal.get
     d :: Integer <- Cereal.get
     when (d == 0) (fail "denominator is zero")
-    pure (mkSomeDense c (n % d))
+    pure (mkSomeDense' c (n % d))
 
 -- | Compatible with 'Discrete'.
 instance Cereal.Serialize SomeDiscrete where
   put = \(SomeDiscrete c r a) -> do
+    -- We go through String for backwards compatibility.
     Cereal.put c
     Cereal.put (numerator r)
     Cereal.put (denominator r)
     Cereal.put a
   get = maybe empty pure =<< do
+    -- We go through String for backwards compatibility.
     c :: String <- Cereal.get
     n :: Integer <- Cereal.get
     d :: Integer <- Cereal.get
     when (d == 0) (fail "denominator is zero")
     a :: Integer <- Cereal.get
-    pure (mkSomeDiscrete c (n % d) a)
+    pure (mkSomeDiscrete' c (n % d) a)
 
 -- | Compatible with 'ExchangeRate'.
 instance Cereal.Serialize SomeExchangeRate where
   put = \(SomeExchangeRate src dst r) -> do
+    -- We go through String for backwards compatibility.
     Cereal.put src
     Cereal.put dst
     Cereal.put (numerator r)
     Cereal.put (denominator r)
   get = maybe empty pure =<< do
+    -- We go through String for backwards compatibility.
     src :: String <- Cereal.get
     dst :: String <- Cereal.get
     n :: Integer <- Cereal.get
     d :: Integer <- Cereal.get
     when (d == 0) (fail "denominator is zero")
-    pure (mkSomeExchangeRate src dst (n % d))
+    pure (mkSomeExchangeRate' src dst (n % d))
 #endif
 
 ------------------------------------------------------------------------------
@@ -1217,18 +1255,21 @@ instance
 
 -- | Compatible with 'Dense'.
 instance Binary.Binary SomeDense where
-  put = \(SomeDense c r) ->
-    Binary.put c >> Binary.put (numerator r) >> Binary.put (denominator r)
+  put = \(SomeDense c r) -> do
+    Binary.put c
+    Binary.put (numerator r)
+    Binary.put (denominator r)
   get = maybe empty pure =<< do
     c :: String <- Binary.get
     n :: Integer <- Binary.get
     d :: Integer <- Binary.get
     when (d == 0) (fail "denominator is zero")
-    pure (mkSomeDense c (n % d))
+    pure (mkSomeDense' c (n % d))
 
 -- | Compatible with 'Discrete'.
 instance Binary.Binary SomeDiscrete where
   put = \(SomeDiscrete c r a) ->
+    -- We go through String for backwards compatibility.
     Binary.put c <>
     Binary.put (numerator r) <>
     Binary.put (denominator r) <>
@@ -1239,7 +1280,7 @@ instance Binary.Binary SomeDiscrete where
     d :: Integer <- Binary.get
     when (d == 0) (fail "denominator is zero")
     a :: Integer <- Binary.get
-    pure (mkSomeDiscrete c (n % d) a)
+    pure (mkSomeDiscrete' c (n % d) a)
 
 -- | Compatible with 'ExchangeRate'.
 instance Binary.Binary SomeExchangeRate where
@@ -1254,7 +1295,7 @@ instance Binary.Binary SomeExchangeRate where
     n :: Integer <- Binary.get
     d :: Integer <- Binary.get
     when (d == 0) (fail "denominator is zero")
-    pure (mkSomeExchangeRate src dst (n % d))
+    pure (mkSomeExchangeRate' src dst (n % d))
 
 --------------------------------------------------------------------------------
 -- Extra instances: serialise
@@ -1282,13 +1323,15 @@ instance
 -- | Compatible with 'Dense'.
 instance Ser.Serialise SomeDense where
   encode = \(SomeDense c r) ->
-    Ser.encode c <> Ser.encode (numerator r) <> Ser.encode (denominator r)
+    Ser.encode c <>
+    Ser.encode (numerator r) <>
+    Ser.encode (denominator r)
   decode = maybe (fail "SomeDense") pure =<< do
     c :: String <- Ser.decode
     n :: Integer <- Ser.decode
     d :: Integer <- Ser.decode
     when (d == 0) (fail "denominator is zero")
-    pure (mkSomeDense c (n % d))
+    pure (mkSomeDense' c (n % d))
 
 -- | Compatible with 'Discrete'.
 instance Ser.Serialise SomeDiscrete where
@@ -1303,7 +1346,7 @@ instance Ser.Serialise SomeDiscrete where
     d :: Integer <- Ser.decode
     when (d == 0) (fail "denominator is zero")
     a :: Integer <- Ser.decode
-    pure (mkSomeDiscrete c (n % d) a)
+    pure (mkSomeDiscrete' c (n % d) a)
 
 -- | Compatible with 'ExchangeRate'.
 instance Ser.Serialise SomeExchangeRate where
@@ -1318,7 +1361,7 @@ instance Ser.Serialise SomeExchangeRate where
     n :: Integer <- Ser.decode
     d :: Integer <- Ser.decode
     when (d == 0) (fail "denominator is zero")
-    pure (mkSomeExchangeRate src dst (n % d))
+    pure (mkSomeExchangeRate' src dst (n % d))
 #endif
 
 --------------------------------------------------------------------------------
@@ -1363,7 +1406,7 @@ instance Ae.FromJSON SomeDense where
        ("Dense" :: String, c, n, d) <- Ae.parseJSON v
        pure (c, n, d)
     when (d == 0) (fail "denominator is zero")
-    maybe empty pure (mkSomeDense c (n % d))
+    maybe empty pure (mkSomeDense' c (n % d))
 
 -- | Compatible with 'SomeDiscrete'
 --
@@ -1405,7 +1448,7 @@ instance Ae.FromJSON SomeDiscrete where
   parseJSON = \v -> do
     (c, n, d, a) <- Ae.parseJSON v <|> do
        -- Pre 0.4 format.
-       ("Discrete" :: String, c, n, d, a) <- Ae.parseJSON v
+       ("Discrete" :: T.Text, c, n, d, a) <- Ae.parseJSON v
        pure (c, n, d, a)
     when (d == 0) (fail "denominator is zero")
     maybe empty pure (mkSomeDiscrete c (n % d) a)
@@ -1451,7 +1494,7 @@ instance Ae.FromJSON SomeExchangeRate where
   parseJSON = \v -> do
     (src, dst, n, d) <- Ae.parseJSON v <|> do
        -- Pre 0.4 format.
-       ("ExchangeRate" :: String, src, dst, n, d) <- Ae.parseJSON v
+       ("ExchangeRate" :: T.Text, src, dst, n, d) <- Ae.parseJSON v
        pure (src, dst, n, d)
     when (d == 0) (fail "denominator is zero")
     maybe empty pure (mkSomeExchangeRate src dst (n % d))
@@ -1481,13 +1524,12 @@ instance Xmlbf.ToXml SomeDense where
     let as = [ (T.pack "c", T.pack c)
              , (T.pack "n", T.pack (show (numerator r)))
              , (T.pack "d", T.pack (show (denominator r))) ]
-        Right e = Xmlbf.element (T.pack "money-dense") (fromList as) []
-    in [e]
+    in [ Xmlbf.element' (T.pack "money-dense") (fromList as) [] ]
 
 -- | Compatible with 'Dense'.
 instance Xmlbf.FromXml SomeDense where
   fromXml = Xmlbf.pElement (T.pack "money-dense") $ do
-    c <- T.unpack <$> Xmlbf.pAttr "c"
+    c <- Xmlbf.pAttr "c"
     n <- Xmlbf.pRead =<< Xmlbf.pAttr "n"
     d <- Xmlbf.pRead =<< Xmlbf.pAttr "d"
     when (d == 0) (fail "denominator is zero")
@@ -1514,17 +1556,16 @@ instance
 -- | Compatible with 'Discrete''
 instance Xmlbf.ToXml SomeDiscrete where
   toXml = \(SomeDiscrete c r a) ->
-    let as = [ (T.pack "c", T.pack c)
-             , (T.pack "n", T.pack (show (numerator r)))
-             , (T.pack "d", T.pack (show (denominator r)))
-             , (T.pack "a", T.pack (show a)) ]
-        Right e = Xmlbf.element (T.pack "money-discrete") (fromList as) []
-    in [e]
+    let as = [ ("c", T.pack c)
+             , ("n", T.pack (show (numerator r)))
+             , ("d", T.pack (show (denominator r)))
+             , ("a", T.pack (show a)) ]
+    in [ Xmlbf.element' (T.pack "money-discrete") (fromList as) [] ]
 
 -- | Compatible with 'Discrete''
 instance Xmlbf.FromXml SomeDiscrete where
   fromXml = Xmlbf.pElement (T.pack "money-discrete") $ do
-    c <- T.unpack <$> Xmlbf.pAttr "c"
+    c <- Xmlbf.pAttr "c"
     n <- Xmlbf.pRead =<< Xmlbf.pAttr "n"
     d <- Xmlbf.pRead =<< Xmlbf.pAttr "d"
     when (d == 0) (fail "denominator is zero")
@@ -1553,18 +1594,17 @@ instance
 -- | Compatible with 'ExchangeRate'
 instance Xmlbf.ToXml SomeExchangeRate where
   toXml = \(SomeExchangeRate src dst r) ->
-    let as = [ (T.pack "src", T.pack src)
-             , (T.pack "dst", T.pack dst)
-             , (T.pack "n", T.pack (show (numerator r)))
-             , (T.pack "d", T.pack (show (denominator r))) ]
-        Right e = Xmlbf.element (T.pack "exchange-rate") (fromList as) []
-    in [e]
+    let as = [ ("src", T.pack src)
+             , ("dst", T.pack dst)
+             , ("n", T.pack (show (numerator r)))
+             , ("d", T.pack (show (denominator r))) ]
+    in [ Xmlbf.element' (T.pack "exchange-rate") (fromList as) [] ]
 
 -- | Compatible with 'ExchangeRate'
 instance Xmlbf.FromXml SomeExchangeRate where
   fromXml = Xmlbf.pElement (T.pack "exchange-rate") $ do
-    src <- T.unpack <$> Xmlbf.pAttr "src"
-    dst <- T.unpack <$> Xmlbf.pAttr "dst"
+    src <- Xmlbf.pAttr "src"
+    dst <- Xmlbf.pAttr "dst"
     n <- Xmlbf.pRead =<< Xmlbf.pAttr "n"
     d <- Xmlbf.pRead =<< Xmlbf.pAttr "d"
     when (d == 0) (fail "denominator is zero")
@@ -1590,7 +1630,7 @@ instance Store.Store SomeDense where
     n :: Integer <- Store.peek
     d :: Integer <- Store.peek
     when (d == 0) (fail "denominator is zero")
-    pure (mkSomeDense c (n % d))
+    pure (mkSomeDense' c (n % d))
 
 -- | Compatible with 'SomeDiscrete'.
 instance
@@ -1607,12 +1647,13 @@ instance Store.Store SomeDiscrete where
     Store.poke (denominator r)
     Store.poke a
   peek = maybe (fail "peek") pure =<< do
+    -- We go through String for backwards compatibility.
     c :: String <- Store.peek
     n :: Integer <- Store.peek
     d :: Integer <- Store.peek
     when (d == 0) (fail "denominator is zero")
     a :: Integer <- Store.peek
-    pure (mkSomeDiscrete c (n % d) a)
+    pure (mkSomeDiscrete' c (n % d) a)
 -- | Compatible with 'SomeExchangeRate'.
 instance
   ( KnownSymbol src, KnownSymbol dst
@@ -1628,12 +1669,12 @@ instance Store.Store SomeExchangeRate where
     Store.poke (numerator r)
     Store.poke (denominator r)
   peek = maybe (fail "peek") pure =<< do
-    src <- Store.peek
-    dst <- Store.peek
-    n <- Store.peek
-    d <- Store.peek
+    src :: String <- Store.peek
+    dst :: String <- Store.peek
+    n :: Integer <- Store.peek
+    d :: Integer <- Store.peek
     when (d == 0) (fail "denominator is zero")
-    pure (mkSomeExchangeRate src dst (n % d))
+    pure (mkSomeExchangeRate' src dst (n % d))
 
 storeContramapSize :: (a -> b) -> Store.Size b -> Store.Size a
 storeContramapSize f = \case
@@ -1713,7 +1754,7 @@ denseToDecimal
   -- representation unless a big number of fractional digits is used.
   -> Dense currency
   -- ^ The dense monetary amount to render.
-  -> Maybe String
+  -> Maybe T.Text
   -- ^ Returns 'Nothing' is the given separators are not acceptable (i.e., they
   -- are digits, or they are equal).
 {-# INLINABLE denseToDecimal #-}
@@ -1791,7 +1832,7 @@ discreteToDecimal
   -- representation unless a big number of fractional digits is used.
   -> Discrete' currency scale
   -- ^ The monetary amount to render.
-  -> Maybe String
+  -> Maybe T.Text
   -- ^ Returns 'Nothing' is the given separators are not acceptable (i.e., they
   -- are digits, or they are equal).
 {-# INLINABLE discreteToDecimal #-}
@@ -1822,7 +1863,7 @@ exchangeRateToDecimal
   -- ^ Number of decimal numbers to render, if any.
   -> ExchangeRate src dst
   -- ^ The 'ExchangeRate' to render.
-  -> Maybe String
+  -> Maybe T.Text
   -- ^ Returns 'Nothing' is the given separators are not acceptable (i.e., they
   -- are digits, or they are equal).
 {-# INLINABLE exchangeRateToDecimal #-}
@@ -1849,14 +1890,14 @@ rationalToDecimal
   -- ^ Number of decimal numbers to render, if any.
   -> Rational
   -- ^ The dense monetary amount to render.
-  -> Maybe String
+  -> Maybe T.Text
   -- ^ Returns 'Nothing' is the given separators are not acceptable (i.e., they
   -- are digits, or they are equal).
 {-# INLINABLE rationalToDecimal #-}
 rationalToDecimal a plus ytsep dsep fdigs0 = \r0 -> do
+  guard (not (Char.isDigit dsep))
   for_ ytsep $ \tsep ->
      guard (tsep /= dsep && not (Char.isDigit tsep))
-  guard (not (Char.isDigit dsep))
   -- this string-fu is not particularly efficient.
   let parts = approximate a (r0 * (10 ^ fdigs0)) :: Integer
       ipart = fromInteger (abs parts) `div` (10 ^ fdigs0) :: Natural
@@ -1864,7 +1905,7 @@ rationalToDecimal a plus ytsep dsep fdigs0 = \r0 -> do
             | otherwise = drop (length (show ipart)) (show (abs parts))
       itext = maybe (show ipart) (renderThousands ipart) ytsep :: String
       fpad0 = List.replicate (fromIntegral fdigs0 - length ftext) '0' :: String
-  Just $ mconcat
+  Just $ T.pack $ mconcat
     [ if | parts < 0 -> "-"
          | plus && parts > 0 -> "+"
          | otherwise -> ""
@@ -1882,7 +1923,7 @@ rationalToDecimal a plus ytsep dsep fdigs0 = \r0 -> do
 -- @
 renderThousands :: Natural -> Char -> String
 {-# INLINABLE renderThousands #-}
-renderThousands n0
+renderThousands n0   -- TODO better use text
   | n0 < 1000 = \_ -> show n0
   | otherwise = \c -> List.foldl' (flip mappend) mempty (List.unfoldr (f c) n0)
       where f :: Char -> Natural -> Maybe (String, Natural)
@@ -1915,7 +1956,7 @@ denseFromDecimal
   -- represents a unit other than the main unit for the currency (e.g., cents
   -- rather than dollars for USD, or grams rather than troy-ounces for XAU, or
   -- millibitcoins rather than bitcoins for BTC).
-  -> String
+  -> T.Text
   -- ^ The raw string containing the decimal representation (e.g.,
   -- @"-1,234.56789"@).
   -> Maybe (Dense currency)
@@ -1947,7 +1988,7 @@ discreteFromDecimal
   -- represents a unit other than the main unit for the currency (e.g., cents
   -- rather than dollars for USD, or grams rather than troy-ounces for XAU, or
   -- millibitcoins rather than bitcoins for BTC).
-  -> String
+  -> T.Text
   -- ^ The raw string containing the decimal representation (e.g.,
   -- @"-1,234.56789"@).
   -> Maybe (Discrete' currency scale)
@@ -1964,13 +2005,13 @@ exchangeRateFromDecimal
   -- @1,234.56789@).
   -> Char
   -- ^ Decimal separator (i.e., the @\'.\'@ in @1,234.56789@)
-  -> String
+  -> T.Text
   -- ^ The raw string containing the decimal representation (e.g.,
   -- @"1,234.56789"@).
   -> Maybe (ExchangeRate src dst)
-exchangeRateFromDecimal yst sf = \case
-  ('-':_) -> Nothing
-  str -> exchangeRate =<< rationalFromDecimal yst sf str
+exchangeRateFromDecimal yst sf t
+  | T.isPrefixOf "-" t = Nothing
+  | otherwise = exchangeRate =<< rationalFromDecimal yst sf t
 
 rationalFromDecimal
   :: Maybe Char
@@ -1978,12 +2019,12 @@ rationalFromDecimal
   -- @-1,234.56789@).
   -> Char
   -- ^ Decimal separator (i.e., the @\'.\'@ in @-1,234.56789@)
-  -> String
+  -> T.Text
   -- ^ The raw string containing the decimal representation (e.g.,
   -- @"-1,234.56789"@).
   -> Maybe Rational
-rationalFromDecimal yst sf = \s ->
-  case ReadP.readP_to_S (rationalFromDecimalP yst sf) s of
+rationalFromDecimal yst sf = \t ->
+  case ReadP.readP_to_S (rationalFromDecimalP yst sf) (T.unpack t) of
     [(x,"")] -> Just x
     _ -> Nothing
 
