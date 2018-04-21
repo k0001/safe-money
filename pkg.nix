@@ -1,7 +1,7 @@
 { mkDerivation, stdenv, ghc
 , base, bytestring, constraints, tasty, tasty-hunit, tasty-quickcheck
 , binary, aeson, cereal, deepseq, hashable, serialise, store, xmlbf, text
-, vector-space, parsec
+, vector-space
 , flags ? {}
 }:
 
@@ -33,7 +33,7 @@ in mkDerivation rec {
   license = stdenv.lib.licenses.bsd3;
   src = ./.;
   libraryHaskellDepends =
-    [ base binary constraints deepseq parsec text ] ++ extraDeps;
+    [ base binary constraints deepseq text ] ++ extraDeps;
   testHaskellDepends = libraryHaskellDepends ++
     [ bytestring tasty tasty-hunit tasty-quickcheck ];
   configureFlags =

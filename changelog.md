@@ -16,9 +16,6 @@
   `String`. This change doesn't break backwards compatibilility with binary
   serializations.
 
-* The `parsec` library is now a mandatory dependency. Note that `parsec` is
-  always included with the standard GHC distribution.
-
 * Introduced a new function `discreteToDecimal`.
 
 * Added tests to ensure backwards compatibility of serializations.

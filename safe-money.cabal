@@ -21,7 +21,7 @@ description:
   crypto currencies and precious metals.
   .
   NOTICE that the only mandatory dependencies of this package are @base@,
-  @binary@, @constraints@, @deepseq@, @text@ and @parsec@. Except for
+  @binary@, @constraints@, @deepseq@ and @text@. Except for
   @constraints@, all of them are included with a standard GHC distribution. The
   rest of the dependencies are OPTIONAL but enabled by default (except @store@
   which is disabled when building with GHCJS because it doesn't compile ther).
@@ -40,7 +40,6 @@ library
     binary,
     constraints,
     deepseq,
-    parsec,
     text
   exposed-modules:
     Money
