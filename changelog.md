@@ -9,6 +9,8 @@
 
 * Introduced a new function `discreteToDecimal`.
 
+* Added tests to ensure backwards compatibility of serializations.
+
 
 # Version 0.5
 

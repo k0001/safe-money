@@ -1,6 +1,7 @@
 {-# LANGUAGE CPP #-}
 {-# LANGUAGE DataKinds #-}
 {-# LANGUAGE FlexibleContexts #-}
+{-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE PolyKinds #-}
 {-# LANGUAGE ScopedTypeVariables #-}
 {-# LANGUAGE UndecidableInstances #-}
@@ -12,17 +13,19 @@ module Main where
 import Control.Category (Category((.), id))
 import Control.DeepSeq (rnf)
 import qualified Data.Binary as Binary
-import qualified Data.ByteString.Lazy as BSL
+import qualified Data.ByteString as B
+import qualified Data.ByteString.Lazy as BL
 import qualified Data.Char as Char
 import Data.Maybe (catMaybes, isJust, isNothing, fromJust)
 import Data.Proxy (Proxy(Proxy))
 import Data.Ratio ((%), numerator, denominator)
 import qualified Data.Text as Text
 import Data.Word (Word8)
+import GHC.Exts (fromList)
 import GHC.TypeLits (Nat, Symbol, KnownSymbol, symbolVal)
 import Prelude hiding ((.), id)
 import qualified Test.Tasty as Tasty
-import Test.Tasty.HUnit ((@?=))
+import Test.Tasty.HUnit ((@?=), (@=?))
 import qualified Test.Tasty.HUnit as HU
 import qualified Test.Tasty.Runners as Tasty
 import Test.Tasty.QuickCheck ((===), (==>), (.&&.))
@@ -135,7 +138,7 @@ main :: IO ()
 main =  Tasty.defaultMainWithIngredients
   [ Tasty.consoleTestReporter
   , Tasty.listingTests
-  ] (Tasty.localOption (QC.QuickCheckTests 100) tests)
+  ] (Tasty.localOption (QC.QuickCheckTests 500) tests)
 
 tests :: Tasty.TestTree
 tests =
@@ -146,6 +149,7 @@ tests =
   , testRationalToDecimal
   , testRationalFromDecimal
   , testDiscreteFromDecimal
+  , testRawSerializations
   ]
 
 testCurrencies :: Tasty.TestTree
@@ -550,7 +554,7 @@ testDense pc =
         let sx = Money.toSomeDense x
             c = Money.someDenseCurrency sx
             r = Money.someDenseAmount sx
-            bs = Ae.encode ("Dense", c, numerator r, denominator r)
+            bs = Ae.encode ("Dense" :: String, c, numerator r, denominator r)
         in (Just  x === Ae.decode bs) .&&.
            (Just sx === Ae.decode bs)
 #endif
@@ -563,17 +567,17 @@ testDense pc =
       QC.forAll QC.arbitrary $ \(x :: Money.Dense currency) ->
          let x' = Money.toSomeDense x
              bs = Binary.encode x'
-         in Right (mempty, BSL.length bs, x') === Binary.decodeOrFail bs
+         in Right (mempty, BL.length bs, x') === Binary.decodeOrFail bs
   , QC.testProperty "Binary encoding roundtrip (Dense through SomeDense)" $
       QC.forAll QC.arbitrary $ \(x :: Money.Dense currency) ->
          let x' = Money.toSomeDense x
              bs = Binary.encode x'
-         in Right (mempty, BSL.length bs, x) === Binary.decodeOrFail bs
+         in Right (mempty, BL.length bs, x) === Binary.decodeOrFail bs
   , QC.testProperty "Binary encoding roundtrip (SomeDense through Dense)" $
       QC.forAll QC.arbitrary $ \(x :: Money.Dense currency) ->
          let x' = Money.toSomeDense x
              bs = Binary.encode x
-         in Right (mempty, BSL.length bs, x') === Binary.decodeOrFail bs
+         in Right (mempty, BL.length bs, x') === Binary.decodeOrFail bs
 
 #ifdef HAS_cereal
   , QC.testProperty "Cereal encoding roundtrip" $
@@ -759,7 +763,7 @@ testDiscrete pc pu =
             c = Money.someDiscreteCurrency sx
             r = Money.someDiscreteScale sx
             a = Money.someDiscreteAmount sx
-            bs = Ae.encode ("Discrete", c, numerator r, denominator r, a)
+            bs = Ae.encode ("Discrete" :: String, c, numerator r, denominator r, a)
         in (Just  x === Ae.decode bs) .&&.
            (Just sx === Ae.decode bs)
 #endif
@@ -772,17 +776,17 @@ testDiscrete pc pu =
       QC.forAll QC.arbitrary $ \(x :: Money.Discrete currency unit) ->
          let x' = Money.toSomeDiscrete x
              bs = Binary.encode x'
-         in Right (mempty, BSL.length bs, x') === Binary.decodeOrFail bs
+         in Right (mempty, BL.length bs, x') === Binary.decodeOrFail bs
   , QC.testProperty "Binary encoding roundtrip (Discrete through SomeDiscrete)" $
       QC.forAll QC.arbitrary $ \(x :: Money.Discrete currency unit) ->
          let x' = Money.toSomeDiscrete x
              bs = Binary.encode x'
-         in Right (mempty, BSL.length bs, x) === Binary.decodeOrFail bs
+         in Right (mempty, BL.length bs, x) === Binary.decodeOrFail bs
   , QC.testProperty "Binary encoding roundtrip (SomeDiscrete through Discrete)" $
       QC.forAll QC.arbitrary $ \(x :: Money.Discrete currency unit) ->
          let x' = Money.toSomeDiscrete x
              bs = Binary.encode x
-         in Right (mempty, BSL.length bs, x') === Binary.decodeOrFail bs
+         in Right (mempty, BL.length bs, x') === Binary.decodeOrFail bs
 
 #ifdef HAS_cereal
   , QC.testProperty "Cereal encoding roundtrip" $
@@ -955,7 +959,7 @@ testExchangeRate ps pd =
             src = Money.someExchangeRateSrcCurrency sx
             dst = Money.someExchangeRateDstCurrency sx
             r = Money.someExchangeRateRate sx
-            bs = Ae.encode ("ExchangeRate", src, dst, numerator r, denominator r)
+            bs = Ae.encode ("ExchangeRate" :: String, src, dst, numerator r, denominator r)
         in (Just  x === Ae.decode bs) .&&.
            (Just sx === Ae.decode bs)
 #endif
@@ -968,17 +972,17 @@ testExchangeRate ps pd =
       QC.forAll QC.arbitrary $ \(x :: Money.ExchangeRate src dst) ->
          let x' = Money.toSomeExchangeRate x
              bs = Binary.encode x'
-         in Right (mempty, BSL.length bs, x') === Binary.decodeOrFail bs
+         in Right (mempty, BL.length bs, x') === Binary.decodeOrFail bs
   , QC.testProperty "Binary encoding roundtrip (ExchangeRate through SomeExchangeRate)" $
       QC.forAll QC.arbitrary $ \(x :: Money.ExchangeRate src dst) ->
          let x' = Money.toSomeExchangeRate x
              bs = Binary.encode x'
-         in Right (mempty, BSL.length bs, x) === Binary.decodeOrFail bs
+         in Right (mempty, BL.length bs, x) === Binary.decodeOrFail bs
   , QC.testProperty "Binary encoding roundtrip (SomeExchangeRate through ExchangeRate)" $
       QC.forAll QC.arbitrary $ \(x :: Money.ExchangeRate src dst) ->
          let x' = Money.toSomeExchangeRate x
              bs = Binary.encode x
-         in Right (mempty, BSL.length bs, x') === Binary.decodeOrFail bs
+         in Right (mempty, BL.length bs, x') === Binary.decodeOrFail bs
 
 #ifdef HAS_cereal
   , QC.testProperty "Cereal encoding roundtrip" $
@@ -1128,7 +1132,211 @@ testRounding _ _ =
       (y, 0) -> Money.denseFromDiscrete y
       (_, _) -> error "testRounding.h: unexpected"
 
+
 hush :: Either a b -> Maybe b
 hush (Left _ ) = Nothing
 hush (Right b) = Just b
 
+--------------------------------------------------------------------------------
+-- Raw parsing "golden tests"
+
+testRawSerializations :: Tasty.TestTree
+testRawSerializations =
+  Tasty.testGroup "Raw serializations"
+  [ Tasty.testGroup "binary"
+    [ HU.testCase "Dense" $ do
+        Right rawDns0 @=?
+          fmap (\(_,_,a) -> a) (Binary.decodeOrFail rawDns0_binary)
+    , HU.testCase "Discrete" $ do
+        Right rawDis0 @=?
+          fmap (\(_,_,a) -> a) (Binary.decodeOrFail rawDis0_binary)
+    , HU.testCase "ExchangeRate" $ do
+        Right rawXr0 @=?
+          fmap (\(_,_,a) -> a) (Binary.decodeOrFail rawXr0_binary)
+    ]
+
+#ifdef HAS_aeson
+  , Tasty.testGroup "aeson"
+    [ HU.testCase "Dense" $ Just rawDns0 @=? Ae.decode rawDns0_aeson
+    , HU.testCase "Discrete" $ Just rawDis0 @=? Ae.decode rawDis0_aeson
+    , HU.testCase "ExchangeRate" $ Just rawXr0 @=? Ae.decode rawXr0_aeson
+    ]
+#endif
+
+#ifdef HAS_serialise
+  , Tasty.testGroup "serialise"
+    [ HU.testCase "Dense" $ do
+        Just rawDns0 @=? hush (Ser.deserialiseOrFail rawDns0_serialise)
+    , HU.testCase "Discrete" $ do
+        Just rawDis0 @=? hush (Ser.deserialiseOrFail rawDis0_serialise)
+    , HU.testCase "ExchangeRate" $ do
+        Just rawXr0 @=? hush (Ser.deserialiseOrFail rawXr0_serialise)
+    ]
+#endif
+
+#ifdef HAS_cereal
+  , Tasty.testGroup "cereal"
+    [ HU.testCase "Dense" $ do
+        Right rawDns0 @=? Cereal.decode rawDns0_cereal
+    , HU.testCase "Discrete" $ do
+        Right rawDis0 @=? Cereal.decode rawDis0_cereal
+    , HU.testCase "ExchangeRate" $ do
+        Right rawXr0 @=? Cereal.decode rawXr0_cereal
+    ]
+#endif
+
+#ifdef HAS_store
+  , Tasty.testGroup "store"
+    [ HU.testCase "Dense" $ do
+        Right rawDns0 @=? Store.decode rawDns0_store
+    , HU.testCase "Discrete" $ do
+        Right rawDis0 @=? Store.decode rawDis0_store
+    , HU.testCase "ExchangeRate" $ do
+        Right rawXr0 @=? Store.decode rawXr0_store
+    ]
+#endif
+
+#ifdef HAS_xmlbf
+  , Tasty.testGroup "xmlbf"
+    [ HU.testCase "Dense" $ do
+        Right rawDns0 @=? Xmlbf.runParser Xmlbf.fromXml rawDns0_xmlbf
+    , HU.testCase "Discrete" $ do
+        Right rawDis0 @=? Xmlbf.runParser Xmlbf.fromXml rawDis0_xmlbf
+    , HU.testCase "ExchangeRate" $ do
+        Right rawXr0 @=? Xmlbf.runParser Xmlbf.fromXml rawXr0_xmlbf
+    ]
+#endif
+  ]
+
+rawDns0 :: Money.Dense "USD"
+rawDns0 = Money.dense' (26%1)
+
+rawDis0 :: Money.Discrete "USD" "cent"
+rawDis0 = Money.discrete 4
+
+rawXr0 :: Money.ExchangeRate "USD" "BTC"
+Just rawXr0 = Money.exchangeRate (3%2)
+
+-- binary
+rawDns0_binary :: BL.ByteString
+rawDns0_binary = "\NUL\NUL\NUL\NUL\NUL\NUL\NUL\ETXUSD\NUL\NUL\NUL\NUL\SUB\NUL\NUL\NUL\NUL\SOH"
+rawDis0_binary :: BL.ByteString
+rawDis0_binary = "\NUL\NUL\NUL\NUL\NUL\NUL\NUL\ETXUSD\NUL\NUL\NUL\NULd\NUL\NUL\NUL\NUL\SOH\NUL\NUL\NUL\NUL\EOT"
+rawXr0_binary :: BL.ByteString
+rawXr0_binary = "\NUL\NUL\NUL\NUL\NUL\NUL\NUL\ETXUSD\NUL\NUL\NUL\NUL\NUL\NUL\NUL\ETXBTC\NUL\NUL\NUL\NUL\ETX\NUL\NUL\NUL\NUL\STX"
+
+#ifdef HAS_aeson
+rawDns0_aeson :: BL.ByteString
+rawDns0_aeson = "[\"USD\",26,1]"
+rawDis0_aeson :: BL.ByteString
+rawDis0_aeson = "[\"USD\",100,1,4]"
+rawXr0_aeson :: BL.ByteString
+rawXr0_aeson = "[\"USD\",\"BTC\",3,2]"
+#endif
+
+#ifdef HAS_serialise
+rawDns0_serialise :: BL.ByteString
+rawDns0_serialise = "cUSD\CAN\SUB\SOH"
+rawDis0_serialise :: BL.ByteString
+rawDis0_serialise = "cUSD\CANd\SOH\EOT"
+rawXr0_serialise :: BL.ByteString
+rawXr0_serialise = "cUSDcBTC\ETX\STX"
+#endif
+
+#ifdef HAS_store
+rawDns0_cereal :: B.ByteString
+rawDns0_cereal = "\NUL\NUL\NUL\NUL\NUL\NUL\NUL\ETXUSD\NUL\NUL\NUL\NUL\SUB\NUL\NUL\NUL\NUL\SOH"
+rawDis0_cereal :: B.ByteString
+rawDis0_cereal = "\NUL\NUL\NUL\NUL\NUL\NUL\NUL\ETXUSD\NUL\NUL\NUL\NULd\NUL\NUL\NUL\NUL\SOH\NUL\NUL\NUL\NUL\EOT"
+rawXr0_cereal :: B.ByteString
+rawXr0_cereal = "\NUL\NUL\NUL\NUL\NUL\NUL\NUL\ETXUSD\NUL\NUL\NUL\NUL\NUL\NUL\NUL\ETXBTC\NUL\NUL\NUL\NUL\ETX\NUL\NUL\NUL\NUL\STX"
+#endif
+
+#ifdef HAS_store
+rawDns0_store :: B.ByteString
+rawDns0_store = "\ETX\NUL\NUL\NUL\NUL\NUL\NUL\NULU\NUL\NUL\NULS\NUL\NUL\NULD\NUL\NUL\NUL\NUL\SUB\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\SOH\NUL\NUL\NUL\NUL\NUL\NUL\NUL"
+rawDis0_store :: B.ByteString
+rawDis0_store = "\ETX\NUL\NUL\NUL\NUL\NUL\NUL\NULU\NUL\NUL\NULS\NUL\NUL\NULD\NUL\NUL\NUL\NULd\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\SOH\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\EOT\NUL\NUL\NUL\NUL\NUL\NUL\NUL"
+rawXr0_store :: B.ByteString
+rawXr0_store = "\ETX\NUL\NUL\NUL\NUL\NUL\NUL\NULU\NUL\NUL\NULS\NUL\NUL\NULD\NUL\NUL\NUL\ETX\NUL\NUL\NUL\NUL\NUL\NUL\NULB\NUL\NUL\NULT\NUL\NUL\NULC\NUL\NUL\NUL\NUL\ETX\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\STX\NUL\NUL\NUL\NUL\NUL\NUL\NUL"
+#endif
+
+#ifdef HAS_xmlbf
+rawDns0_xmlbf :: [Xmlbf.Node]
+rawDns0_xmlbf = -- "<money-dense n=\"26\" d=\"1\" c=\"USD\"/>"
+  [ Xmlbf.element' "money-dense" (fromList [("n","26"), ("d","1"), ("c","USD")]) [] ]
+rawDis0_xmlbf :: [Xmlbf.Node]
+rawDis0_xmlbf = -- "<money-discrete n=\"100\" a=\"4\" d=\"1\" c=\"USD\"/>"
+  [ Xmlbf.element' "money-discrete" (fromList [("n","100"), ("d","1"), ("c","USD"), ("a","4")]) [] ]
+rawXr0_xmlbf :: [Xmlbf.Node]
+rawXr0_xmlbf = -- "<exchange-rate dst=\"BTC\" n=\"3\" d=\"2\" src=\"USD\"/>"
+  [ Xmlbf.element' "exchange-rate" (fromList [("n","3"), ("d","2"), ("src","USD"), ("dst","BTC")]) [] ]
+#endif
+
+{-
+> dns0
+Dense "USD" 26%1
+> dns1
+Dense "" 26%1
+> dis0
+Discrete "USD" 100%1 4
+> dis1
+Discrete "" 1%5 4
+
+> Ae.encode dns0
+"[\"USD\",26,1]"
+> Ae.encode dns1
+"[\"\",26,1]"
+> Ae.encode dis0
+"[\"USD\",100,1,4]"
+> Ae.encode dis1
+"[\"\",1,5,4]"
+
+> Ser.serialise dns0
+"cUSD\CAN\SUB\SOH"
+> Ser.serialise dns1
+"`\CAN\SUB\SOH"
+> Ser.serialise dis0
+"cUSD\CANd\SOH\EOT"
+> Ser.serialise dis1
+"`\SOH\ENQ\EOT"
+
+> Cereal.encode dns0
+"\NUL\NUL\NUL\NUL\NUL\NUL\NUL\ETXUSD\NUL\NUL\NUL\NUL\SUB\NUL\NUL\NUL\NUL\SOH"
+> Cereal.encode dns1
+"\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\SUB\NUL\NUL\NUL\NUL\SOH"
+> Cereal.encode dis0
+"\NUL\NUL\NUL\NUL\NUL\NUL\NUL\ETXUSD\NUL\NUL\NUL\NULd\NUL\NUL\NUL\NUL\SOH\NUL\NUL\NUL\NUL\EOT"
+> Cereal.encode dis1
+"\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\SOH\NUL\NUL\NUL\NUL\ENQ\NUL\NUL\NUL\NUL\EOT"
+
+> Binary.encode dns0
+"\NUL\NUL\NUL\NUL\NUL\NUL\NUL\ETXUSD\NUL\NUL\NUL\NUL\SUB\NUL\NUL\NUL\NUL\SOH"
+> Binary.encode dns1
+"\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\SUB\NUL\NUL\NUL\NUL\SOH"
+> Binary.encode dis0
+"\NUL\NUL\NUL\NUL\NUL\NUL\NUL\ETXUSD\NUL\NUL\NUL\NULd\NUL\NUL\NUL\NUL\SOH\NUL\NUL\NUL\NUL\EOT"
+> Binary.encode dis1
+"\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\SOH\NUL\NUL\NUL\NUL\ENQ\NUL\NUL\NUL\NUL\EOT"
+
+> BB.toLazyByteString (Xmlbf.encode (Xmlbf.toXml dns0))
+"<money-dense n=\"26\" d=\"1\" c=\"USD\"/>"
+> BB.toLazyByteString (Xmlbf.encode (Xmlbf.toXml dns1))
+"<money-dense n=\"26\" d=\"1\" c=\"\"/>"
+> BB.toLazyByteString (Xmlbf.encode (Xmlbf.toXml dis0))
+"<money-discrete n=\"100\" a=\"4\" d=\"1\" c=\"USD\"/>"
+> BB.toLazyByteString (Xmlbf.encode (Xmlbf.toXml dis1))
+"<money-discrete n=\"1\" a=\"4\" d=\"5\" c=\"\"/>"
+
+> Store.encode dns0
+"\ETX\NUL\NUL\NUL\NUL\NUL\NUL\NULU\NUL\NUL\NULS\NUL\NUL\NULD\NUL\NUL\NUL\NUL\SUB\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\SOH\NUL\NUL\NUL\NUL\NUL\NUL\NUL"
+> Store.encode dns1
+"\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\SUB\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\SOH\NUL\NUL\NUL\NUL\NUL\NU
+L\NUL"
+> Store.encode dis0
+"\ETX\NUL\NUL\NUL\NUL\NUL\NUL\NULU\NUL\NUL\NULS\NUL\NUL\NULD\NUL\NUL\NUL\NULd\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\SOH\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\EOT\NUL\NUL\NUL\NUL\NUL\NUL\NUL"
+> Store.encode dis1
+"\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\SOH\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\ENQ\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\EOT\NUL\NUL\NUL\NUL\NUL\NUL\NUL"
+
+
+-}
