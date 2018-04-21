@@ -1135,11 +1135,6 @@ testRounding _ _ =
       (y, 0) -> Money.denseFromDiscrete y
       (_, _) -> error "testRounding.h: unexpected"
 
-
-hush :: Either a b -> Maybe b
-hush (Left _ ) = Nothing
-hush (Right b) = Just b
-
 --------------------------------------------------------------------------------
 -- Raw parsing "golden tests"
 
@@ -1335,4 +1330,11 @@ rawXr0_xmlbf :: [Xmlbf.Node]
 rawXr0_xmlbf = -- "<exchange-rate dst=\"BTC\" n=\"3\" d=\"2\" src=\"USD\"/>"
   [ Xmlbf.element' "exchange-rate" (fromList [("n","3"), ("d","2"), ("src","USD"), ("dst","BTC")]) [] ]
 #endif
+
+--------------------------------------------------------------------------------
+-- Misc
+
+hush :: Either a b -> Maybe b
+hush (Left _ ) = Nothing
+hush (Right b) = Just b
 
