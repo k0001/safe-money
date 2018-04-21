@@ -138,7 +138,7 @@ main :: IO ()
 main =  Tasty.defaultMainWithIngredients
   [ Tasty.consoleTestReporter
   , Tasty.listingTests
-  ] (Tasty.localOption (QC.QuickCheckTests 500) tests)
+  ] (Tasty.localOption (QC.QuickCheckTests 100) tests)
 
 tests :: Tasty.TestTree
 tests =
@@ -1144,66 +1144,114 @@ testRawSerializations :: Tasty.TestTree
 testRawSerializations =
   Tasty.testGroup "Raw serializations"
   [ Tasty.testGroup "binary"
-    [ HU.testCase "Dense" $ do
-        Right rawDns0 @=?
-          fmap (\(_,_,a) -> a) (Binary.decodeOrFail rawDns0_binary)
-    , HU.testCase "Discrete" $ do
-        Right rawDis0 @=?
-          fmap (\(_,_,a) -> a) (Binary.decodeOrFail rawDis0_binary)
-    , HU.testCase "ExchangeRate" $ do
-        Right rawXr0 @=?
-          fmap (\(_,_,a) -> a) (Binary.decodeOrFail rawXr0_binary)
+    [ Tasty.testGroup "encode"
+      [ HU.testCase "Dense" $ do
+          Right rawDns0 @=?
+            fmap (\(_,_,a) -> a) (Binary.decodeOrFail rawDns0_binary)
+      , HU.testCase "Discrete" $ do
+          Right rawDis0 @=?
+            fmap (\(_,_,a) -> a) (Binary.decodeOrFail rawDis0_binary)
+      , HU.testCase "ExchangeRate" $ do
+          Right rawXr0 @=?
+            fmap (\(_,_,a) -> a) (Binary.decodeOrFail rawXr0_binary)
+      ]
+    , Tasty.testGroup "encode"
+      [ HU.testCase "Dense" $ rawDns0_binary @=? Binary.encode rawDns0
+      , HU.testCase "Discrete" $ rawDis0_binary @=? Binary.encode rawDis0
+      , HU.testCase "ExchangeRate" $ rawXr0_binary @=? Binary.encode rawXr0
+      ]
     ]
 
 #ifdef HAS_aeson
   , Tasty.testGroup "aeson"
-    [ HU.testCase "Dense" $ Just rawDns0 @=? Ae.decode rawDns0_aeson
-    , HU.testCase "Discrete" $ Just rawDis0 @=? Ae.decode rawDis0_aeson
-    , HU.testCase "ExchangeRate" $ Just rawXr0 @=? Ae.decode rawXr0_aeson
+    [ Tasty.testGroup "decode"
+      [ HU.testCase "Dense" $ Just rawDns0 @=? Ae.decode rawDns0_aeson
+      , HU.testCase "Discrete" $ Just rawDis0 @=? Ae.decode rawDis0_aeson
+      , HU.testCase "ExchangeRate" $ Just rawXr0 @=? Ae.decode rawXr0_aeson
+      ]
+    , Tasty.testGroup "decode (pre-0.4)"
+      [ HU.testCase "Dense" $ Just rawDns0 @=? Ae.decode rawDns0_aeson_pre04
+      , HU.testCase "Discrete" $ Just rawDis0 @=? Ae.decode rawDis0_aeson_pre04
+      , HU.testCase "ExchangeRate" $ Just rawXr0 @=? Ae.decode rawXr0_aeson_pre04
+      ]
+    , Tasty.testGroup "encode"
+      [ HU.testCase "Dense" $ rawDns0_aeson @=? Ae.encode rawDns0
+      , HU.testCase "Discrete" $ rawDis0_aeson @=? Ae.encode rawDis0
+      , HU.testCase "ExchangeRate" $ rawXr0_aeson @=? Ae.encode rawXr0
+      ]
     ]
 #endif
 
 #ifdef HAS_serialise
   , Tasty.testGroup "serialise"
-    [ HU.testCase "Dense" $ do
-        Just rawDns0 @=? hush (Ser.deserialiseOrFail rawDns0_serialise)
-    , HU.testCase "Discrete" $ do
-        Just rawDis0 @=? hush (Ser.deserialiseOrFail rawDis0_serialise)
-    , HU.testCase "ExchangeRate" $ do
-        Just rawXr0 @=? hush (Ser.deserialiseOrFail rawXr0_serialise)
+    [ Tasty.testGroup "decode"
+      [ HU.testCase "Dense" $ do
+          Just rawDns0 @=? hush (Ser.deserialiseOrFail rawDns0_serialise)
+      , HU.testCase "Discrete" $ do
+          Just rawDis0 @=? hush (Ser.deserialiseOrFail rawDis0_serialise)
+      , HU.testCase "ExchangeRate" $ do
+          Just rawXr0 @=? hush (Ser.deserialiseOrFail rawXr0_serialise)
+      ]
+    , Tasty.testGroup "encode"
+      [ HU.testCase "Dense" $ rawDns0_serialise @=? Ser.serialise rawDns0
+      , HU.testCase "Discrete" $ rawDis0_serialise @=? Ser.serialise rawDis0
+      , HU.testCase "ExchangeRate" $ rawXr0_serialise @=? Ser.serialise rawXr0
+      ]
     ]
 #endif
 
 #ifdef HAS_cereal
   , Tasty.testGroup "cereal"
-    [ HU.testCase "Dense" $ do
-        Right rawDns0 @=? Cereal.decode rawDns0_cereal
-    , HU.testCase "Discrete" $ do
-        Right rawDis0 @=? Cereal.decode rawDis0_cereal
-    , HU.testCase "ExchangeRate" $ do
-        Right rawXr0 @=? Cereal.decode rawXr0_cereal
+    [ Tasty.testGroup "decode"
+      [ HU.testCase "Dense" $ do
+          Right rawDns0 @=? Cereal.decode rawDns0_cereal
+      , HU.testCase "Discrete" $ do
+          Right rawDis0 @=? Cereal.decode rawDis0_cereal
+      , HU.testCase "ExchangeRate" $ do
+          Right rawXr0 @=? Cereal.decode rawXr0_cereal
+      ]
+    , Tasty.testGroup "encode"
+      [ HU.testCase "Dense" $ rawDns0_cereal @=? Cereal.encode rawDns0
+      , HU.testCase "Discrete" $ rawDis0_cereal @=? Cereal.encode rawDis0
+      , HU.testCase "ExchangeRate" $ rawXr0_cereal @=? Cereal.encode rawXr0
+      ]
     ]
+
 #endif
 
 #ifdef HAS_store
   , Tasty.testGroup "store"
-    [ HU.testCase "Dense" $ do
-        Right rawDns0 @=? Store.decode rawDns0_store
-    , HU.testCase "Discrete" $ do
-        Right rawDis0 @=? Store.decode rawDis0_store
-    , HU.testCase "ExchangeRate" $ do
-        Right rawXr0 @=? Store.decode rawXr0_store
+    [ Tasty.testGroup "decode"
+      [ HU.testCase "Dense" $ do
+          Right rawDns0 @=? Store.decode rawDns0_store
+      , HU.testCase "Discrete" $ do
+          Right rawDis0 @=? Store.decode rawDis0_store
+      , HU.testCase "ExchangeRate" $ do
+          Right rawXr0 @=? Store.decode rawXr0_store
+      ]
+    , Tasty.testGroup "encode"
+      [ HU.testCase "Dense" $ rawDns0_store @=? Store.encode rawDns0
+      , HU.testCase "Discrete" $ rawDis0_store @=? Store.encode rawDis0
+      , HU.testCase "ExchangeRate" $ rawXr0_store @=? Store.encode rawXr0
+      ]
     ]
 #endif
 
 #ifdef HAS_xmlbf
   , Tasty.testGroup "xmlbf"
-    [ HU.testCase "Dense" $ do
-        Right rawDns0 @=? Xmlbf.runParser Xmlbf.fromXml rawDns0_xmlbf
-    , HU.testCase "Discrete" $ do
-        Right rawDis0 @=? Xmlbf.runParser Xmlbf.fromXml rawDis0_xmlbf
-    , HU.testCase "ExchangeRate" $ do
-        Right rawXr0 @=? Xmlbf.runParser Xmlbf.fromXml rawXr0_xmlbf
+    [ Tasty.testGroup "decode"
+      [ HU.testCase "Dense" $ do
+          Right rawDns0 @=? Xmlbf.runParser Xmlbf.fromXml rawDns0_xmlbf
+      , HU.testCase "Discrete" $ do
+          Right rawDis0 @=? Xmlbf.runParser Xmlbf.fromXml rawDis0_xmlbf
+      , HU.testCase "ExchangeRate" $ do
+          Right rawXr0 @=? Xmlbf.runParser Xmlbf.fromXml rawXr0_xmlbf
+      ]
+    , Tasty.testGroup "encode"
+      [ HU.testCase "Dense" $ rawDns0_xmlbf @=? Xmlbf.toXml rawDns0
+      , HU.testCase "Discrete" $ rawDis0_xmlbf @=? Xmlbf.toXml rawDis0
+      , HU.testCase "ExchangeRate" $ rawXr0_xmlbf @=? Xmlbf.toXml rawXr0
+      ]
     ]
 #endif
   ]
@@ -1232,6 +1280,14 @@ rawDis0_aeson :: BL.ByteString
 rawDis0_aeson = "[\"USD\",100,1,4]"
 rawXr0_aeson :: BL.ByteString
 rawXr0_aeson = "[\"USD\",\"BTC\",3,2]"
+
+-- pre 0.4
+rawDns0_aeson_pre04 :: BL.ByteString
+rawDns0_aeson_pre04 = "[\"Dense\",\"USD\",26,1]"
+rawDis0_aeson_pre04 :: BL.ByteString
+rawDis0_aeson_pre04 = "[\"Discrete\",\"USD\",100,1,4]"
+rawXr0_aeson_pre04 :: BL.ByteString
+rawXr0_aeson_pre04 = "[\"ExchangeRate\",\"USD\",\"BTC\",3,2]"
 #endif
 
 #ifdef HAS_serialise
@@ -1244,6 +1300,8 @@ rawXr0_serialise = "cUSDcBTC\ETX\STX"
 #endif
 
 #ifdef HAS_store
+-- Such a waste of space these many bytes! Can we shrink this and maintain
+-- backwards compatibility?
 rawDns0_cereal :: B.ByteString
 rawDns0_cereal = "\NUL\NUL\NUL\NUL\NUL\NUL\NUL\ETXUSD\NUL\NUL\NUL\NUL\SUB\NUL\NUL\NUL\NUL\SOH"
 rawDis0_cereal :: B.ByteString
@@ -1253,6 +1311,8 @@ rawXr0_cereal = "\NUL\NUL\NUL\NUL\NUL\NUL\NUL\ETXUSD\NUL\NUL\NUL\NUL\NUL\NUL\NUL
 #endif
 
 #ifdef HAS_store
+-- Such a waste of space these many bytes! Can we shrink this and maintain
+-- backwards compatibility?
 rawDns0_store :: B.ByteString
 rawDns0_store = "\ETX\NUL\NUL\NUL\NUL\NUL\NUL\NULU\NUL\NUL\NULS\NUL\NUL\NULD\NUL\NUL\NUL\NUL\SUB\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\SOH\NUL\NUL\NUL\NUL\NUL\NUL\NUL"
 rawDis0_store :: B.ByteString
@@ -1273,70 +1333,3 @@ rawXr0_xmlbf = -- "<exchange-rate dst=\"BTC\" n=\"3\" d=\"2\" src=\"USD\"/>"
   [ Xmlbf.element' "exchange-rate" (fromList [("n","3"), ("d","2"), ("src","USD"), ("dst","BTC")]) [] ]
 #endif
 
-{-
-> dns0
-Dense "USD" 26%1
-> dns1
-Dense "" 26%1
-> dis0
-Discrete "USD" 100%1 4
-> dis1
-Discrete "" 1%5 4
-
-> Ae.encode dns0
-"[\"USD\",26,1]"
-> Ae.encode dns1
-"[\"\",26,1]"
-> Ae.encode dis0
-"[\"USD\",100,1,4]"
-> Ae.encode dis1
-"[\"\",1,5,4]"
-
-> Ser.serialise dns0
-"cUSD\CAN\SUB\SOH"
-> Ser.serialise dns1
-"`\CAN\SUB\SOH"
-> Ser.serialise dis0
-"cUSD\CANd\SOH\EOT"
-> Ser.serialise dis1
-"`\SOH\ENQ\EOT"
-
-> Cereal.encode dns0
-"\NUL\NUL\NUL\NUL\NUL\NUL\NUL\ETXUSD\NUL\NUL\NUL\NUL\SUB\NUL\NUL\NUL\NUL\SOH"
-> Cereal.encode dns1
-"\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\SUB\NUL\NUL\NUL\NUL\SOH"
-> Cereal.encode dis0
-"\NUL\NUL\NUL\NUL\NUL\NUL\NUL\ETXUSD\NUL\NUL\NUL\NULd\NUL\NUL\NUL\NUL\SOH\NUL\NUL\NUL\NUL\EOT"
-> Cereal.encode dis1
-"\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\SOH\NUL\NUL\NUL\NUL\ENQ\NUL\NUL\NUL\NUL\EOT"
-
-> Binary.encode dns0
-"\NUL\NUL\NUL\NUL\NUL\NUL\NUL\ETXUSD\NUL\NUL\NUL\NUL\SUB\NUL\NUL\NUL\NUL\SOH"
-> Binary.encode dns1
-"\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\SUB\NUL\NUL\NUL\NUL\SOH"
-> Binary.encode dis0
-"\NUL\NUL\NUL\NUL\NUL\NUL\NUL\ETXUSD\NUL\NUL\NUL\NULd\NUL\NUL\NUL\NUL\SOH\NUL\NUL\NUL\NUL\EOT"
-> Binary.encode dis1
-"\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\SOH\NUL\NUL\NUL\NUL\ENQ\NUL\NUL\NUL\NUL\EOT"
-
-> BB.toLazyByteString (Xmlbf.encode (Xmlbf.toXml dns0))
-"<money-dense n=\"26\" d=\"1\" c=\"USD\"/>"
-> BB.toLazyByteString (Xmlbf.encode (Xmlbf.toXml dns1))
-"<money-dense n=\"26\" d=\"1\" c=\"\"/>"
-> BB.toLazyByteString (Xmlbf.encode (Xmlbf.toXml dis0))
-"<money-discrete n=\"100\" a=\"4\" d=\"1\" c=\"USD\"/>"
-> BB.toLazyByteString (Xmlbf.encode (Xmlbf.toXml dis1))
-"<money-discrete n=\"1\" a=\"4\" d=\"5\" c=\"\"/>"
-
-> Store.encode dns0
-"\ETX\NUL\NUL\NUL\NUL\NUL\NUL\NULU\NUL\NUL\NULS\NUL\NUL\NULD\NUL\NUL\NUL\NUL\SUB\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\SOH\NUL\NUL\NUL\NUL\NUL\NUL\NUL"
-> Store.encode dns1
-"\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\SUB\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\SOH\NUL\NUL\NUL\NUL\NUL\NU
-L\NUL"
-> Store.encode dis0
-"\ETX\NUL\NUL\NUL\NUL\NUL\NUL\NULU\NUL\NUL\NULS\NUL\NUL\NULD\NUL\NUL\NUL\NULd\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\SOH\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\EOT\NUL\NUL\NUL\NUL\NUL\NUL\NUL"
-> Store.encode dis1
-"\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\SOH\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\ENQ\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\EOT\NUL\NUL\NUL\NUL\NUL\NUL\NUL"
-
-
--}
