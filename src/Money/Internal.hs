@@ -1864,7 +1864,7 @@ exchangeRateToDecimal
   -> ExchangeRate src dst
   -- ^ The 'ExchangeRate' to render.
   -> Maybe T.Text
-  -- ^ Returns 'Nothing' is the given separators are not acceptable (i.e., they
+  -- ^ Returns 'Nothing' if the given separators are not acceptable (i.e., they
   -- are digits, or they are equal).
 {-# INLINABLE exchangeRateToDecimal #-}
 exchangeRateToDecimal a ytsep dsep fdigs0 = \(ExchangeRate r0) ->
@@ -1891,7 +1891,7 @@ rationalToDecimal
   -> Rational
   -- ^ The dense monetary amount to render.
   -> Maybe T.Text
-  -- ^ Returns 'Nothing' is the given separators are not acceptable (i.e., they
+  -- ^ Returns 'Nothing' if the given separators are not acceptable (i.e., they
   -- are digits, or they are equal).
 {-# INLINABLE rationalToDecimal #-}
 rationalToDecimal a plus ytsep dsep fdigs0 = \r0 -> do
