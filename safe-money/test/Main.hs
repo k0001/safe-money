@@ -12,6 +12,7 @@ module Main where
 
 import Control.Category (Category((.), id))
 import Control.DeepSeq (rnf)
+import qualified Data.AdditiveGroup as AG
 import qualified Data.Binary as Binary
 import qualified Data.ByteString as B
 import qualified Data.ByteString.Lazy as BL
@@ -20,6 +21,7 @@ import Data.Maybe (catMaybes, isJust, isNothing, fromJust)
 import Data.Proxy (Proxy(Proxy))
 import Data.Ratio ((%), numerator, denominator)
 import qualified Data.Text as T
+import qualified Data.VectorSpace as VS
 import Data.Word (Word8)
 import GHC.Exts (fromList)
 import GHC.TypeLits (Nat, Symbol, KnownSymbol, symbolVal)
@@ -31,87 +33,14 @@ import qualified Test.Tasty.Runners as Tasty
 import Test.Tasty.QuickCheck ((===), (==>), (.&&.))
 import qualified Test.Tasty.QuickCheck as QC
 
-#ifdef HAS_aeson
-import qualified Data.Aeson as Ae
-#endif
-
-#ifdef HAS_cereal
-import qualified Data.Serialize as Cereal
-#endif
-
-#ifdef HAS_serialise
-import qualified Codec.Serialise as Ser
-#endif
-
-#ifdef HAS_store
-import qualified Data.Store as Store
-#endif
-
-#ifdef HAS_vector_space
-import qualified Data.AdditiveGroup as AG
-import qualified Data.VectorSpace as VS
-#endif
-
-#ifdef HAS_xmlbf
-import qualified Xmlbf
-#endif
 
 import qualified Money
-import qualified Money.Internal as Money
+import qualified Money.Internal as MoneyI
   (rationalFromDecimal, rationalToDecimal)
 
 --------------------------------------------------------------------------------
 
-instance
-  ( Money.GoodScale scale
-  ) => QC.Arbitrary (Money.Discrete' currency scale) where
-  arbitrary = fmap fromInteger QC.arbitrary
-  shrink = fmap fromInteger . QC.shrink . toInteger
-
-instance QC.Arbitrary Money.SomeDiscrete where
-  arbitrary = do
-    let md = Money.mkSomeDiscrete
-               <$> QC.arbitrary <*> QC.arbitrary <*> QC.arbitrary
-    fromJust <$> QC.suchThat md isJust
-  shrink = \x -> Money.withSomeDiscrete x (map Money.toSomeDiscrete . QC.shrink)
-
-instance QC.Arbitrary (Money.Dense currency) where
-  arbitrary = do
-     let myd = fmap Money.dense QC.arbitrary
-     fromJust <$> QC.suchThat myd isJust
-  shrink = catMaybes . map Money.dense . QC.shrink . toRational
-
-instance QC.Arbitrary Money.SomeDense where
-  arbitrary = do
-    let md = Money.mkSomeDense <$> QC.arbitrary <*> QC.arbitrary
-    fromJust <$> QC.suchThat md isJust
-  shrink = \x -> Money.withSomeDense x (map Money.toSomeDense . QC.shrink)
-
-instance QC.Arbitrary (Money.ExchangeRate src dst) where
-  arbitrary = do
-    let myxr = fmap Money.exchangeRate QC.arbitrary
-    fromJust <$> QC.suchThat myxr isJust
-  shrink = catMaybes . map Money.exchangeRate
-         . QC.shrink . Money.exchangeRateToRational
-
-instance QC.Arbitrary Money.SomeExchangeRate where
-  arbitrary = do
-    let md = Money.mkSomeExchangeRate
-               <$> QC.arbitrary <*> QC.arbitrary <*> QC.arbitrary
-    fromJust <$> QC.suchThat md isJust
-  shrink = \x ->
-    Money.withSomeExchangeRate x (map Money.toSomeExchangeRate . QC.shrink)
-
-instance QC.Arbitrary Money.Approximation where
-  arbitrary = QC.oneof [ pure Money.Round
-                       , pure Money.Floor
-                       , pure Money.Ceiling
-                       , pure Money.Truncate ]
-
-instance QC.Arbitrary T.Text where
-  arbitrary = T.pack <$> QC.arbitrary
-
--- | Generates a valid 'Money.rationalToDecimal' result. Returns the thousand
+-- | Generates a valid 'MoneyI.rationalToDecimal' result. Returns the thousand
 -- and decimal separators as welland decimal separators as well.
 genDecimal :: QC.Gen (T.Text, Maybe Char, Char)
 genDecimal = do
@@ -120,7 +49,7 @@ genDecimal = do
   digs :: Word8 <- QC.arbitrary
   r :: Rational <- (%) <$> QC.arbitrary <*> QC.suchThat QC.arbitrary (/= 0)
   (yts, ds) <- genDecimalSeps
-  Just dec <- pure (Money.rationalToDecimal aprox plus yts ds digs r)
+  Just dec <- pure (MoneyI.rationalToDecimal aprox plus yts ds digs r)
   pure (dec, yts, ds)
 
 -- | Generates valid separators for decimal representations (see genDecimal).
@@ -406,14 +335,14 @@ testRationalToDecimal =
 
     render :: Money.Approximation -> Rational -> [T.Text]
     render a r =
-      [ fromJust $ Money.rationalToDecimal a False Nothing    '.' 2 r  --  0
-      , fromJust $ Money.rationalToDecimal a False (Just ',') '.' 2 r  --  1
-      , fromJust $ Money.rationalToDecimal a True  Nothing    '.' 2 r  --  2
-      , fromJust $ Money.rationalToDecimal a True  (Just ',') '.' 2 r  --  3
-      , fromJust $ Money.rationalToDecimal a False Nothing    '.' 0 r  --  8
-      , fromJust $ Money.rationalToDecimal a False (Just ',') '.' 0 r  --  9
-      , fromJust $ Money.rationalToDecimal a True  Nothing    '.' 0 r  -- 10
-      , fromJust $ Money.rationalToDecimal a True  (Just ',') '.' 0 r  -- 11
+      [ fromJust $ MoneyI.rationalToDecimal a False Nothing    '.' 2 r  --  0
+      , fromJust $ MoneyI.rationalToDecimal a False (Just ',') '.' 2 r  --  1
+      , fromJust $ MoneyI.rationalToDecimal a True  Nothing    '.' 2 r  --  2
+      , fromJust $ MoneyI.rationalToDecimal a True  (Just ',') '.' 2 r  --  3
+      , fromJust $ MoneyI.rationalToDecimal a False Nothing    '.' 0 r  --  8
+      , fromJust $ MoneyI.rationalToDecimal a False (Just ',') '.' 0 r  --  9
+      , fromJust $ MoneyI.rationalToDecimal a True  Nothing    '.' 0 r  -- 10
+      , fromJust $ MoneyI.rationalToDecimal a True  (Just ',') '.' 0 r  -- 11
       ]
 
 testRationalFromDecimal :: Tasty.TestTree
@@ -424,7 +353,7 @@ testRationalFromDecimal =
           mgoodsep :: QC.Gen Char = QC.suchThat QC.arbitrary (not . Char.isDigit)
       in QC.forAll ((,,) <$> mbadsep <*> mbadsep <*> mgoodsep) $
            \(s1 :: Char, s2 :: Char, s3 :: Char) ->
-              let f = Money.rationalFromDecimal
+              let f = MoneyI.rationalFromDecimal
               in (f Nothing s1 (error "untouched") === Nothing) .&&.
                  (f (Just s1) s2 (error "untouched") === Nothing) .&&.
                  (f (Just s1) s1 (error "untouched") === Nothing) .&&.
@@ -438,8 +367,8 @@ testRationalFromDecimal =
       in QC.forAll gen $ \( (yst :: Maybe Char, sd :: Char)
                           , (r :: Rational, plus :: Bool, digs :: Word8,
                              aprox :: Money.Approximation) ) ->
-           let Just dec = Money.rationalToDecimal aprox plus yst sd digs r
-               Just r' = Money.rationalFromDecimal yst sd dec
+           let Just dec = MoneyI.rationalToDecimal aprox plus yst sd digs r
+               Just r' = MoneyI.rationalFromDecimal yst sd dec
            in 1 > abs (abs r - abs r')
   ]
 
@@ -489,19 +418,19 @@ testDense pc =
                              digs :: Word8, aprox :: Money.Approximation) ) ->
             let ydnsd1 = Money.denseToDecimal aprox plus yst sd digs 1 dns
                 ydnsd100 = Money.denseToDecimal aprox plus yst sd digs 100 dns
-                yrd1 = Money.rationalToDecimal aprox plus yst sd digs (toRational dns)
-                yrd100 = Money.rationalToDecimal aprox plus yst sd digs (toRational dns * 100)
+                yrd1 = MoneyI.rationalToDecimal aprox plus yst sd digs (toRational dns)
+                yrd100 = MoneyI.rationalToDecimal aprox plus yst sd digs (toRational dns * 100)
             in (ydnsd1 === yrd1) .&&. (ydnsd100 === yrd100)
 
   , QC.testProperty "denseFromDecimal: Same as rationalFromDecimal" $
       QC.forAll genDecimal $ \(dec :: T.Text, yts :: Maybe Char, ds :: Char) ->
-         let Just r = Money.rationalFromDecimal yts ds dec
+         let Just r = MoneyI.rationalFromDecimal yts ds dec
              Just dns = Money.denseFromDecimal yts ds 1 dec
          in r === toRational (dns :: Money.Dense currency)
 
   , QC.testProperty "denseFromDecimal: Same as rationalFromDecimal" $
       QC.forAll genDecimal $ \(dec :: T.Text, yts :: Maybe Char, ds :: Char) ->
-         let Just r = Money.rationalFromDecimal yts ds dec
+         let Just r = MoneyI.rationalFromDecimal yts ds dec
              Just dns = Money.denseFromDecimal yts ds 1 dec
          in r === toRational (dns :: Money.Dense currency)
 
@@ -520,7 +449,6 @@ testDense pc =
                Just dns' = Money.denseFromDecimal yst sd sc dec
            in Money.dense' 1 > abs (abs dns - abs dns')
 
-#ifdef HAS_vector_space
   , HU.testCase "AdditiveGroup: zeroV" $
       (AG.zeroV :: Money.Dense currency) @?= Money.dense' (0%1)
   , QC.testProperty "AdditiveGroup: negateV" $
@@ -536,31 +464,6 @@ testDense pc =
       QC.forAll QC.arbitrary $ \(x :: Money.Dense currency, y) ->
          (toRational x VS.*^ y === x * y) .&&.
          (toRational y VS.*^ x === x * y)
-#endif
-
-#ifdef HAS_aeson
-  , QC.testProperty "Aeson encoding roundtrip" $
-      QC.forAll QC.arbitrary $ \(x :: Money.Dense currency) ->
-         Just x === Ae.decode (Ae.encode x)
-  , QC.testProperty "Aeson encoding roundtrip (SomeDense)" $
-      QC.forAll QC.arbitrary $ \(x :: Money.Dense currency) ->
-         let x' = Money.toSomeDense x
-         in Just x' === Ae.decode (Ae.encode x')
-  , QC.testProperty "Aeson encoding roundtrip (Dense through SomeDense)" $
-      QC.forAll QC.arbitrary $ \(x :: Money.Dense currency) ->
-         Just x === Ae.decode (Ae.encode (Money.toSomeDense x))
-  , QC.testProperty "Aeson encoding roundtrip (SomeDense through Dense)" $
-      QC.forAll QC.arbitrary $ \(x :: Money.Dense currency) ->
-         Just (Money.toSomeDense x) === Ae.decode (Ae.encode x)
-  , QC.testProperty "Aeson decoding of pre-0.4 format (Dense, SomeDense)" $
-      QC.forAll QC.arbitrary $ \(x :: Money.Dense currency) ->
-        let sx = Money.toSomeDense x
-            c = T.unpack (Money.someDenseCurrency sx)
-            r = Money.someDenseAmount sx
-            bs = Ae.encode ("Dense" :: String, c, numerator r, denominator r)
-        in (Just  x === Ae.decode bs) .&&.
-           (Just sx === Ae.decode bs)
-#endif
 
   , QC.testProperty "Binary encoding roundtrip" $
       QC.forAll QC.arbitrary $ \(x :: Money.Dense currency) ->
@@ -581,70 +484,6 @@ testDense pc =
          let x' = Money.toSomeDense x
              bs = Binary.encode x
          in Right (mempty, BL.length bs, x') === Binary.decodeOrFail bs
-
-#ifdef HAS_cereal
-  , QC.testProperty "Cereal encoding roundtrip" $
-      QC.forAll QC.arbitrary $ \(x :: Money.Dense currency) ->
-         Right x === Cereal.decode (Cereal.encode x)
-  , QC.testProperty "Cereal encoding roundtrip (SomeDense)" $
-      QC.forAll QC.arbitrary $ \(x :: Money.Dense currency) ->
-         let x' = Money.toSomeDense x
-         in Right x' === Cereal.decode (Cereal.encode x')
-  , QC.testProperty "Cereal encoding roundtrip (Dense through SomeDense)" $
-      QC.forAll QC.arbitrary $ \(x :: Money.Dense currency) ->
-         Right x === Cereal.decode (Cereal.encode (Money.toSomeDense x))
-  , QC.testProperty "Cereal encoding roundtrip (SomeDense through Dense)" $
-      QC.forAll QC.arbitrary $ \(x :: Money.Dense currency) ->
-         Right (Money.toSomeDense x) === Cereal.decode (Cereal.encode x)
-#endif
-
-#ifdef HAS_serialise
-  , QC.testProperty "Serialise encoding roundtrip" $
-      QC.forAll QC.arbitrary $ \(x :: Money.Dense currency) ->
-         Just x === hush (Ser.deserialiseOrFail (Ser.serialise x))
-  , QC.testProperty "Serialise encoding roundtrip (SomeDense)" $
-      QC.forAll QC.arbitrary $ \(x :: Money.Dense currency) ->
-         let x' = Money.toSomeDense x
-         in Just x' === hush (Ser.deserialiseOrFail (Ser.serialise x'))
-  , QC.testProperty "Serialise encoding roundtrip (Dense through SomeDense)" $
-      QC.forAll QC.arbitrary $ \(x :: Money.Dense currency) ->
-         Just x === hush (Ser.deserialiseOrFail (Ser.serialise (Money.toSomeDense x)))
-  , QC.testProperty "Serialise encoding roundtrip (SomeDense through Dense)" $
-      QC.forAll QC.arbitrary $ \(x :: Money.Dense currency) ->
-         Just (Money.toSomeDense x) === hush (Ser.deserialiseOrFail (Ser.serialise x))
-#endif
-
-#ifdef HAS_store
-  , QC.testProperty "Store encoding roundtrip" $
-      QC.forAll QC.arbitrary $ \(x :: Money.Dense currency) ->
-         Right x === Store.decode (Store.encode x)
-  , QC.testProperty "Store encoding roundtrip (SomeDense)" $
-      QC.forAll QC.arbitrary $ \(x :: Money.Dense currency) ->
-         let x' = Money.toSomeDense x
-         in Right x' === Store.decode (Store.encode x')
-  , QC.testProperty "Store encoding roundtrip (Dense through SomeDense)" $
-      QC.forAll QC.arbitrary $ \(x :: Money.Dense currency) ->
-         Right x === Store.decode (Store.encode (Money.toSomeDense x))
-  , QC.testProperty "Store encoding roundtrip (SomeDense through Dense)" $
-      QC.forAll QC.arbitrary $ \(x :: Money.Dense currency) ->
-         Right (Money.toSomeDense x) === Store.decode (Store.encode x)
-#endif
-
-#ifdef HAS_xmlbf
-  , QC.testProperty "Xmlbf encoding roundtrip" $
-      QC.forAll QC.arbitrary $ \(x :: Money.Dense currency) ->
-         Right x === Xmlbf.runParser Xmlbf.fromXml (Xmlbf.toXml x)
-  , QC.testProperty "Xmlbf encoding roundtrip (SomeDense)" $
-      QC.forAll QC.arbitrary $ \(x :: Money.Dense currency) ->
-         let x' = Money.toSomeDense x
-         in Right x' === Xmlbf.runParser Xmlbf.fromXml (Xmlbf.toXml x')
-  , QC.testProperty "Xmlbf encoding roundtrip (Dense through SomeDense)" $
-      QC.forAll QC.arbitrary $ \(x :: Money.Dense currency) ->
-         Right x === Xmlbf.runParser Xmlbf.fromXml (Xmlbf.toXml (Money.toSomeDense x))
-  , QC.testProperty "Xmlbf encoding roundtrip (SomeDense through Dense)" $
-      QC.forAll QC.arbitrary $ \(x :: Money.Dense currency) ->
-         Right (Money.toSomeDense x) === Xmlbf.runParser Xmlbf.fromXml (Xmlbf.toXml x)
-#endif
   ]
 
 testExchange :: Tasty.TestTree
@@ -728,7 +567,6 @@ testDiscrete pc pu =
                ydec' = Money.denseToDecimal aprox plus yst sd digs sc dns
            in ydec === ydec'
 
-#ifdef HAS_vector_space
   , HU.testCase "AdditiveGroup: zeroV" $
       (AG.zeroV :: Money.Discrete currency unit) @?= Money.discrete 0
   , QC.testProperty "AdditiveGroup: negateV" $
@@ -744,32 +582,6 @@ testDiscrete pc pu =
       QC.forAll QC.arbitrary $ \(x :: Money.Discrete currency unit, y) ->
          (toInteger x VS.*^ y === x * y) .&&.
          (toInteger y VS.*^ x === x * y)
-#endif
-
-#ifdef HAS_aeson
-  , QC.testProperty "Aeson encoding roundtrip" $
-      QC.forAll QC.arbitrary $ \(x :: Money.Discrete currency unit) ->
-         Just x === Ae.decode (Ae.encode x)
-  , QC.testProperty "Aeson encoding roundtrip (SomeDiscrete)" $
-      QC.forAll QC.arbitrary $ \(x :: Money.Discrete currency unit) ->
-         let x' = Money.toSomeDiscrete x
-         in Just x' === Ae.decode (Ae.encode x')
-  , QC.testProperty "Aeson encoding roundtrip (Discrete through SomeDiscrete)" $
-      QC.forAll QC.arbitrary $ \(x :: Money.Discrete currency unit) ->
-         Just x === Ae.decode (Ae.encode (Money.toSomeDiscrete x))
-  , QC.testProperty "Aeson encoding roundtrip (SomeDiscrete through Discrete)" $
-      QC.forAll QC.arbitrary $ \(x :: Money.Discrete currency unit) ->
-         Just (Money.toSomeDiscrete x) === Ae.decode (Ae.encode x)
-  , QC.testProperty "Aeson decoding of pre-0.4 format (Discrete, SomeDiscrete)" $
-      QC.forAll QC.arbitrary $ \(x :: Money.Discrete currency unit) ->
-        let sx = Money.toSomeDiscrete x
-            c = T.unpack (Money.someDiscreteCurrency sx)
-            r = Money.someDiscreteScale sx
-            a = Money.someDiscreteAmount sx
-            bs = Ae.encode ("Discrete" :: String, c, numerator r, denominator r, a)
-        in (Just  x === Ae.decode bs) .&&.
-           (Just sx === Ae.decode bs)
-#endif
 
   , QC.testProperty "Binary encoding roundtrip" $
       QC.forAll QC.arbitrary $ \(x :: Money.Discrete currency unit) ->
@@ -790,70 +602,6 @@ testDiscrete pc pu =
          let x' = Money.toSomeDiscrete x
              bs = Binary.encode x
          in Right (mempty, BL.length bs, x') === Binary.decodeOrFail bs
-
-#ifdef HAS_cereal
-  , QC.testProperty "Cereal encoding roundtrip" $
-      QC.forAll QC.arbitrary $ \(x :: Money.Discrete currency unit) ->
-         Right x === Cereal.decode (Cereal.encode x)
-  , QC.testProperty "Cereal encoding roundtrip (SomeDiscrete)" $
-      QC.forAll QC.arbitrary $ \(x :: Money.Discrete currency unit) ->
-         let x' = Money.toSomeDiscrete x
-         in Right x' === Cereal.decode (Cereal.encode x')
-  , QC.testProperty "Cereal encoding roundtrip (Discrete through SomeDiscrete)" $
-      QC.forAll QC.arbitrary $ \(x :: Money.Discrete currency unit) ->
-         Right x === Cereal.decode (Cereal.encode (Money.toSomeDiscrete x))
-  , QC.testProperty "Cereal encoding roundtrip (SomeDiscrete through Discrete)" $
-      QC.forAll QC.arbitrary $ \(x :: Money.Discrete currency unit) ->
-         Right (Money.toSomeDiscrete x) === Cereal.decode (Cereal.encode x)
-#endif
-
-#ifdef HAS_serialise
-  , QC.testProperty "Serialise encoding roundtrip" $
-      QC.forAll QC.arbitrary $ \(x :: Money.Discrete currency unit) ->
-         Just x === hush (Ser.deserialiseOrFail (Ser.serialise x))
-  , QC.testProperty "Serialise encoding roundtrip (SomeDiscrete)" $
-      QC.forAll QC.arbitrary $ \(x :: Money.Discrete currency unit) ->
-         let x' = Money.toSomeDiscrete x
-         in Just x' === hush (Ser.deserialiseOrFail (Ser.serialise x'))
-  , QC.testProperty "Serialise encoding roundtrip (Discrete through SomeDiscrete)" $
-      QC.forAll QC.arbitrary $ \(x :: Money.Discrete currency unit) ->
-         Just x === hush (Ser.deserialiseOrFail (Ser.serialise (Money.toSomeDiscrete x)))
-  , QC.testProperty "Serialise encoding roundtrip (SomeDiscrete through Discrete)" $
-      QC.forAll QC.arbitrary $ \(x :: Money.Discrete currency unit) ->
-         Just (Money.toSomeDiscrete x) === hush (Ser.deserialiseOrFail (Ser.serialise x))
-#endif
-
-#ifdef HAS_store
-  , QC.testProperty "Store encoding roundtrip" $
-      QC.forAll QC.arbitrary $ \(x :: Money.Discrete currency unit) ->
-         Right x === Store.decode (Store.encode x)
-  , QC.testProperty "Store encoding roundtrip (SomeDiscrete)" $
-      QC.forAll QC.arbitrary $ \(x :: Money.Discrete currency unit) ->
-         let x' = Money.toSomeDiscrete x
-         in Right x' === Store.decode (Store.encode x')
-  , QC.testProperty "Store encoding roundtrip (Discrete through SomeDiscrete)" $
-      QC.forAll QC.arbitrary $ \(x :: Money.Discrete currency unit) ->
-         Right x === Store.decode (Store.encode (Money.toSomeDiscrete x))
-  , QC.testProperty "Store encoding roundtrip (SomeDiscrete through Discrete)" $
-      QC.forAll QC.arbitrary $ \(x :: Money.Discrete currency unit) ->
-         Right (Money.toSomeDiscrete x) === Store.decode (Store.encode x)
-#endif
-
-#ifdef HAS_xmlbf
-  , QC.testProperty "Xmlbf encoding roundtrip" $
-      QC.forAll QC.arbitrary $ \(x :: Money.Discrete currency unit) ->
-         Right x === Xmlbf.runParser Xmlbf.fromXml (Xmlbf.toXml x)
-  , QC.testProperty "Xmlbf encoding roundtrip (SomeDiscrete)" $
-      QC.forAll QC.arbitrary $ \(x :: Money.Discrete currency unit) ->
-         let x' = Money.toSomeDiscrete x
-         in Right x' === Xmlbf.runParser Xmlbf.fromXml (Xmlbf.toXml x')
-  , QC.testProperty "Xmlbf encoding roundtrip (Discrete through SomeDiscrete)" $
-      QC.forAll QC.arbitrary $ \(x :: Money.Discrete currency unit) ->
-         Right x === Xmlbf.runParser Xmlbf.fromXml (Xmlbf.toXml (Money.toSomeDiscrete x))
-  , QC.testProperty "Xmlbf encoding roundtrip (SomeDiscrete through Discrete)" $
-      QC.forAll QC.arbitrary $ \(x :: Money.Discrete currency unit) ->
-         Right (Money.toSomeDiscrete x) === Xmlbf.runParser Xmlbf.fromXml (Xmlbf.toXml x)
-#endif
   ]
 
 testExchangeRate
@@ -931,41 +679,16 @@ testExchangeRate ps pd =
                           , (xr :: Money.ExchangeRate src dst, digs :: Word8,
                              aprox :: Money.Approximation ) ) ->
            let xrd = Money.exchangeRateToDecimal aprox yst sd digs xr
-               rd = Money.rationalToDecimal aprox False yst sd digs
+               rd = MoneyI.rationalToDecimal aprox False yst sd digs
                        (Money.exchangeRateToRational xr)
            in xrd === rd
 
   , QC.testProperty "exchangeRateFromDecimal: Same as rationalFromDecimal" $
       QC.forAll genDecimal $ \(dec :: T.Text, yts :: Maybe Char, ds :: Char) ->
-         let Just r = Money.rationalFromDecimal yts ds dec
+         let Just r = MoneyI.rationalFromDecimal yts ds dec
              yxr = Money.exchangeRateFromDecimal yts ds dec
                       :: Maybe (Money.ExchangeRate src dst)
          in (r > 0) ==> (Just r === fmap Money.exchangeRateToRational yxr)
-
-#ifdef HAS_aeson
-  , QC.testProperty "Aeson encoding roundtrip" $
-      QC.forAll QC.arbitrary $ \(x :: Money.ExchangeRate src dst) ->
-         Just x === Ae.decode (Ae.encode x)
-  , QC.testProperty "Aeson encoding roundtrip (SomeExchangeRate)" $
-      QC.forAll QC.arbitrary $ \(x :: Money.ExchangeRate src dst) ->
-         let x' = Money.toSomeExchangeRate x
-         in Just x' === Ae.decode (Ae.encode x')
-  , QC.testProperty "Aeson encoding roundtrip (ExchangeRate through SomeExchangeRate)" $
-      QC.forAll QC.arbitrary $ \(x :: Money.ExchangeRate src dst) ->
-         Just x === Ae.decode (Ae.encode (Money.toSomeExchangeRate x))
-  , QC.testProperty "Aeson encoding roundtrip (SomeExchangeRate through ExchangeRate)" $
-      QC.forAll QC.arbitrary $ \(x :: Money.ExchangeRate src dst) ->
-         Just (Money.toSomeExchangeRate x) === Ae.decode (Ae.encode x)
-  , QC.testProperty "Aeson decoding of pre-0.4 format (ExchangeRate, SomeExchangeRate)" $
-      QC.forAll QC.arbitrary $ \(x :: Money.ExchangeRate src dst) ->
-        let sx = Money.toSomeExchangeRate x
-            src = T.unpack (Money.someExchangeRateSrcCurrency sx)
-            dst = T.unpack (Money.someExchangeRateDstCurrency sx)
-            r = Money.someExchangeRateRate sx
-            bs = Ae.encode ("ExchangeRate" :: String, src, dst, numerator r, denominator r)
-        in (Just  x === Ae.decode bs) .&&.
-           (Just sx === Ae.decode bs)
-#endif
 
   , QC.testProperty "Binary encoding roundtrip" $
       QC.forAll QC.arbitrary $ \(x :: Money.ExchangeRate src dst) ->
@@ -986,70 +709,6 @@ testExchangeRate ps pd =
          let x' = Money.toSomeExchangeRate x
              bs = Binary.encode x
          in Right (mempty, BL.length bs, x') === Binary.decodeOrFail bs
-
-#ifdef HAS_cereal
-  , QC.testProperty "Cereal encoding roundtrip" $
-      QC.forAll QC.arbitrary $ \(x :: Money.ExchangeRate src dst) ->
-         Right x === Cereal.decode (Cereal.encode x)
-  , QC.testProperty "Cereal encoding roundtrip (SomeExchangeRate)" $
-      QC.forAll QC.arbitrary $ \(x :: Money.ExchangeRate src dst) ->
-         let x' = Money.toSomeExchangeRate x
-         in Right x' === Cereal.decode (Cereal.encode x')
-  , QC.testProperty "Cereal encoding roundtrip (ExchangeRate through SomeExchangeRate)" $
-      QC.forAll QC.arbitrary $ \(x :: Money.ExchangeRate src dst) ->
-         Right x === Cereal.decode (Cereal.encode (Money.toSomeExchangeRate x))
-  , QC.testProperty "Cereal encoding roundtrip (SomeExchangeRate through ExchangeRate)" $
-      QC.forAll QC.arbitrary $ \(x :: Money.ExchangeRate src dst) ->
-         Right (Money.toSomeExchangeRate x) === Cereal.decode (Cereal.encode x)
-#endif
-
-#ifdef HAS_serialise
-  , QC.testProperty "Serialise encoding roundtrip" $
-      QC.forAll QC.arbitrary $ \(x :: Money.ExchangeRate src dst) ->
-         Just x === hush (Ser.deserialiseOrFail (Ser.serialise x))
-  , QC.testProperty "Serialise encoding roundtrip (SomeExchangeRate)" $
-      QC.forAll QC.arbitrary $ \(x :: Money.ExchangeRate src dst) ->
-         let x' = Money.toSomeExchangeRate x
-         in Just x' === hush (Ser.deserialiseOrFail (Ser.serialise x'))
-  , QC.testProperty "Serialise encoding roundtrip (ExchangeRate through SomeExchangeRate)" $
-      QC.forAll QC.arbitrary $ \(x :: Money.ExchangeRate src dst) ->
-         Just x === hush (Ser.deserialiseOrFail (Ser.serialise (Money.toSomeExchangeRate x)))
-  , QC.testProperty "Serialise encoding roundtrip (SomeExchangeRate through ExchangeRate)" $
-      QC.forAll QC.arbitrary $ \(x :: Money.ExchangeRate src dst) ->
-         Just (Money.toSomeExchangeRate x) === hush (Ser.deserialiseOrFail (Ser.serialise x))
-#endif
-
-#ifdef HAS_store
-  , QC.testProperty "Store encoding roundtrip" $
-      QC.forAll QC.arbitrary $ \(x :: Money.ExchangeRate src dst) ->
-         Right x === Store.decode (Store.encode x)
-  , QC.testProperty "Store encoding roundtrip (SomeExchangeRate)" $
-      QC.forAll QC.arbitrary $ \(x :: Money.ExchangeRate src dst) ->
-         let x' = Money.toSomeExchangeRate x
-         in Right x' === Store.decode (Store.encode x')
-  , QC.testProperty "Store encoding roundtrip (ExchangeRate through SomeExchangeRate)" $
-      QC.forAll QC.arbitrary $ \(x :: Money.ExchangeRate src dst) ->
-         Right x === Store.decode (Store.encode (Money.toSomeExchangeRate x))
-  , QC.testProperty "Store encoding roundtrip (SomeExchangeRate through ExchangeRate)" $
-      QC.forAll QC.arbitrary $ \(x :: Money.ExchangeRate src dst) ->
-         Right (Money.toSomeExchangeRate x) === Store.decode (Store.encode x)
-#endif
-
-#ifdef HAS_xmlbf
-  , QC.testProperty "Xmlbf encoding roundtrip" $
-      QC.forAll QC.arbitrary $ \(x :: Money.ExchangeRate src dst) ->
-         Right x === Xmlbf.runParser Xmlbf.fromXml (Xmlbf.toXml x)
-  , QC.testProperty "Xmlbf encoding roundtrip (SomeExchangeRate)" $
-      QC.forAll QC.arbitrary $ \(x :: Money.ExchangeRate src dst) ->
-         let x' = Money.toSomeExchangeRate x
-         in Right x' === Xmlbf.runParser Xmlbf.fromXml (Xmlbf.toXml x')
-  , QC.testProperty "Xmlbf encoding roundtrip (ExchangeRate through SomeExchangeRate)" $
-      QC.forAll QC.arbitrary $ \(x :: Money.ExchangeRate src dst) ->
-         Right x === Xmlbf.runParser Xmlbf.fromXml (Xmlbf.toXml (Money.toSomeExchangeRate x))
-  , QC.testProperty "Xmlbf encoding roundtrip (SomeExchangeRate through ExchangeRate)" $
-      QC.forAll QC.arbitrary $ \(x :: Money.ExchangeRate src dst) ->
-         Right (Money.toSomeExchangeRate x) === Xmlbf.runParser Xmlbf.fromXml (Xmlbf.toXml x)
-#endif
   ]
 
 
@@ -1159,99 +818,6 @@ testRawSerializations =
       , HU.testCase "ExchangeRate" $ rawXr0_binary @=? Binary.encode rawXr0
       ]
     ]
-
-#ifdef HAS_aeson
-  , Tasty.testGroup "aeson"
-    [ Tasty.testGroup "decode"
-      [ HU.testCase "Dense" $ Just rawDns0 @=? Ae.decode rawDns0_aeson
-      , HU.testCase "Discrete" $ Just rawDis0 @=? Ae.decode rawDis0_aeson
-      , HU.testCase "ExchangeRate" $ Just rawXr0 @=? Ae.decode rawXr0_aeson
-      ]
-    , Tasty.testGroup "decode (pre-0.4)"
-      [ HU.testCase "Dense" $ Just rawDns0 @=? Ae.decode rawDns0_aeson_pre04
-      , HU.testCase "Discrete" $ Just rawDis0 @=? Ae.decode rawDis0_aeson_pre04
-      , HU.testCase "ExchangeRate" $ Just rawXr0 @=? Ae.decode rawXr0_aeson_pre04
-      ]
-    , Tasty.testGroup "encode"
-      [ HU.testCase "Dense" $ rawDns0_aeson @=? Ae.encode rawDns0
-      , HU.testCase "Discrete" $ rawDis0_aeson @=? Ae.encode rawDis0
-      , HU.testCase "ExchangeRate" $ rawXr0_aeson @=? Ae.encode rawXr0
-      ]
-    ]
-#endif
-
-#ifdef HAS_serialise
-  , Tasty.testGroup "serialise"
-    [ Tasty.testGroup "decode"
-      [ HU.testCase "Dense" $ do
-          Just rawDns0 @=? hush (Ser.deserialiseOrFail rawDns0_serialise)
-      , HU.testCase "Discrete" $ do
-          Just rawDis0 @=? hush (Ser.deserialiseOrFail rawDis0_serialise)
-      , HU.testCase "ExchangeRate" $ do
-          Just rawXr0 @=? hush (Ser.deserialiseOrFail rawXr0_serialise)
-      ]
-    , Tasty.testGroup "encode"
-      [ HU.testCase "Dense" $ rawDns0_serialise @=? Ser.serialise rawDns0
-      , HU.testCase "Discrete" $ rawDis0_serialise @=? Ser.serialise rawDis0
-      , HU.testCase "ExchangeRate" $ rawXr0_serialise @=? Ser.serialise rawXr0
-      ]
-    ]
-#endif
-
-#ifdef HAS_cereal
-  , Tasty.testGroup "cereal"
-    [ Tasty.testGroup "decode"
-      [ HU.testCase "Dense" $ do
-          Right rawDns0 @=? Cereal.decode rawDns0_cereal
-      , HU.testCase "Discrete" $ do
-          Right rawDis0 @=? Cereal.decode rawDis0_cereal
-      , HU.testCase "ExchangeRate" $ do
-          Right rawXr0 @=? Cereal.decode rawXr0_cereal
-      ]
-    , Tasty.testGroup "encode"
-      [ HU.testCase "Dense" $ rawDns0_cereal @=? Cereal.encode rawDns0
-      , HU.testCase "Discrete" $ rawDis0_cereal @=? Cereal.encode rawDis0
-      , HU.testCase "ExchangeRate" $ rawXr0_cereal @=? Cereal.encode rawXr0
-      ]
-    ]
-
-#endif
-
-#ifdef HAS_store
-  , Tasty.testGroup "store"
-    [ Tasty.testGroup "decode"
-      [ HU.testCase "Dense" $ do
-          Right rawDns0 @=? Store.decode rawDns0_store
-      , HU.testCase "Discrete" $ do
-          Right rawDis0 @=? Store.decode rawDis0_store
-      , HU.testCase "ExchangeRate" $ do
-          Right rawXr0 @=? Store.decode rawXr0_store
-      ]
-    , Tasty.testGroup "encode"
-      [ HU.testCase "Dense" $ rawDns0_store @=? Store.encode rawDns0
-      , HU.testCase "Discrete" $ rawDis0_store @=? Store.encode rawDis0
-      , HU.testCase "ExchangeRate" $ rawXr0_store @=? Store.encode rawXr0
-      ]
-    ]
-#endif
-
-#ifdef HAS_xmlbf
-  , Tasty.testGroup "xmlbf"
-    [ Tasty.testGroup "decode"
-      [ HU.testCase "Dense" $ do
-          Right rawDns0 @=? Xmlbf.runParser Xmlbf.fromXml rawDns0_xmlbf
-      , HU.testCase "Discrete" $ do
-          Right rawDis0 @=? Xmlbf.runParser Xmlbf.fromXml rawDis0_xmlbf
-      , HU.testCase "ExchangeRate" $ do
-          Right rawXr0 @=? Xmlbf.runParser Xmlbf.fromXml rawXr0_xmlbf
-      ]
-    , Tasty.testGroup "encode"
-      [ HU.testCase "Dense" $ rawDns0_xmlbf @=? Xmlbf.toXml rawDns0
-      , HU.testCase "Discrete" $ rawDis0_xmlbf @=? Xmlbf.toXml rawDis0
-      , HU.testCase "ExchangeRate" $ rawXr0_xmlbf @=? Xmlbf.toXml rawXr0
-      ]
-    ]
-#endif
   ]
 
 rawDns0 :: Money.Dense "USD"
@@ -1270,66 +836,6 @@ rawDis0_binary :: BL.ByteString
 rawDis0_binary = "\NUL\NUL\NUL\NUL\NUL\NUL\NUL\ETXUSD\NUL\NUL\NUL\NULd\NUL\NUL\NUL\NUL\SOH\NUL\NUL\NUL\NUL\EOT"
 rawXr0_binary :: BL.ByteString
 rawXr0_binary = "\NUL\NUL\NUL\NUL\NUL\NUL\NUL\ETXUSD\NUL\NUL\NUL\NUL\NUL\NUL\NUL\ETXBTC\NUL\NUL\NUL\NUL\ETX\NUL\NUL\NUL\NUL\STX"
-
-#ifdef HAS_aeson
-rawDns0_aeson :: BL.ByteString
-rawDns0_aeson = "[\"USD\",26,1]"
-rawDis0_aeson :: BL.ByteString
-rawDis0_aeson = "[\"USD\",100,1,4]"
-rawXr0_aeson :: BL.ByteString
-rawXr0_aeson = "[\"USD\",\"BTC\",3,2]"
-
--- pre 0.4
-rawDns0_aeson_pre04 :: BL.ByteString
-rawDns0_aeson_pre04 = "[\"Dense\",\"USD\",26,1]"
-rawDis0_aeson_pre04 :: BL.ByteString
-rawDis0_aeson_pre04 = "[\"Discrete\",\"USD\",100,1,4]"
-rawXr0_aeson_pre04 :: BL.ByteString
-rawXr0_aeson_pre04 = "[\"ExchangeRate\",\"USD\",\"BTC\",3,2]"
-#endif
-
-#ifdef HAS_serialise
-rawDns0_serialise :: BL.ByteString
-rawDns0_serialise = "cUSD\CAN\SUB\SOH"
-rawDis0_serialise :: BL.ByteString
-rawDis0_serialise = "cUSD\CANd\SOH\EOT"
-rawXr0_serialise :: BL.ByteString
-rawXr0_serialise = "cUSDcBTC\ETX\STX"
-#endif
-
-#ifdef HAS_store
--- Such a waste of space these many bytes! Can we shrink this and maintain
--- backwards compatibility?
-rawDns0_cereal :: B.ByteString
-rawDns0_cereal = "\NUL\NUL\NUL\NUL\NUL\NUL\NUL\ETXUSD\NUL\NUL\NUL\NUL\SUB\NUL\NUL\NUL\NUL\SOH"
-rawDis0_cereal :: B.ByteString
-rawDis0_cereal = "\NUL\NUL\NUL\NUL\NUL\NUL\NUL\ETXUSD\NUL\NUL\NUL\NULd\NUL\NUL\NUL\NUL\SOH\NUL\NUL\NUL\NUL\EOT"
-rawXr0_cereal :: B.ByteString
-rawXr0_cereal = "\NUL\NUL\NUL\NUL\NUL\NUL\NUL\ETXUSD\NUL\NUL\NUL\NUL\NUL\NUL\NUL\ETXBTC\NUL\NUL\NUL\NUL\ETX\NUL\NUL\NUL\NUL\STX"
-#endif
-
-#ifdef HAS_store
--- Such a waste of space these many bytes! Can we shrink this and maintain
--- backwards compatibility?
-rawDns0_store :: B.ByteString
-rawDns0_store = "\ETX\NUL\NUL\NUL\NUL\NUL\NUL\NULU\NUL\NUL\NULS\NUL\NUL\NULD\NUL\NUL\NUL\NUL\SUB\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\SOH\NUL\NUL\NUL\NUL\NUL\NUL\NUL"
-rawDis0_store :: B.ByteString
-rawDis0_store = "\ETX\NUL\NUL\NUL\NUL\NUL\NUL\NULU\NUL\NUL\NULS\NUL\NUL\NULD\NUL\NUL\NUL\NULd\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\SOH\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\EOT\NUL\NUL\NUL\NUL\NUL\NUL\NUL"
-rawXr0_store :: B.ByteString
-rawXr0_store = "\ETX\NUL\NUL\NUL\NUL\NUL\NUL\NULU\NUL\NUL\NULS\NUL\NUL\NULD\NUL\NUL\NUL\ETX\NUL\NUL\NUL\NUL\NUL\NUL\NULB\NUL\NUL\NULT\NUL\NUL\NULC\NUL\NUL\NUL\NUL\ETX\NUL\NUL\NUL\NUL\NUL\NUL\NUL\NUL\STX\NUL\NUL\NUL\NUL\NUL\NUL\NUL"
-#endif
-
-#ifdef HAS_xmlbf
-rawDns0_xmlbf :: [Xmlbf.Node]
-rawDns0_xmlbf = -- "<money-dense n=\"26\" d=\"1\" c=\"USD\"/>"
-  [ Xmlbf.element' "money-dense" (fromList [("n","26"), ("d","1"), ("c","USD")]) [] ]
-rawDis0_xmlbf :: [Xmlbf.Node]
-rawDis0_xmlbf = -- "<money-discrete n=\"100\" a=\"4\" d=\"1\" c=\"USD\"/>"
-  [ Xmlbf.element' "money-discrete" (fromList [("n","100"), ("d","1"), ("c","USD"), ("a","4")]) [] ]
-rawXr0_xmlbf :: [Xmlbf.Node]
-rawXr0_xmlbf = -- "<exchange-rate dst=\"BTC\" n=\"3\" d=\"2\" src=\"USD\"/>"
-  [ Xmlbf.element' "exchange-rate" (fromList [("n","3"), ("d","2"), ("src","USD"), ("dst","BTC")]) [] ]
-#endif
 
 --------------------------------------------------------------------------------
 -- Misc

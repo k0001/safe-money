@@ -1,3 +1,67 @@
+# Version 0.7
+
+* _IMPORTANT_. All of the changes in this release are fully backwards
+  compatible. What happens in this release is that many instances
+  previously exported by `safe-money` now live in different libraries so
+  that downstream packages can avoid using Cabal flags to specify
+  dependencies.
+
+* _COMPILER ASSISTED BREAKING CHANGE_. `FromJSON` and `ToJSON` (from
+  `aeson`) instances are not exported from the `safe-money` library
+  anymore. Instead, you are now expected to depend on the vetted
+  `safe-money-aeson` library and import `Money.Aeson` to get the
+  relevant instances. These instances are exactly the same ones
+  previously exported by `safe-money`. As a consequence of this change,
+  the `aeson` Cabal flag in `safe-money` and the optional dependency on
+  `aeson` were removed, which simplifies downstream packaging.
+
+* _COMPILER ASSISTED BREAKING CHANGE_. `Store` (from `store`) instances
+  are not exported from the `safe-money` library anymore. Instead, you
+  are now expected to depend on the vetted `safe-money-store` library
+  and import `Money.Store` to get the relevant instances. These
+  instances are exactly the same ones previously exported by
+  `safe-money`. As a consequence of this change, the `store` Cabal flag
+  in `safe-money` and the optional dependency on `serialise` were
+  removed, which simplifies downstream packaging.
+
+* _COMPILER ASSISTED BREAKING CHANGE_. `Serialise` (from `serialise`)
+  instances are not exported from the `safe-money` library anymore.
+  Instead, you are now expected to depend on the vetted
+  `safe-money-serialise` library and import `Money.Serialise` to get the
+  relevant instances. These instances are exactly the same ones
+  previously exported by `safe-money`. As a consequence of this change,
+  the `serialise` Cabal flag in `safe-money` and the optional dependency
+  on `serialise` were removed, which simplifies downstream packaging.
+
+* _COMPILER ASSISTED BREAKING CHANGE_. `Serialize` (from `cereal`)
+  instances are not exported from the `safe-money` library anymore.
+  Instead, you are now expected to depend on the vetted
+  `safe-money-cereal` library and import `Money.Serialize` to get the
+  relevant instances. These instances are exactly the same ones
+  previously exported by `safe-money`. As a consequence of this change,
+  the `cereal` Cabal flag in `safe-money` and the optional dependency on
+  `cereal` were removed, which simplifies downstream packaging.
+
+* _COMPILER ASSISTED BREAKING CHANGE_. `FromXml` and `ToXml` (from
+  `xmlbf`) instances are not exported from the `safe-money` library
+  anymore. Instead, you are now expected to depend on the vetted
+  `safe-money-xmlbf` library and import `Money.Aeson` to get the
+  relevant instances. These instances are exactly the same ones
+  previously exported by `safe-money`. As a consequence of this change,
+  the `xmlbf` Cabal flag in `safe-money` and the optional dependency on
+  `xmlbf` were removed, which simplifies downstream packaging.
+
+* _COMPILER ASSISTED BREAKING CHANGE_. `hashable` and `vector-space` are
+  now mandatory dependencies of `safe-money`. `Hashable`, `VectorSpace`
+  and `AdditiveGroup` instances for the various `safe-money` datatypes
+  are now exported from `Money`. The `hashable` and `vector-space` Cabal
+  flags are now gone.
+
+* `Arbitrary` instances (from the `QuickCheck` packages) for the various
+  `safe-money` datatypes are now exported from `Money`. `QuickCheck` is
+  now a mandatory dependency of `safe-money`.
+
+
 # Version 0.6
 
 * _COMPILER ASSISTED BREAKING CHANGE_. `denseToDecimal` now takes a positive

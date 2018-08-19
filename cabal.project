@@ -1,0 +1,7 @@
+packages:
+  safe-money/
+  safe-money-aeson/
+  safe-money-cereal/
+  safe-money-serialise/
+  safe-money-store/
+  safe-money-xmlbf/

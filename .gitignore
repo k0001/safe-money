@@ -1,2 +1,7 @@
-dist/*
-*.swp
+*/dist/*
+*.sw[a-p]
+dist-newstyle/*
+*/dist-newstyle/*
+.ghci
+cabal.project.local
+result

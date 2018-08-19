@@ -1,5 +1,4 @@
 {-# LANGUAGE BangPatterns #-}
-{-# LANGUAGE CPP #-}
 {-# LANGUAGE ConstraintKinds #-}
 {-# LANGUAGE DataKinds #-}
 {-# LANGUAGE DeriveGeneric #-}
@@ -27,6 +26,7 @@ module Money.Internal
  ( -- * Dense monetary values
    Dense
  , denseCurrency
+ , denseCurrency'
  , dense
  , dense'
  , denseFromDiscrete
@@ -37,6 +37,7 @@ module Money.Internal
  , Discrete'
  , discrete
  , discreteCurrency
+ , discreteCurrency'
  , discreteFromDense
  , discreteFromDecimal
  , discreteToDecimal
@@ -57,25 +58,32 @@ module Money.Internal
  , SomeDense
  , toSomeDense
  , mkSomeDense
+ , mkSomeDense'
  , fromSomeDense
  , withSomeDense
  , someDenseCurrency
+ , someDenseCurrency'
  , someDenseAmount
  , SomeDiscrete
  , toSomeDiscrete
  , mkSomeDiscrete
+ , mkSomeDiscrete'
  , fromSomeDiscrete
  , withSomeDiscrete
  , someDiscreteCurrency
+ , someDiscreteCurrency'
  , someDiscreteScale
  , someDiscreteAmount
  , SomeExchangeRate
  , toSomeExchangeRate
  , mkSomeExchangeRate
+ , mkSomeExchangeRate'
  , fromSomeExchangeRate
  , withSomeExchangeRate
  , someExchangeRateSrcCurrency
+ , someExchangeRateSrcCurrency'
  , someExchangeRateDstCurrency
+ , someExchangeRateDstCurrency'
  , someExchangeRateRate
  -- * Misc
  , Approximation(Round, Floor, Ceiling, Truncate)
@@ -86,19 +94,23 @@ module Money.Internal
 import Control.Applicative ((<|>), empty)
 import Control.Category (Category((.), id))
 import Control.DeepSeq (NFData)
-import Control.Monad ((<=<), guard, when)
+import Control.Monad (guard, when)
+import qualified Data.AdditiveGroup as AG
 import qualified Data.Binary as Binary
 import qualified Data.Char as Char
 import Data.Constraint (Dict(Dict))
 import Data.Functor (($>))
 import Data.Foldable (for_)
+import Data.Hashable (Hashable)
 import qualified Data.List as List
+import Data.Maybe (catMaybes, isJust, fromJust)
 import Data.Monoid ((<>))
 import Data.Proxy (Proxy(..))
 import Data.Ratio ((%), numerator, denominator)
 import qualified Data.Text as T
+import qualified Data.VectorSpace as VS
 import Data.Word (Word8)
-import GHC.Exts (Constraint, fromList)
+import GHC.Exts (Constraint)
 import qualified GHC.Generics as GHC
 import GHC.TypeLits
   (Symbol, SomeSymbol(..), Nat, SomeNat(..), CmpNat, KnownSymbol, KnownNat,
@@ -106,39 +118,12 @@ import GHC.TypeLits
 import qualified GHC.TypeLits as GHC
 import Numeric.Natural (Natural)
 import Prelude hiding ((.), id)
+import qualified Test.QuickCheck as QC
 import qualified Text.ParserCombinators.ReadPrec as ReadPrec
 import qualified Text.ParserCombinators.ReadP as ReadP
 import qualified Text.Read as Read
 import Unsafe.Coerce (unsafeCoerce)
 
-#ifdef HAS_aeson
-import qualified Data.Aeson as Ae
-#endif
-
-#ifdef HAS_cereal
-import qualified Data.Serialize as Cereal
-#endif
-
-#ifdef HAS_hashable
-import Data.Hashable (Hashable)
-#endif
-
-#ifdef HAS_serialise
-import qualified Codec.Serialise as Ser
-#endif
-
-#ifdef HAS_store
-import qualified Data.Store as Store
-#endif
-
-#ifdef HAS_vector_space
-import qualified Data.AdditiveGroup as AG
-import qualified Data.VectorSpace as VS
-#endif
-
-#ifdef HAS_xmlbf
-import qualified Xmlbf
-#endif
 
 --------------------------------------------------------------------------------
 -- | 'Dense' represents a dense monetary value for @currency@ (usually a
@@ -194,9 +179,8 @@ newtype Dense (currency :: Symbol) = Dense Rational
 -- 'dense'' (1 '%' 4) '*' 'dense'' (1 '%' 2)  ==  'dense'' (1 '%' 8)
 -- @
 --
--- In fact, if you compiled this library with support for
--- 'Data.VectorSpace.VectorSpace', then '*' functions exactly as
--- 'Data.VectorSpace.*^'.
+-- In fact, '*' functions exactly as 'Data.VectorSpace.*^' from the
+-- 'Data.VectorSpace' instance.
 --
 -- @
 -- ('*')  ==  ('Data.VectorSpace.*^')
@@ -296,8 +280,13 @@ dense' = \r ->
 -- \"USD\"
 -- @
 denseCurrency :: KnownSymbol currency => Dense currency -> T.Text
-denseCurrency = T.pack . symbolVal
+denseCurrency = T.pack . denseCurrency'
 {-# INLINE denseCurrency #-}
+
+-- | Like 'denseCurrency' but returns 'String'.
+denseCurrency' :: KnownSymbol currency => Dense currency -> String
+denseCurrency' = symbolVal
+{-# INLINE denseCurrency' #-}
 
 -- | 'Discrete' represents a discrete monetary value for a @currency@ expresed
 -- as an integer amount of a particular @unit@. For example, with @currency ~
@@ -363,9 +352,8 @@ deriving instance GoodScale scale => GHC.Generic (Discrete' currency scale)
 -- 'discrete' 2 '*' 'discrete' 4  ==  'discrete' 8
 -- @
 --
--- In fact, if you compiled this library with support for
--- 'Data.VectorSpace.VectorSpace', then '*' functions exactly as
--- 'Data.VectorSpace.*^'.
+-- In fact, '*' functions exactly as 'Data.VectorSpace.*^' from the
+-- 'Data.VectorSpace' instance.
 --
 -- @
 -- ('*')  ==  ('Data.VectorSpace.*^')
@@ -450,12 +438,20 @@ denseFromDiscrete = \c@(Discrete i) -> Dense (fromInteger i / scale c)
 -- \"USD\"
 -- @
 discreteCurrency
+  :: (KnownSymbol currency, GoodScale scale)
+  => Discrete' currency scale
+  -> T.Text -- ^
+discreteCurrency = T.pack . discreteCurrency'
+{-# INLINE discreteCurrency #-}
+
+-- | Like 'discreteCurrency' but returns 'String'.
+discreteCurrency'
   :: forall currency scale
   .  (KnownSymbol currency, GoodScale scale)
   => Discrete' currency scale
-  -> T.Text -- ^
-discreteCurrency = \_ -> T.pack (symbolVal (Proxy @ currency))
-{-# INLINE discreteCurrency #-}
+  -> String -- ^
+discreteCurrency' = \_ -> symbolVal (Proxy @ currency)
+{-# INLINE discreteCurrency' #-}
 
 -- | Method for approximating a fractional number to an integer number.
 data Approximation
@@ -783,8 +779,13 @@ deriving instance Ord SomeDense
 
 -- | Currency name.
 someDenseCurrency :: SomeDense -> T.Text
-someDenseCurrency = T.pack . _someDenseCurrency
+someDenseCurrency = T.pack . someDenseCurrency'
 {-# INLINE someDenseCurrency #-}
+
+-- | Like 'someDenseCurrency' but returns 'String'.
+someDenseCurrency' :: SomeDense -> String
+someDenseCurrency' = _someDenseCurrency
+{-# INLINE someDenseCurrency' #-}
 
 -- | Currency unit amount.
 someDenseAmount :: SomeDense -> Rational
@@ -880,8 +881,13 @@ deriving instance Ord SomeDiscrete
 
 -- | Currency name.
 someDiscreteCurrency :: SomeDiscrete -> T.Text
-someDiscreteCurrency = T.pack . _someDiscreteCurrency
+someDiscreteCurrency = T.pack . someDiscreteCurrency'
 {-# INLINE someDiscreteCurrency #-}
+
+-- | Like 'someDiscreteCurrency' but returns 'String'.
+someDiscreteCurrency' :: SomeDiscrete -> String
+someDiscreteCurrency' = _someDiscreteCurrency
+{-# INLINE someDiscreteCurrency' #-}
 
 -- | Positive, non-zero.
 someDiscreteScale :: SomeDiscrete -> Rational
@@ -1012,13 +1018,23 @@ deriving instance Ord SomeExchangeRate
 
 -- | Source currency name.
 someExchangeRateSrcCurrency :: SomeExchangeRate -> T.Text
-someExchangeRateSrcCurrency = T.pack . _someExchangeRateSrcCurrency
+someExchangeRateSrcCurrency = T.pack . someExchangeRateSrcCurrency'
 {-# INLINE someExchangeRateSrcCurrency #-}
+
+-- | Like 'someExchangeRateSrcCurrency' but returns 'String'.
+someExchangeRateSrcCurrency' :: SomeExchangeRate -> String
+someExchangeRateSrcCurrency' = _someExchangeRateSrcCurrency
+{-# INLINE someExchangeRateSrcCurrency' #-}
 
 -- | Destination currency name.
 someExchangeRateDstCurrency :: SomeExchangeRate -> T.Text
 someExchangeRateDstCurrency = T.pack . _someExchangeRateDstCurrency
 {-# INLINE someExchangeRateDstCurrency #-}
+
+-- | Like 'someExchangeRateDstCurrency' but returns 'String'.
+someExchangeRateDstCurrency' :: SomeExchangeRate -> String
+someExchangeRateDstCurrency' = _someExchangeRateDstCurrency
+{-# INLINE someExchangeRateDstCurrency' #-}
 
 -- | Exchange rate. Positive, non-zero.
 someExchangeRateRate :: SomeExchangeRate -> Rational
@@ -1103,7 +1119,6 @@ type family Snd (ab :: (ka, kb)) :: ka where Snd '(a,b) = b
 --------------------------------------------------------------------------------
 -- vector-space instances
 
-#ifdef HAS_vector_space
 instance AG.AdditiveGroup (Dense currency) where
   zeroV = Dense AG.zeroV
   {-# INLINE zeroV #-}
@@ -1137,11 +1152,9 @@ instance GoodScale scale => VS.VectorSpace (Discrete' currency scale) where
   type Scalar (Discrete' currency scale) = Integer
   s *^ Discrete a = Discrete $! (s VS.*^ a)
   {-# INLINE (*^) #-}
-#endif
 
 --------------------------------------------------------------------------------
 -- Extra instances: hashable
-#ifdef HAS_hashable
 instance Hashable Approximation
 instance Hashable (Dense currency)
 instance Hashable SomeDense
@@ -1149,7 +1162,6 @@ instance GoodScale scale => Hashable (Discrete' currency scale)
 instance Hashable SomeDiscrete
 instance Hashable (ExchangeRate src dst)
 instance Hashable SomeExchangeRate
-#endif
 
 --------------------------------------------------------------------------------
 -- Extra instances: deepseq
@@ -1162,76 +1174,6 @@ instance NFData (ExchangeRate src dst)
 instance NFData SomeExchangeRate
 
 --------------------------------------------------------------------------------
--- Extra instances: cereal
-#ifdef HAS_cereal
--- | Compatible with 'SomeDense'.
-instance (KnownSymbol currency) => Cereal.Serialize (Dense currency) where
-  put = Cereal.put . toSomeDense
-  get = maybe empty pure =<< fmap fromSomeDense Cereal.get
-
--- | Compatible with 'SomeDiscrete'.
-instance
-  ( KnownSymbol currency, GoodScale scale
-  ) => Cereal.Serialize (Discrete' currency scale) where
-  put = Cereal.put . toSomeDiscrete
-  get = maybe empty pure =<< fmap fromSomeDiscrete Cereal.get
-
--- | Compatible with 'SomeExchangeRate'.
-instance
-  ( KnownSymbol src, KnownSymbol dst
-  ) => Cereal.Serialize (ExchangeRate src dst) where
-  put = Cereal.put . toSomeExchangeRate
-  get = maybe empty pure =<< fmap fromSomeExchangeRate Cereal.get
-
--- | Compatible with 'Dense'.
-instance Cereal.Serialize SomeDense where
-  put = \(SomeDense c r) -> do
-    Cereal.put c
-    Cereal.put (numerator r)
-    Cereal.put (denominator r)
-  get = maybe empty pure =<< do
-    c :: String <- Cereal.get
-    n :: Integer <- Cereal.get
-    d :: Integer <- Cereal.get
-    when (d == 0) (fail "denominator is zero")
-    pure (mkSomeDense' c (n % d))
-
--- | Compatible with 'Discrete'.
-instance Cereal.Serialize SomeDiscrete where
-  put = \(SomeDiscrete c r a) -> do
-    -- We go through String for backwards compatibility.
-    Cereal.put c
-    Cereal.put (numerator r)
-    Cereal.put (denominator r)
-    Cereal.put a
-  get = maybe empty pure =<< do
-    -- We go through String for backwards compatibility.
-    c :: String <- Cereal.get
-    n :: Integer <- Cereal.get
-    d :: Integer <- Cereal.get
-    when (d == 0) (fail "denominator is zero")
-    a :: Integer <- Cereal.get
-    pure (mkSomeDiscrete' c (n % d) a)
-
--- | Compatible with 'ExchangeRate'.
-instance Cereal.Serialize SomeExchangeRate where
-  put = \(SomeExchangeRate src dst r) -> do
-    -- We go through String for backwards compatibility.
-    Cereal.put src
-    Cereal.put dst
-    Cereal.put (numerator r)
-    Cereal.put (denominator r)
-  get = maybe empty pure =<< do
-    -- We go through String for backwards compatibility.
-    src :: String <- Cereal.get
-    dst :: String <- Cereal.get
-    n :: Integer <- Cereal.get
-    d :: Integer <- Cereal.get
-    when (d == 0) (fail "denominator is zero")
-    pure (mkSomeExchangeRate' src dst (n % d))
-#endif
-
-------------------------------------------------------------------------------
 -- Extra instances: binary
 
 -- | Compatible with 'SomeDense'.
@@ -1296,392 +1238,6 @@ instance Binary.Binary SomeExchangeRate where
     d :: Integer <- Binary.get
     when (d == 0) (fail "denominator is zero")
     pure (mkSomeExchangeRate' src dst (n % d))
-
---------------------------------------------------------------------------------
--- Extra instances: serialise
-#ifdef HAS_serialise
--- | Compatible with 'SomeDense'.
-instance (KnownSymbol currency) => Ser.Serialise (Dense currency) where
-  encode = Ser.encode . toSomeDense
-  decode = maybe (fail "Dense") pure =<< fmap fromSomeDense Ser.decode
-
--- | Compatible with 'SomeDiscrete'.
-instance
-  ( KnownSymbol currency, GoodScale scale
-  ) => Ser.Serialise (Discrete' currency scale) where
-  encode = Ser.encode . toSomeDiscrete
-  decode = maybe (fail "Discrete'") pure =<< fmap fromSomeDiscrete Ser.decode
-
--- | Compatible with 'SomeExchangeRate'.
-instance
-  ( KnownSymbol src, KnownSymbol dst
-  ) => Ser.Serialise (ExchangeRate src dst) where
-  encode = Ser.encode . toSomeExchangeRate
-  decode = maybe (fail "ExchangeRate") pure
-             =<< fmap fromSomeExchangeRate Ser.decode
-
--- | Compatible with 'Dense'.
-instance Ser.Serialise SomeDense where
-  encode = \(SomeDense c r) ->
-    Ser.encode c <>
-    Ser.encode (numerator r) <>
-    Ser.encode (denominator r)
-  decode = maybe (fail "SomeDense") pure =<< do
-    c :: String <- Ser.decode
-    n :: Integer <- Ser.decode
-    d :: Integer <- Ser.decode
-    when (d == 0) (fail "denominator is zero")
-    pure (mkSomeDense' c (n % d))
-
--- | Compatible with 'Discrete'.
-instance Ser.Serialise SomeDiscrete where
-  encode = \(SomeDiscrete c r a) ->
-    Ser.encode c <>
-    Ser.encode (numerator r) <>
-    Ser.encode (denominator r) <>
-    Ser.encode a
-  decode = maybe (fail "SomeDiscrete") pure =<< do
-    c :: String <- Ser.decode
-    n :: Integer <- Ser.decode
-    d :: Integer <- Ser.decode
-    when (d == 0) (fail "denominator is zero")
-    a :: Integer <- Ser.decode
-    pure (mkSomeDiscrete' c (n % d) a)
-
--- | Compatible with 'ExchangeRate'.
-instance Ser.Serialise SomeExchangeRate where
-  encode = \(SomeExchangeRate src dst r) ->
-    Ser.encode src <>
-    Ser.encode dst <>
-    Ser.encode (numerator r) <>
-    Ser.encode (denominator r)
-  decode = maybe (fail "SomeExchangeRate") pure =<< do
-    src :: String <- Ser.decode
-    dst :: String <- Ser.decode
-    n :: Integer <- Ser.decode
-    d :: Integer <- Ser.decode
-    when (d == 0) (fail "denominator is zero")
-    pure (mkSomeExchangeRate' src dst (n % d))
-#endif
-
---------------------------------------------------------------------------------
--- Extra instances: aeson
-#ifdef HAS_aeson
--- | Compatible with 'SomeDense'
---
--- Example rendering @'dense'' (2 '%' 3) :: 'Dense' \"BTC\"@:
---
--- @
--- [\"BTC\", 2, 3]
--- @
---
--- Note: The JSON serialization changed in version 0.4 (the leading @"Dense"@
--- string was dropped from the rendered 'Ae.Array').
-instance KnownSymbol currency => Ae.ToJSON (Dense currency) where
-  toJSON = Ae.toJSON . toSomeDense
-
--- | Compatible with 'SomeDense'
---
--- Note: The JSON serialization changed in version 0.4. However, this instance
--- is still able to cope with the previous format.
-instance KnownSymbol currency => Ae.FromJSON (Dense currency) where
-  parseJSON = maybe empty pure <=< fmap fromSomeDense . Ae.parseJSON
-
--- | Compatible with 'Dense'
---
--- Note: The JSON serialization changed in version 0.4 (the leading @"Dense"@
--- string was dropped from the rendered 'Ae.Array').
-instance Ae.ToJSON SomeDense where
-  toJSON = \(SomeDense c r) ->
-    Ae.toJSON (c, numerator r, denominator r)
-
--- | Compatible with 'Dense'.
---
--- Note: The JSON serialization changed in version 0.4. However, this instance
--- is still able to cope with the previous format.
-instance Ae.FromJSON SomeDense where
-  parseJSON = \v -> do
-    (c, n, d) <- Ae.parseJSON v <|> do
-       -- Pre 0.4 format.
-       ("Dense" :: String, c, n, d) <- Ae.parseJSON v
-       pure (c, n, d)
-    when (d == 0) (fail "denominator is zero")
-    maybe empty pure (mkSomeDense' c (n % d))
-
--- | Compatible with 'SomeDiscrete'
---
--- Example rendering @'discrete' 43 :: 'Discrete' \"BTC\" \"satoshi\"@:
---
--- @
--- [\"BTC\", 100000000, 1, 43]
--- @
---
--- Note: The JSON serialization changed in version 0.4 (the leading @"Discrete"@
--- string was dropped from the rendered 'Ae.Array').
-instance
-  ( KnownSymbol currency, GoodScale scale
-  ) => Ae.ToJSON (Discrete' currency scale) where
-  toJSON = Ae.toJSON . toSomeDiscrete
-
--- | Compatible with 'SomeDiscrete'
---
--- Note: The JSON serialization changed in version 0.4. However, this instance
--- is still able to cope with the previous format.
-instance
-  ( KnownSymbol currency, GoodScale scale
-  ) => Ae.FromJSON (Discrete' currency scale) where
-  parseJSON = maybe empty pure <=< fmap fromSomeDiscrete . Ae.parseJSON
-
--- | Compatible with 'Discrete''
---
--- Note: The JSON serialization changed in version 0.4 (the leading @"Discrete"@
--- string was dropped from the rendered 'Ae.Array').
-instance Ae.ToJSON SomeDiscrete where
-  toJSON = \(SomeDiscrete c r a) ->
-    Ae.toJSON (c, numerator r, denominator r, a)
-
--- | Compatible with 'Discrete''
---
--- Note: The JSON serialization changed in version 0.4. However, this instance
--- is still able to cope with the previous format.
-instance Ae.FromJSON SomeDiscrete where
-  parseJSON = \v -> do
-    (c, n, d, a) <- Ae.parseJSON v <|> do
-       -- Pre 0.4 format.
-       ("Discrete" :: T.Text, c, n, d, a) <- Ae.parseJSON v
-       pure (c, n, d, a)
-    when (d == 0) (fail "denominator is zero")
-    maybe empty pure (mkSomeDiscrete c (n % d) a)
-
--- | Compatible with 'SomeExchangeRate'
---
--- Example rendering an 'ExchangeRate' constructed with
--- @'exchangeRate' (5 '%' 7) :: 'ExchangeRate' \"USD\" \"JPY\"@
---
--- @
--- [\"USD\", \"JPY\", 5, 7]
--- @
---
--- Note: The JSON serialization changed in version 0.4 (the leading
--- @"ExchangeRate"@ string was dropped from the rendered 'Ae.Array').
-instance
-  ( KnownSymbol src, KnownSymbol dst
-  ) => Ae.ToJSON (ExchangeRate src dst) where
-  toJSON = Ae.toJSON . toSomeExchangeRate
-
--- | Compatible with 'SomeExchangeRate'
---
--- Note: The JSON serialization changed in version 0.4. However, this instance
--- is still able to cope with the previous format.
-instance
-  ( KnownSymbol src, KnownSymbol dst
-  ) => Ae.FromJSON (ExchangeRate src dst) where
-  parseJSON = maybe empty pure <=< fmap fromSomeExchangeRate . Ae.parseJSON
-
--- | Compatible with 'ExchangeRate'
---
--- Note: The JSON serialization changed in version 0.4 (the leading
--- @"ExchangeRate"@ string was dropped from the rendered 'Ae.Array').
-instance Ae.ToJSON SomeExchangeRate where
-  toJSON = \(SomeExchangeRate src dst r) ->
-    Ae.toJSON (src, dst, numerator r, denominator r)
-
--- | Compatible with 'ExchangeRate'
---
--- Note: The JSON serialization changed in version 0.4. However, this instance
--- is still able to cope with the previous format.
-instance Ae.FromJSON SomeExchangeRate where
-  parseJSON = \v -> do
-    (src, dst, n, d) <- Ae.parseJSON v <|> do
-       -- Pre 0.4 format.
-       ("ExchangeRate" :: T.Text, src, dst, n, d) <- Ae.parseJSON v
-       pure (src, dst, n, d)
-    when (d == 0) (fail "denominator is zero")
-    maybe empty pure (mkSomeExchangeRate src dst (n % d))
-#endif
-
---------------------------------------------------------------------------------
--- Extra instances: xmlbf
-#ifdef HAS_xmlbf
-
--- | Compatible with 'SomeDense'
---
--- Example rendering @'dense' (2 '%' 3) :: 'Dense' \"BTC\"@:
---
--- @
--- \<money-dense c=\"BTC\" n=\"2\" d=\"3\"/>
--- @
-instance KnownSymbol currency => Xmlbf.ToXml (Dense currency) where
-  toXml = Xmlbf.toXml . toSomeDense
-
--- | Compatible with 'SomeDense'
-instance KnownSymbol currency => Xmlbf.FromXml (Dense currency) where
-  fromXml = maybe empty pure =<< fmap fromSomeDense Xmlbf.fromXml
-
--- | Compatible with 'Dense'
-instance Xmlbf.ToXml SomeDense where
-  toXml = \(SomeDense c r) ->
-    let as = [ (T.pack "c", T.pack c)
-             , (T.pack "n", T.pack (show (numerator r)))
-             , (T.pack "d", T.pack (show (denominator r))) ]
-    in [ Xmlbf.element' (T.pack "money-dense") (fromList as) [] ]
-
--- | Compatible with 'Dense'.
-instance Xmlbf.FromXml SomeDense where
-  fromXml = Xmlbf.pElement (T.pack "money-dense") $ do
-    c <- Xmlbf.pAttr "c"
-    n <- Xmlbf.pRead =<< Xmlbf.pAttr "n"
-    d <- Xmlbf.pRead =<< Xmlbf.pAttr "d"
-    when (d == 0) (fail "denominator is zero")
-    maybe empty pure (mkSomeDense c (n % d))
-
--- | Compatible with 'SomeDiscrete'
---
--- Example rendering @'discrete' 43 :: 'Discrete' \"BTC\" \"satoshi\"@:
---
--- @
--- \<money-discrete c=\"BTC\" n=\"100000000\" d=\"1\" a=\"43\"/>
--- @
-instance
-  ( KnownSymbol currency, GoodScale scale
-  ) => Xmlbf.ToXml (Discrete' currency scale) where
-  toXml = Xmlbf.toXml . toSomeDiscrete
-
--- | Compatible with 'SomeDiscrete'
-instance
-  ( KnownSymbol currency, GoodScale scale
-  ) => Xmlbf.FromXml (Discrete' currency scale) where
-  fromXml = maybe empty pure =<< fmap fromSomeDiscrete Xmlbf.fromXml
-
--- | Compatible with 'Discrete''
-instance Xmlbf.ToXml SomeDiscrete where
-  toXml = \(SomeDiscrete c r a) ->
-    let as = [ ("c", T.pack c)
-             , ("n", T.pack (show (numerator r)))
-             , ("d", T.pack (show (denominator r)))
-             , ("a", T.pack (show a)) ]
-    in [ Xmlbf.element' (T.pack "money-discrete") (fromList as) [] ]
-
--- | Compatible with 'Discrete''
-instance Xmlbf.FromXml SomeDiscrete where
-  fromXml = Xmlbf.pElement (T.pack "money-discrete") $ do
-    c <- Xmlbf.pAttr "c"
-    n <- Xmlbf.pRead =<< Xmlbf.pAttr "n"
-    d <- Xmlbf.pRead =<< Xmlbf.pAttr "d"
-    when (d == 0) (fail "denominator is zero")
-    a <- Xmlbf.pRead =<< Xmlbf.pAttr "a"
-    maybe empty pure (mkSomeDiscrete c (n % d) a)
-
--- | Compatible with 'SomeExchangeRate'
---
--- Example rendering an 'ExchangeRate' constructed with
--- @'exchangeRate' (5 '%' 7) :: 'ExchangeRate' \"USD\" \"JPY\"@
---
--- @
--- \<exchange-rate src=\"USD\" dst=\"JPY\" n=\"5\" d=\"7\"/>
--- @
-instance
-  ( KnownSymbol src, KnownSymbol dst
-  ) => Xmlbf.ToXml (ExchangeRate src dst) where
-  toXml = Xmlbf.toXml . toSomeExchangeRate
-
--- | Compatible with 'SomeExchangeRate'
-instance
-  ( KnownSymbol src, KnownSymbol dst
-  ) => Xmlbf.FromXml (ExchangeRate src dst) where
-  fromXml = maybe empty pure =<< fmap fromSomeExchangeRate Xmlbf.fromXml
-
--- | Compatible with 'ExchangeRate'
-instance Xmlbf.ToXml SomeExchangeRate where
-  toXml = \(SomeExchangeRate src dst r) ->
-    let as = [ ("src", T.pack src)
-             , ("dst", T.pack dst)
-             , ("n", T.pack (show (numerator r)))
-             , ("d", T.pack (show (denominator r))) ]
-    in [ Xmlbf.element' (T.pack "exchange-rate") (fromList as) [] ]
-
--- | Compatible with 'ExchangeRate'
-instance Xmlbf.FromXml SomeExchangeRate where
-  fromXml = Xmlbf.pElement (T.pack "exchange-rate") $ do
-    src <- Xmlbf.pAttr "src"
-    dst <- Xmlbf.pAttr "dst"
-    n <- Xmlbf.pRead =<< Xmlbf.pAttr "n"
-    d <- Xmlbf.pRead =<< Xmlbf.pAttr "d"
-    when (d == 0) (fail "denominator is zero")
-    maybe empty pure (mkSomeExchangeRate src dst (n % d))
-#endif
-
---------------------------------------------------------------------------------
--- Extra instances: store
-#ifdef HAS_store
--- | Compatible with 'SomeDense'.
-instance (KnownSymbol currency) => Store.Store (Dense currency) where
-  size = storeContramapSize toSomeDense Store.size
-  poke = Store.poke . toSomeDense
-  peek = maybe (fail "peek") pure =<< fmap fromSomeDense Store.peek
--- | Compatible with 'Dense'.
-instance Store.Store SomeDense where
-  poke = \(SomeDense c r) -> do
-    Store.poke c
-    Store.poke (numerator r)
-    Store.poke (denominator r)
-  peek = maybe (fail "peek") pure =<< do
-    c :: String <- Store.peek
-    n :: Integer <- Store.peek
-    d :: Integer <- Store.peek
-    when (d == 0) (fail "denominator is zero")
-    pure (mkSomeDense' c (n % d))
-
--- | Compatible with 'SomeDiscrete'.
-instance
-  ( KnownSymbol currency, GoodScale scale
-  ) => Store.Store (Discrete' currency scale) where
-  size = storeContramapSize toSomeDiscrete Store.size
-  poke = Store.poke . toSomeDiscrete
-  peek = maybe (fail "peek") pure =<< fmap fromSomeDiscrete Store.peek
--- | Compatible with 'Discrete''.
-instance Store.Store SomeDiscrete where
-  poke = \(SomeDiscrete c r a) ->do
-    Store.poke c
-    Store.poke (numerator r)
-    Store.poke (denominator r)
-    Store.poke a
-  peek = maybe (fail "peek") pure =<< do
-    -- We go through String for backwards compatibility.
-    c :: String <- Store.peek
-    n :: Integer <- Store.peek
-    d :: Integer <- Store.peek
-    when (d == 0) (fail "denominator is zero")
-    a :: Integer <- Store.peek
-    pure (mkSomeDiscrete' c (n % d) a)
--- | Compatible with 'SomeExchangeRate'.
-instance
-  ( KnownSymbol src, KnownSymbol dst
-  ) => Store.Store (ExchangeRate src dst) where
-  size = storeContramapSize toSomeExchangeRate Store.size
-  poke = Store.poke . toSomeExchangeRate
-  peek = maybe (fail "peek") pure =<< fmap fromSomeExchangeRate Store.peek
--- | Compatible with 'ExchangeRate'.
-instance Store.Store SomeExchangeRate where
-  poke = \(SomeExchangeRate src dst r) -> do
-    Store.poke src
-    Store.poke dst
-    Store.poke (numerator r)
-    Store.poke (denominator r)
-  peek = maybe (fail "peek") pure =<< do
-    src :: String <- Store.peek
-    dst :: String <- Store.peek
-    n :: Integer <- Store.peek
-    d :: Integer <- Store.peek
-    when (d == 0) (fail "denominator is zero")
-    pure (mkSomeExchangeRate' src dst (n % d))
-
-storeContramapSize :: (a -> b) -> Store.Size b -> Store.Size a
-storeContramapSize f = \case
-  Store.VarSize g -> Store.VarSize (g . f)
-  Store.ConstSize x -> Store.ConstSize x
-{-# INLINABLE storeContramapSize #-}
-#endif
 
 --------------------------------------------------------------------------------
 -- Decimal rendering
@@ -2065,3 +1621,51 @@ rationalFromDecimalP ytsep dsep = do
      Nothing -> fromInteger (read ipart)
      Just fpart -> read (ipart <> fpart) % (10 ^ length fpart)
 
+--------------------------------------------------------------------------------
+-- QuickCheck Arbitrary instances
+
+instance
+  ( GoodScale scale
+  ) => QC.Arbitrary (Discrete' currency scale) where
+  arbitrary = fmap fromInteger QC.arbitrary
+  shrink = fmap fromInteger . QC.shrink . toInteger
+
+instance QC.Arbitrary SomeDiscrete where
+  arbitrary = do
+    let md = mkSomeDiscrete
+               <$> fmap T.pack QC.arbitrary
+               <*> QC.arbitrary
+               <*> QC.arbitrary
+    fromJust <$> QC.suchThat md isJust
+  shrink = \x -> withSomeDiscrete x (map toSomeDiscrete . QC.shrink)
+
+instance QC.Arbitrary (Dense currency) where
+  arbitrary = do
+     let myd = fmap dense QC.arbitrary
+     fromJust <$> QC.suchThat myd isJust
+  shrink = catMaybes . map dense . QC.shrink . toRational
+
+instance QC.Arbitrary SomeDense where
+  arbitrary = do
+    let md = mkSomeDense <$> fmap T.pack QC.arbitrary <*> QC.arbitrary
+    fromJust <$> QC.suchThat md isJust
+  shrink = \x -> withSomeDense x (map toSomeDense . QC.shrink)
+
+instance QC.Arbitrary (ExchangeRate src dst) where
+  arbitrary = do
+    let myxr = fmap exchangeRate QC.arbitrary
+    fromJust <$> QC.suchThat myxr isJust
+  shrink = catMaybes . map exchangeRate
+         . QC.shrink . exchangeRateToRational
+
+instance QC.Arbitrary SomeExchangeRate where
+  arbitrary = do
+    let md = mkSomeExchangeRate
+               <$> fmap T.pack QC.arbitrary
+               <*> fmap T.pack QC.arbitrary
+               <*> QC.arbitrary
+    fromJust <$> QC.suchThat md isJust
+  shrink = \x -> withSomeExchangeRate x (map toSomeExchangeRate . QC.shrink)
+
+instance QC.Arbitrary Approximation where
+  arbitrary = QC.oneof [ pure Round, pure Floor, pure Ceiling, pure Truncate ]
