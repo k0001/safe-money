@@ -17,7 +17,7 @@ import qualified Data.Binary as Binary
 import qualified Data.ByteString as B
 import qualified Data.ByteString.Lazy as BL
 import qualified Data.Char as Char
-import Data.Maybe (catMaybes, isJust, isNothing, fromJust)
+import Data.Maybe (catMaybes, fromJust, fromMaybe, isJust, isNothing)
 import Data.Proxy (Proxy(Proxy))
 import Data.Ratio ((%), numerator, denominator)
 import qualified Data.Text as T
@@ -49,7 +49,10 @@ genDecimal = do
   digs :: Word8 <- QC.arbitrary
   r :: Rational <- (%) <$> QC.arbitrary <*> QC.suchThat QC.arbitrary (/= 0)
   (yts, ds) <- genDecimalSeps
-  Just dec <- pure (MoneyI.rationalToDecimal aprox plus yts ds digs r)
+  let
+      dec = fromMaybe
+          (error "genDecimal failed because rationalToDecimal returned Nothing")
+          (MoneyI.rationalToDecimal aprox plus yts ds digs r)
   pure (dec, yts, ds)
 
 -- | Generates valid separators for decimal representations (see genDecimal).
