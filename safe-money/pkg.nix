@@ -4,7 +4,7 @@
 }:
 mkDerivation {
   pname = "safe-money";
-  version = "0.7";
+  version = "0.7.1";
   src = ./.;
   libraryHaskellDepends = [
     base binary constraints deepseq hashable QuickCheck text

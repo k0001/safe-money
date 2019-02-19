@@ -1,3 +1,7 @@
+# Version 0.7.1
+
+* Fixed compilation with GHC 8.6.
+
 # Version 0.7
 
 * _IMPORTANT_. All of the changes in this release are fully backwards
