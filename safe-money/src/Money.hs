@@ -703,10 +703,14 @@ type instance I.Scale "UYU" "centesimo" = '(100, 1)
 type instance I.Scale "UZS" "UZS" = '(100, 1)
 type instance I.Scale "UZS" "som" = '(1, 1)
 type instance I.Scale "UZS" "tiyin" = '(100, 1)
--- | Venezuelan bolivar
+-- | Venezuelan bolivar fuerte
 type instance I.Scale "VEF" "VEF" = '(100, 1)
 type instance I.Scale "VEF" "bolivar" = '(1, 1)
 type instance I.Scale "VEF" "centimo" = '(100, 1)
+-- | Venezuelan bolivar soberano
+type instance I.Scale "VES" "VES" = '(100, 1)
+type instance I.Scale "VES" "bolivar" = '(1, 1)
+type instance I.Scale "VES" "centimo" = '(100, 1)
 -- | Vietnamese dong
 type instance I.Scale "VND" "VND" = '(10, 1)
 type instance I.Scale "VND" "dong" = '(1, 1)

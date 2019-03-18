@@ -1,3 +1,8 @@
+# Version 0.7.2
+
+* New currency: VES (Bolívar Soberano). (Issue #33)
+
+
 # Version 0.7.1
 
 * Fixed compilation with GHC 8.6.
