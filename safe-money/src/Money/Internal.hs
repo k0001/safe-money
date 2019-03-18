@@ -1455,7 +1455,8 @@ rationalToDecimal a plus ytsep dsep fdigs0 = \r0 -> do
   for_ ytsep $ \tsep ->
      guard (tsep /= dsep && not (Char.isDigit tsep))
   -- this string-fu is not particularly efficient.
-  let parts = approximate a (r0 * (10 ^ fdigs0)) :: Integer
+  let start = r0 * (10 ^ fdigs0) :: Rational
+      parts = approximate a start :: Integer
       ipart = fromInteger (abs parts) `div` (10 ^ fdigs0) :: Natural
       ftext | ipart == 0 = show (abs parts) :: String
             | otherwise = drop (length (show ipart)) (show (abs parts))
@@ -1466,7 +1467,9 @@ rationalToDecimal a plus ytsep dsep fdigs0 = \r0 -> do
          | plus && parts > 0 -> "+"
          | otherwise -> ""
     , itext
-    , if | fdigs0 > 0 -> dsep : ftext <> fpad0
+    , if | fdigs0 > 0 -> dsep : if start < 1
+                                   then fpad0 <> ftext
+                                   else ftext <> fpad0
          | otherwise -> ""
     ]
 

@@ -2,6 +2,10 @@
 
 * Fixed compilation with GHC 8.6.
 
+* Fixed an issue when rendering decimal values smaller than the smallest
+  possible fractional part. (Issue #39)
+
+
 # Version 0.7
 
 * _IMPORTANT_. All of the changes in this release are fully backwards
