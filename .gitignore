@@ -5,3 +5,4 @@ dist-newstyle/*
 .ghci
 cabal.project.local
 result
+.ghc.environment.*
