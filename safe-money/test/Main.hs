@@ -120,10 +120,10 @@ testRationalToDecimal =
          , "1,023,004,567.90"     --  1
          , "+1023004567.90"       --  2
          , "+1,023,004,567.90"    --  3
-         , "1023004568"           --  8
-         , "1,023,004,568"        --  9
-         , "+1023004568"          -- 10
-         , "+1,023,004,568"       -- 11
+         , "1023004568"           --  4
+         , "1,023,004,568"        --  5
+         , "+1023004568"          --  6
+         , "+1,023,004,568"       --  7
          ]
   , HU.testCase "Round: negate r1" $ do
        render Money.Round (negate r1) @?=
@@ -131,10 +131,10 @@ testRationalToDecimal =
          , "-1,023,004,567.90"    --  1
          , "-1023004567.90"       --  2
          , "-1,023,004,567.90"    --  3
-         , "-1023004568"          --  8
-         , "-1,023,004,568"       --  9
-         , "-1023004568"          -- 10
-         , "-1,023,004,568"       -- 11
+         , "-1023004568"          --  4
+         , "-1,023,004,568"       --  5
+         , "-1023004568"          --  6
+         , "-1,023,004,568"       --  7
          ]
   , HU.testCase "Round: r2" $ do
        render Money.Round r2 @?=
@@ -142,10 +142,10 @@ testRationalToDecimal =
          , "1.23"    --  1
          , "+1.23"   --  2
          , "+1.23"   --  3
-         , "1"       --  8
-         , "1"       --  9
-         , "+1"      -- 10
-         , "+1"      -- 11
+         , "1"       --  4
+         , "1"       --  5
+         , "+1"      --  6
+         , "+1"      --  7
          ]
   , HU.testCase "Round: negate r2" $ do
        render Money.Round (negate r2) @?=
@@ -153,10 +153,10 @@ testRationalToDecimal =
          , "-1.23"    --  1
          , "-1.23"    --  2
          , "-1.23"    --  3
-         , "-1"       --  8
-         , "-1"       --  9
-         , "-1"       -- 10
-         , "-1"       -- 11
+         , "-1"       --  4
+         , "-1"       --  5
+         , "-1"       --  6
+         , "-1"       --  7
          ]
   , HU.testCase "Round: r3" $ do
        render Money.Round r3 @?=
@@ -164,10 +164,10 @@ testRationalToDecimal =
          , "0.34"   --  1
          , "+0.34"  --  2
          , "+0.34"  --  3
-         , "0"      --  8
-         , "0"      --  9
-         , "0"      -- 10
-         , "0"      -- 11
+         , "0"      --  4
+         , "0"      --  5
+         , "0"      --  6
+         , "0"      --  7
          ]
   , HU.testCase "Round: negate r3" $ do
        render Money.Round (negate r3) @?=
@@ -175,10 +175,10 @@ testRationalToDecimal =
          , "-0.34"   --  1
          , "-0.34"   --  2
          , "-0.34"   --  3
-         , "0"       --  8
-         , "0"       --  9
-         , "0"       -- 10
-         , "0"       -- 11
+         , "0"       --  4
+         , "0"       --  5
+         , "0"       --  6
+         , "0"       --  7
          ]
   , HU.testCase "Floor: r1" $ do
        render Money.Floor r1 @?=
@@ -186,10 +186,10 @@ testRationalToDecimal =
          , "1,023,004,567.89"     --  1
          , "+1023004567.89"       --  2
          , "+1,023,004,567.89"    --  3
-         , "1023004567"           --  8
-         , "1,023,004,567"        --  9
-         , "+1023004567"          -- 10
-         , "+1,023,004,567"       -- 11
+         , "1023004567"           --  4
+         , "1,023,004,567"        --  5
+         , "+1023004567"          --  6
+         , "+1,023,004,567"       --  7
          ]
   , HU.testCase "Floor: negate r1" $ do
        render Money.Floor (negate r1) @?=
@@ -197,10 +197,10 @@ testRationalToDecimal =
          , "-1,023,004,567.90"    --  1
          , "-1023004567.90"       --  2
          , "-1,023,004,567.90"    --  3
-         , "-1023004568"          --  8
-         , "-1,023,004,568"       --  9
-         , "-1023004568"          -- 10
-         , "-1,023,004,568"       -- 11
+         , "-1023004568"          --  4
+         , "-1,023,004,568"       --  5
+         , "-1023004568"          --  6
+         , "-1,023,004,568"       --  7
          ]
   , HU.testCase "Floor: r2" $ do
        render Money.Floor r2 @?=
@@ -208,10 +208,10 @@ testRationalToDecimal =
          , "1.23"    --  1
          , "+1.23"   --  2
          , "+1.23"   --  3
-         , "1"       --  8
-         , "1"       --  9
-         , "+1"      -- 10
-         , "+1"      -- 11
+         , "1"       --  4
+         , "1"       --  5
+         , "+1"      --  6
+         , "+1"      --  7
          ]
   , HU.testCase "Floor: negate r2" $ do
        render Money.Floor (negate r2) @?=
@@ -219,10 +219,10 @@ testRationalToDecimal =
          , "-1.23"    --  1
          , "-1.23"    --  2
          , "-1.23"    --  3
-         , "-2"       --  8
-         , "-2"       --  9
-         , "-2"       -- 10
-         , "-2"       -- 11
+         , "-2"       --  4
+         , "-2"       --  5
+         , "-2"       --  6
+         , "-2"       --  7
          ]
   , HU.testCase "Floor: r3" $ do
        render Money.Floor r3 @?=
@@ -230,10 +230,10 @@ testRationalToDecimal =
          , "0.34"   --  1
          , "+0.34"  --  2
          , "+0.34"  --  3
-         , "0"      --  8
-         , "0"      --  9
-         , "0"      -- 10
-         , "0"      -- 11
+         , "0"      --  4
+         , "0"      --  5
+         , "0"      --  6
+         , "0"      --  7
          ]
   , HU.testCase "Floor: negate r3" $ do
        render Money.Floor (negate r3) @?=
@@ -241,10 +241,10 @@ testRationalToDecimal =
          , "-0.35"   --  1
          , "-0.35"   --  2
          , "-0.35"   --  3
-         , "-1"      --  8
-         , "-1"      --  9
-         , "-1"      -- 10
-         , "-1"      -- 11
+         , "-1"      --  4
+         , "-1"      --  5
+         , "-1"      --  6
+         , "-1"      --  7
          ]
   , HU.testCase "Ceiling: r1" $ do
        render Money.Ceiling r1 @?=
@@ -252,10 +252,10 @@ testRationalToDecimal =
          , "1,023,004,567.90"     --  1
          , "+1023004567.90"       --  2
          , "+1,023,004,567.90"    --  3
-         , "1023004568"           --  8
-         , "1,023,004,568"        --  9
-         , "+1023004568"          -- 10
-         , "+1,023,004,568"       -- 11
+         , "1023004568"           --  4
+         , "1,023,004,568"        --  5
+         , "+1023004568"          --  6
+         , "+1,023,004,568"       --  7
          ]
   , HU.testCase "Ceiling: negate r1" $ do
        render Money.Ceiling (negate r1) @?=
@@ -263,10 +263,10 @@ testRationalToDecimal =
          , "-1,023,004,567.89"    --  1
          , "-1023004567.89"       --  2
          , "-1,023,004,567.89"    --  3
-         , "-1023004567"          --  8
-         , "-1,023,004,567"       --  9
-         , "-1023004567"          -- 10
-         , "-1,023,004,567"       -- 11
+         , "-1023004567"          --  4
+         , "-1,023,004,567"       --  5
+         , "-1023004567"          --  6
+         , "-1,023,004,567"       --  7
          ]
   , HU.testCase "Ceiling: r2" $ do
        render Money.Ceiling r2 @?=
@@ -274,10 +274,10 @@ testRationalToDecimal =
          , "1.23"    --  1
          , "+1.23"   --  2
          , "+1.23"   --  3
-         , "2"       --  8
-         , "2"       --  9
-         , "+2"      -- 10
-         , "+2"      -- 11
+         , "2"       --  4
+         , "2"       --  5
+         , "+2"      --  6
+         , "+2"      --  7
          ]
   , HU.testCase "Ceiling: negate r2" $ do
        render Money.Ceiling (negate r2) @?=
@@ -285,10 +285,10 @@ testRationalToDecimal =
          , "-1.23"    --  1
          , "-1.23"    --  2
          , "-1.23"    --  3
-         , "-1"       --  8
-         , "-1"       --  9
-         , "-1"       -- 10
-         , "-1"       -- 11
+         , "-1"       --  4
+         , "-1"       --  5
+         , "-1"       --  6
+         , "-1"       --  7
          ]
   , HU.testCase "Ceiling: r3" $ do
        render Money.Ceiling r3 @?=
@@ -296,10 +296,10 @@ testRationalToDecimal =
          , "0.35"   --  1
          , "+0.35"  --  2
          , "+0.35"  --  3
-         , "1"      --  8
-         , "1"      --  9
-         , "+1"     -- 10
-         , "+1"     -- 11
+         , "1"      --  4
+         , "1"      --  5
+         , "+1"     --  6
+         , "+1"     --  7
          ]
   , HU.testCase "Ceiling: negate r3" $ do
        render Money.Ceiling (negate r3) @?=
@@ -307,10 +307,10 @@ testRationalToDecimal =
          , "-0.34"   --  1
          , "-0.34"   --  2
          , "-0.34"   --  3
-         , "0"       --  8
-         , "0"       --  9
-         , "0"       -- 10
-         , "0"       -- 11
+         , "0"       --  4
+         , "0"       --  5
+         , "0"       --  6
+         , "0"       --  7
          ]
 
   , HU.testCase "Truncate: r1" $ do
@@ -342,10 +342,10 @@ testRationalToDecimal =
       , fromJust $ MoneyI.rationalToDecimal a False (Just ',') '.' 2 r  --  1
       , fromJust $ MoneyI.rationalToDecimal a True  Nothing    '.' 2 r  --  2
       , fromJust $ MoneyI.rationalToDecimal a True  (Just ',') '.' 2 r  --  3
-      , fromJust $ MoneyI.rationalToDecimal a False Nothing    '.' 0 r  --  8
-      , fromJust $ MoneyI.rationalToDecimal a False (Just ',') '.' 0 r  --  9
-      , fromJust $ MoneyI.rationalToDecimal a True  Nothing    '.' 0 r  -- 10
-      , fromJust $ MoneyI.rationalToDecimal a True  (Just ',') '.' 0 r  -- 11
+      , fromJust $ MoneyI.rationalToDecimal a False Nothing    '.' 0 r  --  4
+      , fromJust $ MoneyI.rationalToDecimal a False (Just ',') '.' 0 r  --  5
+      , fromJust $ MoneyI.rationalToDecimal a True  Nothing    '.' 0 r  --  6
+      , fromJust $ MoneyI.rationalToDecimal a True  (Just ',') '.' 0 r  --  7
       ]
 
 testRationalFromDecimal :: Tasty.TestTree
