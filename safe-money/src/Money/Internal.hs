@@ -85,10 +85,37 @@ module Money.Internal
  , someExchangeRateDstCurrency
  , someExchangeRateDstCurrency'
  , someExchangeRateRate
- -- * Misc
- , Approximation(Round, Floor, Ceiling, Truncate)
+ -- * Rationals
  , rationalToDecimal
  , rationalFromDecimal
+ -- * Miscellaneous
+ , Approximation(Round, Floor, Ceiling, Truncate)
+ -- ** Decimal config
+ , DecimalConf
+ , defaultDecimalConf
+ , decimalConfSeparators
+ , decimalConfSeparatorsSet
+ , decimalConfLeadingPlus
+ , decimalConfLeadingPlusSet
+ , decimalConfDigits
+ , decimalConfDigitsSet
+ , decimalConfScale
+ , decimalConfScaleSet
+ -- *** Separators
+ , Separators
+ , mkSeparators
+ , separatorsComma
+ , separatorsCommaDot
+ , separatorsCommaNarrownbsp
+ , separatorsCommaNbsp
+ , separatorsCommaThinsp
+ , separatorsCommaSpace
+ , separatorsDot
+ , separatorsDotComma
+ , separatorsDotNarrownbsp
+ , separatorsDotThinsp
+ , separatorsDotNbsp
+ , separatorsDotSpace
  ) where
 
 import Control.Applicative ((<|>), empty)
@@ -710,6 +737,8 @@ exchangeRateToRational = \(ExchangeRate r0) -> r0
 {-# INLINE exchangeRateToRational #-}
 
 -- | Safely construct an 'ExchangeRate' from a *positive* 'Rational' number.
+--
+-- If the given 'Rational' is non-positive, returns 'Nothing'.
 exchangeRate :: Rational -> Maybe (ExchangeRate src dst)
 exchangeRate = \r ->
   if denominator r /= 0 && r > 0
@@ -772,9 +801,9 @@ data SomeDense = SomeDense
   , _someDenseAmount            :: !Rational
   } deriving (Eq, Show, GHC.Generic)
 
--- | __WARNING__ This instance does not compare monetary amounts, it just helps
--- you sort 'SomeDense' values in case you need to put them in a 'Data.Set.Set'
--- or similar.
+-- | __WARNING__ This instance does not compare monetary amounts across
+-- different currencies, it just helps you sort 'SomeDense' values in case you
+-- need to put them in a 'Data.Set.Set' or similar.
 deriving instance Ord SomeDense
 
 -- | Currency name.
@@ -874,9 +903,9 @@ data SomeDiscrete = SomeDiscrete
   , _someDiscreteAmount   :: !Integer  -- ^ Amount of unit.
   } deriving (Eq, Show, GHC.Generic)
 
--- | __WARNING__ This instance does not compare monetary amounts, it just helps
--- you sort 'SomeDiscrete' values in case you need to put them in a
--- 'Data.Set.Set' or similar.
+-- | __WARNING__ This instance does not compare monetary amounts across
+-- different currencies, it just helps you sort 'SomeDiscrete' values in case
+-- you need to put them in a 'Data.Set.Set' or similar.
 deriving instance Ord SomeDiscrete
 
 -- | Currency name.
@@ -1011,9 +1040,9 @@ data SomeExchangeRate = SomeExchangeRate
   , _someExchangeRateRate            :: !Rational -- ^ Positive, non-zero.
   } deriving (Eq, Show, GHC.Generic)
 
--- | __WARNING__ This instance does not compare monetary amounts, it just helps
--- you sort 'SomeExchangeRate' values in case you need to put them in a
--- 'Data.Set.Set' or similar.
+-- | __WARNING__ This instance does not compare rates across different currency
+-- pairs (whatever that means), it just helps you sort 'SomeExchangeRate' values
+-- in case you need to put them in a 'Data.Set.Set' or similar.
 deriving instance Ord SomeExchangeRate
 
 -- | Source currency name.
@@ -1246,77 +1275,25 @@ instance Binary.Binary SomeExchangeRate where
 -- manner.
 --
 -- @
--- > 'denseToDecimal' 'Round' 'True' ('Just' \',\') \'.\' 2 (1 '%' 1)
+-- > 'denseToDecimal' 'defaultDecimalConf' 'Round'
 --      ('dense'' (123456 '%' 100) :: 'Dense' \"USD\")
--- Just \"+1,234.56\"
+-- \"1234.56\"
 -- @
---
--- @
--- > 'denseToDecimal' 'Round' 'True' ('Just' \',\') \'.\' 2 (100 '%' 1)
---      ('dense'' (123456 '%' 100) :: 'Dense' \"USD\")
--- Just \"+123,456.00\"
--- @
---
--- This function returns 'Nothing' if the scale is less than @1@, or if it's not
--- possible to reliably render the decimal string due to a bad choice of
--- separators. That is, if the separators are digits or equal among themselves,
--- this function returns 'Nothing'.
 denseToDecimal
-  :: Approximation
+  :: DecimalConf
+  -- ^ Config to use for rendering the decimal number.
+  -> Approximation
   -- ^ Approximation to use if necesary in order to fit the 'Dense' amount in
   -- as many decimal numbers as requested.
-  -> Bool
-  -- ^ Whether to render a leading @\'+\'@ sign in case the amount is positive.
-  -> Maybe Char
-  -- ^ Thousands separator for the integer part, if any (i.e., the @\',\'@ in
-  -- @1,234.56789@).
-  --
-  -- If the given separator is a digit, or if it is equal to the decimal
-  -- separator, then this functions returns 'Nothing'.
-  -> Char
-  -- ^ Decimal separator (i.e., the @\'.\'@ in @1,234.56789@).
-  --
-  -- If the given separator is a digit, or if it is equal to the thousands
-  -- separator, then this functions returns 'Nothing'.
-  -> Word8
-  -- ^ Number of decimal numbers to render, if any.
-  -> Rational
-  -- ^ Scale used to when rendering the decimal number. This is useful if you
-  -- want to render a “number of cents” rather than a “number of dollars” when
-  -- rendering a USD amount, for example.
-  --
-  -- Set this to @1 '%' 1@ if you don't care.
-  --
-  -- For example, when rendering render @'dense'' (123 '%' 100) :: 'Dense'
-  -- "USD"@ as a decimal number with three decimal places, a scale of @1 '%' 1@
-  -- (analogous to  @'Scale' \"USD\" \"dollar\"@) would render @1@ as the
-  -- integer part and @230@ as the fractional part, whereas a scale of @100 '%'
-  -- 1@ (analogous @'Scale' \"USD\" \"cent\"@) would render @123@ as the integer
-  -- part and @000@ as the fractional part.
-  --
-  -- You can easily obtain the scale for a particular currency and unit
-  -- combination using the 'scale' function. Otherwise, you are free to pass in
-  -- any other /positive/ 'Rational' number. If a non-positive scale is given,
-  -- then this function returns 'Nothing'.
-  --
-  -- Specifying scales other than @1 '%' 1@ is particularly useful for
-  -- currencies whose main unit is too big. For example, the main unit of gold
-  -- (XAU) is the troy-ounce, which is too big for day to day accounting, so
-  -- using the gram or the grain as the unit when rendering decimal amounts
-  -- could be useful.
-  --
-  -- Be careful when using a scale smaller than @1 '%' 1@, since it may become
-  -- impossible to parse back a meaningful amount from the rendered decimal
-  -- representation unless a big number of fractional digits is used.
   -> Dense currency
   -- ^ The dense monetary amount to render.
-  -> Maybe T.Text
+  -> T.Text
   -- ^ Returns 'Nothing' is the given separators are not acceptable (i.e., they
   -- are digits, or they are equal).
 {-# INLINABLE denseToDecimal #-}
-denseToDecimal a plus ytsep dsep fdigs scal = \(Dense r0) -> do
-  guard (scal > 0)
-  rationalToDecimal a plus ytsep dsep fdigs (r0 * scal)
+denseToDecimal ds a = \(Dense r0) -> do
+  rationalToDecimal ds a r0
+
 
 -- | Render a 'Discrete'' monetary amount as a decimal number in a potentially
 -- lossy manner.
@@ -1324,150 +1301,269 @@ denseToDecimal a plus ytsep dsep fdigs scal = \(Dense r0) -> do
 -- This is simply a convenient wrapper around 'denseToDecimal':
 --
 -- @
--- 'discreteToDecimal' a b c d e f (dis :: 'Discrete'' currency scale)
---     == 'denseToDecimal' a b c d e f ('denseFromDiscrete' dis :: 'Dense' currency)
+-- 'discreteToDecimal' ds a (dis :: 'Discrete'' currency scale)
+--     == 'denseToDecimal' ds a ('denseFromDiscrete' dis :: 'Dense' currency)
 -- @
 --
 -- In particular, the @scale@ in @'Discrete'' currency scale@ has no influence
--- over the scale in which the decimal number is rendered. Use the 'Rational'
--- parameter to this function for modifying that behavior.
+-- over the scale in which the decimal number is rendered. Change the scale
+-- with 'decimalConfScaleSet' in order to modify that behavior.
 --
 -- Please refer to 'denseToDecimal' for further documentation.
---
--- This function returns 'Nothing' if the scale is less than @1@, or if it's not
--- possible to reliably render the decimal string due to a bad choice of
--- separators. That is, if the separators are digits or equal among themselves,
--- this function returns 'Nothing'.
 discreteToDecimal
   :: GoodScale scale
-  => Approximation
+  => DecimalConf
+  -- ^ Config to use for rendering the decimal number.
+  -> Approximation
   -- ^ Approximation to use if necesary in order to fit the 'Discrete' amount in
   -- as many decimal numbers as requested.
-  -> Bool
-  -- ^ Whether to render a leading @\'+\'@ sign in case the amount is positive.
-  -> Maybe Char
-  -- ^ Thousands separator for the integer part, if any (i.e., the @\',\'@ in
-  -- @1,234.56789@).
-  --
-  -- If the given separator is a digit, or if it is equal to the decimal
-  -- separator, then this functions returns 'Nothing'.
-  -> Char
-  -- ^ Decimal separator (i.e., the @\'.\'@ in @1,234.56789@).
-  --
-  -- If the given separator is a digit, or if it is equal to the thousands
-  -- separator, then this functions returns 'Nothing'.
-  -> Word8
-  -- ^ Number of decimal numbers to render, if any.
-  -> Rational
-  -- ^ Scale used to when rendering the decimal number. This is useful if you
-  -- want to render a “number of cents” rather than a “number of dollars” when
-  -- rendering a USD amount, for example.
-  --
-  -- Set this to @1 '%' 1@ if you don't care.
-  --
-  -- For example, when rendering render @'discrete' 123 :: 'Dense' \"USD\"
-  -- \"cent\"@ as a decimal number with three decimal places, a scale of @1 '%'
-  -- 1@ (analogous to  @'Scale' \"USD\" \"dollar\"@) would render @1@ as the
-  -- integer part and @230@ as the fractional part, whereas a scale of @100 '%'
-  -- 1@ (analogous @'Scale' \"USD\" \"cent\"@) would render @123@ as the integer
-  -- part and @000@ as the fractional part.
-  --
-  -- You can easily obtain the scale for a particular currency and unit
-  -- combination using the 'scale' function. Otherwise, you are free to pass in
-  -- any other /positive/ 'Rational' number. If a non-positive scale is
-  -- given, then this function returns 'Nothing'.
-  --
-  -- Specifying scales other than @1 '%' 1@ is particularly useful for
-  -- currencies whose main unit is too big. For example, the main unit of gold
-  -- (XAU) is the troy-ounce, which is too big for day to day accounting, so
-  -- using the gram or the grain as the unit when rendering decimal amounts
-  -- could be useful.
-  --
-  -- Be careful when using a scale smaller than @1 '%' 1@, since it may become
-  -- impossible to parse back a meaningful amount from the rendered decimal
-  -- representation unless a big number of fractional digits is used.
   -> Discrete' currency scale
   -- ^ The monetary amount to render.
-  -> Maybe T.Text
+  -> T.Text
   -- ^ Returns 'Nothing' is the given separators are not acceptable (i.e., they
   -- are digits, or they are equal).
 {-# INLINABLE discreteToDecimal #-}
-discreteToDecimal a plus ytsep dsep fdigs scal = \dns ->
-  denseToDecimal a plus ytsep dsep fdigs scal (denseFromDiscrete dns)
+discreteToDecimal ds a = \dns ->
+  denseToDecimal ds a (denseFromDiscrete dns)
 
 -- | Render a 'ExchangeRate' as a decimal number in a potentially lossy manner.
 --
 -- @
--- > 'exchangeRateToDecimal' 'Round' 'True' ('Just' \',\') \'.\' 2
---       '=<<' ('exchangeRate' (123456 '%' 100) :: 'Maybe' ('ExchangeRate' \"USD\" \"EUR\"))
+-- > 'exchangeRateToDecimal' 'defaultDecimalConf' 'Round'
+--       '<$>' ('exchangeRate' (123456 '%' 100) :: 'Maybe' ('ExchangeRate' \"USD\" \"EUR\"))
 -- Just \"1,234.56\"
 -- @
---
--- This function returns 'Nothing' if it is not possible to reliably render the
--- decimal string due to a bad choice of separators. That is, if the separators
--- are digits or equal among themselves, this function returns 'Nothing'.
 exchangeRateToDecimal
-  :: Approximation
+  :: DecimalConf
+  -- ^ Config to use for rendering the decimal number.
+  -> Approximation
   -- ^ Approximation to use if necesary in order to fit the 'Dense' amount in
   -- as many decimal numbers as requested.
-  -> Maybe Char
-  -- ^ Thousands separator for the integer part, if any (i.e., the @\',\'@ in
-  -- @1,234.56789@).
-  -> Char
-  -- ^ Decimal separator (i.e., the @\'.\'@ in @1,234.56789@)
-  -> Word8
-  -- ^ Number of decimal numbers to render, if any.
   -> ExchangeRate src dst
   -- ^ The 'ExchangeRate' to render.
-  -> Maybe T.Text
+  -> T.Text
   -- ^ Returns 'Nothing' if the given separators are not acceptable (i.e., they
   -- are digits, or they are equal).
 {-# INLINABLE exchangeRateToDecimal #-}
-exchangeRateToDecimal a ytsep dsep fdigs0 = \(ExchangeRate r0) ->
-  rationalToDecimal a False ytsep dsep fdigs0 r0
+exchangeRateToDecimal ds a = \(ExchangeRate r0) ->
+  rationalToDecimal ds a r0
 
--- | Render a 'Rational' number as a decimal approximation.
+--------------------------------------------------------------------------------
+
+-- | Decimal and thousands separators used when rendering or parsing a decimal
+-- number.
 --
--- This function returns 'Nothing' if it is not possible to reliably render the
--- decimal string due to a bad choice of separators. That is, if the separators
--- are digits or equal among themselves, this function returns 'Nothing'.
-rationalToDecimal
-  :: Approximation
-  -- ^ Approximation to use if necesary in order to fit the 'Dense' amount in
-  -- as many decimal numbers as requested.
-  -> Bool
-  -- ^ Whether to render a leading @\'+\'@ sign in case the amount is positive.
+-- Use 'mkSeparators' to construct.
+data Separators = Separators Char (Maybe Char)
+  deriving (Eq, Show)
+
+-- | Construct 'Separators' to use with in 'DecimalConf'.
+--
+-- The separatorsA can't be an ASCII digit nor control character, and they must
+-- be different from each other.
+mkSeparators
+  :: Char
+  -- ^ Decimal separator (i.e., the @\'.\'@ in @1,234.56789@)
   -> Maybe Char
   -- ^ Thousands separator for the integer part, if any (i.e., the @\',\'@ in
   -- @1,234.56789@).
-  -> Char
-  -- ^ Decimal separator (i.e., the @\'.\'@ in @1,234.56789@)
-  -> Word8
-  -- ^ Number of decimal numbers to render, if any.
+  -> Maybe Separators
+mkSeparators ds yts = do
+  guard (not (Char.isDigit ds || Char.isControl ds))
+  for_ yts $ \ts ->
+    guard (not (ts == ds || Char.isDigit ts || Char.isControl ts))
+  pure (Separators ds yts)
+
+-- | @1234567,89@
+separatorsComma :: Separators
+separatorsComma = Separators ',' Nothing
+
+-- | @1.234.567,89@
+separatorsCommaDot :: Separators
+separatorsCommaDot = Separators ',' (Just '.')
+
+-- | @1 234 567,89@
+--
+-- The whitespace is Unicode's /NARROW NO-BREAK SPACE/ (U+202f, 8239,
+-- @'\8239'@).
+separatorsCommaNarrownbsp :: Separators
+separatorsCommaNarrownbsp = Separators ',' (Just '\8239')
+
+-- | @1 234 567,89@
+--
+-- The whitespace is Unicode's /NO-BREAK SPACE/ (U+00a0, 160, @'\160'@).
+separatorsCommaNbsp :: Separators
+separatorsCommaNbsp = Separators ',' (Just '\160')
+
+-- | @1 234 567,89@
+--
+-- The whitespace is Unicode's /THIN SPACE/ (U+2009, 8201, @'\8201'@).
+separatorsCommaThinsp :: Separators
+separatorsCommaThinsp = Separators ',' (Just '\8201')
+
+-- | @1 234 567,89@
+--
+-- The whitespace is ASCII's /SPC/ (U+0020, 32, @'\32'@).
+separatorsCommaSpace :: Separators
+separatorsCommaSpace = Separators ',' (Just '\32')
+
+-- | @1234567.89@
+separatorsDot :: Separators
+separatorsDot = Separators '.' Nothing
+
+-- | @1,234,567.89@
+separatorsDotComma :: Separators
+separatorsDotComma = Separators '.' (Just ',')
+
+-- | @1 234 567.89@
+--
+-- The whitespace is Unicode's /NARROW NO-BREAK SPACE/ (U+202f, 8239,
+-- @'\8239'@).
+separatorsDotNarrownbsp :: Separators
+separatorsDotNarrownbsp = Separators '.' (Just '\8239')
+
+-- | @1 234 567.89@
+--
+-- The whitespace is Unicode's /THIN SPACE/ (U+2009, 8201, @'\8201'@).
+separatorsDotThinsp :: Separators
+separatorsDotThinsp = Separators '.' (Just '\8201')
+
+-- | @1 234 567.89@
+--
+-- The whitespace is Unicode's /NO-BREAK SPACE/ (U+00a0, 160, @'\160'@).
+separatorsDotNbsp :: Separators
+separatorsDotNbsp = Separators '.' (Just '\160')
+
+-- | @1 234 567.89@
+--
+-- The whitespace is ASCII's /SPACE/ (U+0020, 32, @'\32'@).
+separatorsDotSpace :: Separators
+separatorsDotSpace = Separators '.' (Just '\32')
+
+--------------------------------------------------------------------------------
+
+-- | Config to use when rendering or parsing decimal numbers.
+--
+-- Construct with 'defaultDecimalConf', modify with 'decimalConfSeparatorsSet',
+-- 'decimalConfLeadingPlusSet', 'decimalConfDigitsSet' and
+-- 'decimalConfScaleSet'.
+data DecimalConf = DecimalConf
+  { decimalConf_separators :: !Separators
+  , decimalConf_leadingPlus :: !Bool
+  , decimalConf_digits :: !Word8
+  , decimalConf_scale :: !Rational
+  } deriving (Eq, Show)
+
+-- | See 'decimalConfSeparators'.
+decimalConfSeparators :: DecimalConf -> Separators
+decimalConfSeparators = decimalConf_separators
+
+-- | Decimal and thousands separators to use when rendering the decimal number.
+-- Construct one with 'mkSeparators', or pick a ready made one like
+-- 'separatorsDot' or 'separatorsDotNarrownbsp'.
+decimalConfSeparatorsSet :: Separators -> DecimalConf -> DecimalConf
+decimalConfSeparatorsSet s dc = dc { decimalConf_separators = s }
+
+-- | See 'decimalConfLeadingPlusSet'.
+decimalConfLeadingPlus :: DecimalConf -> Bool
+decimalConfLeadingPlus = decimalConf_leadingPlus
+
+-- | Whether to render a leading @\'+\'@ sign in case the amount is positive.
+decimalConfLeadingPlusSet :: Bool -> DecimalConf -> DecimalConf
+decimalConfLeadingPlusSet b dc = dc { decimalConf_leadingPlus = b }
+
+-- | See 'decimalConfDigitsSet'.
+decimalConfDigits :: DecimalConf -> Word8
+decimalConfDigits = decimalConf_digits
+
+-- | Number of decimal numbers to render, if any.
+decimalConfDigitsSet :: Word8 -> DecimalConf -> DecimalConf
+decimalConfDigitsSet w dc = dc { decimalConf_digits = w }
+
+-- | See 'decimalConfScaleSet'.
+decimalConfScale :: DecimalConf -> Rational
+decimalConfScale = decimalConf_scale
+
+-- | Scale used to when rendering the decimal number. This is useful if, for
+-- example, you want to render a “number of cents” rather than a “number of
+-- dollars” as the whole part of the decimal number when rendering a USD
+-- amount. It's particularly useful when rendering currencies such as XAU,
+-- where one might prefer to render amounts as a number of grams, rather than
+-- as a number of troy-ounces.
+--
+-- /Set this to @1@ if you don't care./
+--
+-- This function returns 'Nothing' if a non-positive scale is given.
+--
+-- For example, when rendering render @'dense'' (123 '%' 100) :: 'Dense'
+-- \"USD\"@ as a decimal number with two decimal places, a scale of @1@
+-- (analogous to  @'Scale' \"USD\" \"dollar\"@) would render @1@ as the
+-- integer part and @23@ as the fractional part, whereas a scale of @100@
+-- (analogous @'Scale' \"USD\" \"cent\"@) would render @123@ as the integer
+-- part and @00@ as the fractional part.
+--
+-- You can easily obtain the scale for a particular currency and unit
+-- combination using the 'scale' function.
+--
+-- __Important:__ Generally, you will want this number to be @1@ or larger.
+-- This is because scales in the range @(0, 1)@ can be particularly lossy unless
+-- the number of decimal digits is sufficiently large.
+decimalConfScaleSet :: Rational -> DecimalConf -> Maybe DecimalConf
+decimalConfScaleSet r dc = do
+  guard (r > 0)
+  pure (dc { decimalConf_scale = r })
+
+-- | Default 'DecimalConf'.
+--
+-- * No leading @\'+\'@ sign
+--
+-- * No thousands separator
+--
+-- * Decimal separator is @\'.\'@
+--
+-- * @2@ decimal digits
+--
+-- * A scale of @1@
+--
+-- That is, something like @1.23@ or @-1234567.89@.
+defaultDecimalConf :: DecimalConf
+defaultDecimalConf = DecimalConf
+  { decimalConf_separators = separatorsDot
+  , decimalConf_leadingPlus = False
+  , decimalConf_digits = 2
+  , decimalConf_scale = 1
+  }
+
+--------------------------------------------------------------------------------
+
+-- | Render a 'Rational' number as a decimal approximation.
+rationalToDecimal
+  :: DecimalConf
+  -- ^ Config to use for rendering the decimal number.
+  -> Approximation
+  -- ^ Approximation to use if necesary in order to fit the 'Dense' amount in
+  -- as many decimal numbers as requested.
   -> Rational
   -- ^ The dense monetary amount to render.
-  -> Maybe T.Text
+  -> T.Text
   -- ^ Returns 'Nothing' if the given separators are not acceptable (i.e., they
   -- are digits, or they are equal).
 {-# INLINABLE rationalToDecimal #-}
-rationalToDecimal a plus ytsep dsep fdigs0 = \r0 -> do
-  guard (not (Char.isDigit dsep))
-  for_ ytsep $ \tsep ->
-     guard (tsep /= dsep && not (Char.isDigit tsep))
+rationalToDecimal (DecimalConf (Separators ds yts) plus fdigs0 scal) a = \r0 -> do
   -- this string-fu is not particularly efficient.
-  let start = r0 * (10 ^ fdigs0) :: Rational
+  let start = r0 * scal * (10 ^ fdigs0) :: Rational
       parts = approximate a start :: Integer
       ipart = fromInteger (abs parts) `div` (10 ^ fdigs0) :: Natural
       ftext | ipart == 0 = show (abs parts) :: String
             | otherwise = drop (length (show ipart)) (show (abs parts))
-      itext = maybe (show ipart) (renderThousands ipart) ytsep :: String
+      itext = maybe (show ipart) (renderThousands ipart) yts :: String
       fpad0 = List.replicate (fromIntegral fdigs0 - length ftext) '0' :: String
-  Just $ T.pack $ mconcat
+  T.pack $ mconcat
     [ if | parts < 0 -> "-"
          | plus && parts > 0 -> "+"
          | otherwise -> ""
     , itext
-    , if | fdigs0 > 0 -> dsep : if start < 1
+    , if | fdigs0 > 0 -> ds : if start < 1
                                    then fpad0 <> ftext
                                    else ftext <> fpad0
          | otherwise -> ""
@@ -1497,114 +1593,88 @@ renderThousands n0   -- TODO better use text
 -- Decimal parsing
 
 -- | Parses a decimal representation of a 'Dense'.
---
--- Leading @\'-\'@ and @\'+\'@ characters are considered.
 denseFromDecimal
-  :: Maybe Char
-  -- ^ Thousands separator for the integer part, if any (i.e., the @\',\'@ in
-  -- @-1,234.56789@).
-  -> Char
-  -- ^ Decimal separator (i.e., the @\'.\'@ in @-1,234.56789@)
-  -> Rational
-  -- ^ Scale used by the rendered decimal. It is important to get this number
-  -- correctly, otherwise the resulting 'Dense' amount will be wrong. Please
-  -- refer to the documentation for 'denseToDecimal' to understand the meaning
-  -- of this scale.
+  :: DecimalConf
+  -- ^ Config to use for parsing the decimal number.
   --
-  -- In summary, this scale will have a value of @1@ unless the decimal amount
-  -- represents a unit other than the main unit for the currency (e.g., cents
-  -- rather than dollars for USD, or grams rather than troy-ounces for XAU, or
-  -- millibitcoins rather than bitcoins for BTC).
+  -- Notice that a leading @\'-\'@ or @\'+\'@ will always be correctly
+  -- interpreted, notwithstanding what the “leading @\'+\'@” policy is on
+  -- the given 'DecimalConf'.
   -> T.Text
   -- ^ The raw string containing the decimal representation (e.g.,
   -- @"-1,234.56789"@).
   -> Maybe (Dense currency)
-denseFromDecimal yst sf scal str = do
-  guard (scal > 0)
-  r <- rationalFromDecimal yst sf str
-  pure (Dense $! (r / scal))
+denseFromDecimal ds t = do
+  r <- rationalFromDecimal ds t
+  pure (Dense $! r) -- TODO this scale thing ok?
+  -- pure (Dense $! r / decimalConf_scale ds) -- TODO this scale thing ok?
 
 -- | Parses a decimal representation of a 'Discrete'.
---
--- Leading @\'-\'@ and @\'+\'@ characters are considered.
 --
 -- Notice that parsing will fail unless the entire precision of the decimal
 -- number can be represented in the desired @scale@.
 discreteFromDecimal
   :: GoodScale scale
-  => Maybe Char
-  -- ^ Thousands separator for the integer part, if any (i.e., the @\',\'@ in
-  -- @-1,234.56789@).
-  -> Char
-  -- ^ Decimal separator (i.e., the @\'.\'@ in @-1,234.56789@)
-  -> Rational
-  -- ^ Scale used by the rendered decimal. It is important to get this number
-  -- correctly, otherwise the resulting 'Dense' amount will be wrong. Please
-  -- refer to the documentation for 'denseToDecimal' to understand the meaning
-  -- of this scale.
+  => DecimalConf
+  -- ^ Config to use for parsing the decimal number.
   --
-  -- In summary, this scale will have a value of @1@ unless the decimal amount
-  -- represents a unit other than the main unit for the currency (e.g., cents
-  -- rather than dollars for USD, or grams rather than troy-ounces for XAU, or
-  -- millibitcoins rather than bitcoins for BTC).
+  -- Notice that a leading @\'-\'@ or @\'+\'@ will always be correctly
+  -- interpreted, notwithstanding what the “leading @\'+\'@” policy is on
+  -- the given 'DecimalConf'.
   -> T.Text
   -- ^ The raw string containing the decimal representation (e.g.,
   -- @"-1,234.56789"@).
   -> Maybe (Discrete' currency scale)
-discreteFromDecimal yst sf scal = \str -> do
-  dns <- denseFromDecimal yst sf scal str
+discreteFromDecimal ds = \t -> do
+  dns <- denseFromDecimal ds t
   case discreteFromDense Truncate dns of
     (x, 0) -> Just x
     _ -> Nothing -- We fail for decimals that don't fit exactly in our scale.
 
 -- | Parses a decimal representation of an 'ExchangeRate'.
 exchangeRateFromDecimal
-  :: Maybe Char
-  -- ^ Thousands separator for the integer part, if any (i.e., the @\',\'@ in
-  -- @1,234.56789@).
-  -> Char
-  -- ^ Decimal separator (i.e., the @\'.\'@ in @1,234.56789@)
+  :: DecimalConf
+  -- ^ Config to use for parsing the decimal number.
+  --
+  -- Notice that a leading @\'-\'@ or @\'+\'@ will always be correctly
+  -- interpreted, notwithstanding what the “leading @\'+\'@” policy is on
+  -- the given 'DecimalConf'.
   -> T.Text
   -- ^ The raw string containing the decimal representation (e.g.,
   -- @"1,234.56789"@).
   -> Maybe (ExchangeRate src dst)
-exchangeRateFromDecimal yst sf t
+exchangeRateFromDecimal ds t
   | T.isPrefixOf "-" t = Nothing
-  | otherwise = exchangeRate =<< rationalFromDecimal yst sf t
+  | otherwise = exchangeRate =<< rationalFromDecimal ds t
 
+-- | Parses a decimal number representation as 'T.Text' into a 'Rational'.
 rationalFromDecimal
-  :: Maybe Char
-  -- ^ Thousands separator for the integer part, if any (i.e., the @\',\'@ in
-  -- @-1,234.56789@).
-  -> Char
-  -- ^ Decimal separator (i.e., the @\'.\'@ in @-1,234.56789@)
+  :: DecimalConf
+  -- ^ Config to use for parsing the decimal number.
+  --
+  -- Notice that a leading @\'-\'@ or @\'+\'@ will always be correctly
+  -- interpreted, notwithstanding what the “leading @\'+\'@” policy is on
+  -- the given 'DecimalConf'.
   -> T.Text
   -- ^ The raw string containing the decimal representation (e.g.,
   -- @"-1,234.56789"@).
   -> Maybe Rational
-rationalFromDecimal yst sf = \t ->
-  case ReadP.readP_to_S (rationalFromDecimalP yst sf) (T.unpack t) of
+rationalFromDecimal ds = \t ->
+  case ReadP.readP_to_S (rationalFromDecimalP ds) (T.unpack t) of
     [(x,"")] -> Just x
     _ -> Nothing
 
 -- TODO limit number of digits parsed to prevent DoS
 rationalFromDecimalP
-  :: Maybe Char
-  -- ^ Thousands separator for the integer part, if any (i.e., the @\',\'@ in
-  -- @-1,234.56789@).
+  :: DecimalConf
+  -- ^ Config to use for parsing the decimal number.
   --
-  -- The separator can't be a digit or control character. If it is, then parsing
-  -- will always fail.
-  -> Char
-  -- ^ Decimal separator (i.e., the @\'.\'@ in @-1,234.56789@).
-  --
-  -- The separator can't be a digit or control character. If it is, then parsing
-  -- will always fail.
+  -- Notice that a leading @\'-\'@ or @\'+\'@ will always be correctly
+  -- interpreted, notwithstanding what the “leading @\'+\'@” policy is on
+  -- the given 'DecimalConf'.
   -> ReadP.ReadP Rational
-rationalFromDecimalP ytsep dsep = do
-   for_ ytsep $ \tsep ->
-      guard (tsep /= dsep && not (Char.isDigit tsep))
-   guard (not (Char.isDigit dsep))
+rationalFromDecimalP ds = do
+   let Separators dsep ytsep = decimalConf_separators ds
    sig :: Rational -> Rational <-
      (ReadP.char '-' $> negate) <|>
      (ReadP.char '+' $> id) <|>
@@ -1620,9 +1690,10 @@ rationalFromDecimalP ytsep dsep = do
    yfpart :: Maybe String <-
      (ReadP.char dsep *> fmap Just (ReadP.munch1 Char.isDigit) <* ReadP.eof) <|>
      (ReadP.eof $> Nothing)
-   pure $! sig $ case yfpart of
-     Nothing -> fromInteger (read ipart)
-     Just fpart -> read (ipart <> fpart) % (10 ^ length fpart)
+   let r = sig $ case yfpart of
+         Nothing -> fromInteger (read ipart)
+         Just fpart -> read (ipart <> fpart) % (10 ^ length fpart)
+   pure $! r / decimalConf_scale ds
 
 --------------------------------------------------------------------------------
 -- QuickCheck Arbitrary instances
@@ -1672,3 +1743,21 @@ instance QC.Arbitrary SomeExchangeRate where
 
 instance QC.Arbitrary Approximation where
   arbitrary = QC.oneof [ pure Round, pure Floor, pure Ceiling, pure Truncate ]
+
+instance QC.Arbitrary Separators where
+  arbitrary = do
+    let msep = QC.suchThat QC.arbitrary $ \c ->
+          not (Char.isDigit c) && not (Char.isControl c)
+    ds :: Char <- msep
+    yts :: Maybe Char <- QC.oneof
+      [ pure Nothing, fmap Just (QC.suchThat msep (/= ds)) ]
+    let Just out = mkSeparators ds yts
+    pure out
+
+instance QC.Arbitrary DecimalConf where
+  arbitrary = DecimalConf
+    <$> QC.arbitrary
+    <*> QC.arbitrary
+    <*> QC.arbitrary
+    <*> fmap (\x -> abs x + 1) QC.arbitrary
+

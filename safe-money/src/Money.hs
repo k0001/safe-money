@@ -98,8 +98,34 @@ module Money
  , I.someExchangeRateSrcCurrency
  , I.someExchangeRateDstCurrency
  , I.someExchangeRateRate
- -- * Misc
+ -- * Miscellaneous
  , I.Approximation(Round, Floor, Ceiling, Truncate)
+ -- ** Decimal config
+ , I.DecimalConf
+ , I.defaultDecimalConf
+ , I.decimalConfSeparators
+ , I.decimalConfSeparatorsSet
+ , I.decimalConfLeadingPlus
+ , I.decimalConfLeadingPlusSet
+ , I.decimalConfDigits
+ , I.decimalConfDigitsSet
+ , I.decimalConfScale
+ , I.decimalConfScaleSet
+ -- *** Separators
+ , I.Separators
+ , I.mkSeparators
+ , I.separatorsComma
+ , I.separatorsCommaDot
+ , I.separatorsCommaNarrownbsp
+ , I.separatorsCommaNbsp
+ , I.separatorsCommaThinsp
+ , I.separatorsCommaSpace
+ , I.separatorsDot
+ , I.separatorsDotComma
+ , I.separatorsDotNarrownbsp
+ , I.separatorsDotThinsp
+ , I.separatorsDotNbsp
+ , I.separatorsDotSpace
  ) where
 
 import qualified Money.Internal as I

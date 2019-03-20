@@ -1,6 +1,13 @@
-# Version 0.7.2
+# Version 0.8
 
-* New currency: VES (Bolívar Soberano). (Issue #33)
+* _COMPILER ASSISTED BREAKING CHANGE_. Introduced `DecimalConf`, which all
+  of the `xxxToDecimal` and `xxxFromDecimal` are now using. This concentrates
+  all decimal rendering and parsing settings in a single place, and more
+  importantly, it makes all of the `xxxToDecimal` return a `Text` value
+  directly, rather than a `Maybe Text`. In turn, `Separators` has been
+  introduced for configuring decimal and thousands separators. See issue #30.
+
+* New currency: VES (Bolívar Soberano). See issue #33.
 
 
 # Version 0.7.1
@@ -8,7 +15,7 @@
 * Fixed compilation with GHC 8.6.
 
 * Fixed an issue when rendering decimal values smaller than the smallest
-  possible fractional part. (Issue #39)
+  possible fractional part. See issue #39.
 
 
 # Version 0.7

@@ -40,32 +40,24 @@ import qualified Money.Internal as MoneyI
 
 --------------------------------------------------------------------------------
 
--- | Generates a valid 'MoneyI.rationalToDecimal' result. Returns the thousand
--- and decimal separators as welland decimal separators as well.
-genDecimal :: QC.Gen (T.Text, Maybe Char, Char)
+-- | A wrapper around a decimal representation and its 'Money.DecimalConf',
+-- mostly just to benefit from its 'QC.Arbitrary' instance.
+data Decimal = Decimal Money.DecimalConf T.Text
+  deriving (Show)
+
+instance QC.Arbitrary Decimal where
+  arbitrary = uncurry (flip Decimal) <$> genDecimal
+  shrink (Decimal ds t) = Decimal <$> QC.shrink ds
+                                  <*> fmap T.pack (QC.shrink (T.unpack t))
+
+-- | Generates a valid 'MoneyI.rationalToDecimal' result using the returned
+-- 'Money.DecimalConf'.
+genDecimal :: QC.Gen (T.Text, Money.DecimalConf)
 genDecimal = do
   aprox :: Money.Approximation <- QC.arbitrary
-  plus :: Bool <- QC.arbitrary
-  digs :: Word8 <- QC.arbitrary
+  ds :: Money.DecimalConf <- QC.arbitrary
   r :: Rational <- (%) <$> QC.arbitrary <*> QC.suchThat QC.arbitrary (/= 0)
-  (yts, ds) <- genDecimalSeps
-  let
-      dec = fromMaybe
-          (error "genDecimal failed because rationalToDecimal returned Nothing")
-          (MoneyI.rationalToDecimal aprox plus yts ds digs r)
-  pure (dec, yts, ds)
-
--- | Generates valid separators for decimal representations (see genDecimal).
-genDecimalSeps :: QC.Gen (Maybe Char, Char)
-genDecimalSeps = do
-  let msep = QC.suchThat QC.arbitrary (not . Char.isDigit)
-  ds :: Char <- msep
-  yts :: Maybe Char <- genMaybe (QC.suchThat msep (/= ds))
-  pure (yts, ds)
-
-
-genMaybe :: QC.Gen a -> QC.Gen (Maybe a)
-genMaybe m = QC.oneof [pure Nothing, fmap Just m]
+  pure (MoneyI.rationalToDecimal ds aprox r, ds)
 
 --------------------------------------------------------------------------------
 
@@ -83,6 +75,7 @@ tests =
   , testExchange
   , testRationalToDecimal
   , testRationalFromDecimal
+  , testMkSeparators
   , testDiscreteFromDecimal
   , testRawSerializations
   ]
@@ -412,41 +405,45 @@ testRationalToDecimal =
 
     render :: Money.Approximation -> Rational -> [T.Text]
     render a r =
-      [ fromJust $ MoneyI.rationalToDecimal a False Nothing    '.' 2 r  --  0
-      , fromJust $ MoneyI.rationalToDecimal a False (Just ',') '.' 2 r  --  1
-      , fromJust $ MoneyI.rationalToDecimal a True  Nothing    '.' 2 r  --  2
-      , fromJust $ MoneyI.rationalToDecimal a True  (Just ',') '.' 2 r  --  3
-      , fromJust $ MoneyI.rationalToDecimal a False Nothing    '.' 0 r  --  4
-      , fromJust $ MoneyI.rationalToDecimal a False (Just ',') '.' 0 r  --  5
-      , fromJust $ MoneyI.rationalToDecimal a True  Nothing    '.' 0 r  --  6
-      , fromJust $ MoneyI.rationalToDecimal a True  (Just ',') '.' 0 r  --  7
+      [ MoneyI.rationalToDecimal ds_dd_2 a r           -- 0
+      , MoneyI.rationalToDecimal ds_tc_dd_2 a r        -- 1
+      , MoneyI.rationalToDecimal ds_p_dd_2 a r         -- 2
+      , MoneyI.rationalToDecimal ds_p_tc_dd_2 a r      -- 3
+      , MoneyI.rationalToDecimal ds_dd_0 a r        -- 4
+      , MoneyI.rationalToDecimal ds_tc_dd_0 a r     -- 5
+      , MoneyI.rationalToDecimal ds_p_dd_0 a r      -- 6
+      , MoneyI.rationalToDecimal ds_p_tc_dd_0 a r   -- 7
       ]
+
+testMkSeparators :: Tasty.TestTree
+testMkSeparators =
+  Tasty.testGroup "mkSeparators"
+  [ QC.testProperty "Unsupported separators" $
+      let mbadsep :: QC.Gen Char = QC.suchThat QC.arbitrary $ \c ->
+            Char.isDigit c || Char.isControl c
+          mgoodsep :: QC.Gen Char = QC.suchThat QC.arbitrary $ \c ->
+            not (Char.isDigit c || Char.isControl c)
+      in QC.forAll ((,,) <$> mbadsep <*> mbadsep <*> mgoodsep) $
+           \(s1 :: Char, s2 :: Char, s3 :: Char) ->
+               (Money.mkSeparators s1 Nothing   === Nothing) .&&.
+               (Money.mkSeparators s2 (Just s1) === Nothing) .&&.
+               (Money.mkSeparators s1 (Just s1) === Nothing) .&&.
+               (Money.mkSeparators s3 (Just s3) === Nothing)
+  ]
 
 testRationalFromDecimal :: Tasty.TestTree
 testRationalFromDecimal =
   Tasty.testGroup "rationalFromDecimal"
-  [ QC.testProperty "Unsupported separators" $
-      let mbadsep :: QC.Gen Char = QC.suchThat QC.arbitrary Char.isDigit
-          mgoodsep :: QC.Gen Char = QC.suchThat QC.arbitrary (not . Char.isDigit)
-      in QC.forAll ((,,) <$> mbadsep <*> mbadsep <*> mgoodsep) $
-           \(s1 :: Char, s2 :: Char, s3 :: Char) ->
-              let f = MoneyI.rationalFromDecimal
-              in (f Nothing s1 (error "untouched") === Nothing) .&&.
-                 (f (Just s1) s2 (error "untouched") === Nothing) .&&.
-                 (f (Just s1) s1 (error "untouched") === Nothing) .&&.
-                 (f (Just s3) s3 (error "untouched") === Nothing)
-
-  , Tasty.localOption (QC.QuickCheckTests 1000) $
+  [ Tasty.localOption (QC.QuickCheckTests 1000) $
     QC.testProperty "Lossy roundtrip" $
       -- We check that the roundtrip results in a close amount with a fractional
       -- difference of up to one.
-      let gen = (,) <$> genDecimalSeps <*> QC.arbitrary
-      in QC.forAll gen $ \( (yst :: Maybe Char, sd :: Char)
-                          , (r :: Rational, plus :: Bool, digs :: Word8,
-                             aprox :: Money.Approximation) ) ->
-           let Just dec = MoneyI.rationalToDecimal aprox plus yst sd digs r
-               Just r' = MoneyI.rationalFromDecimal yst sd dec
-           in 1 > abs (abs r - abs r')
+      QC.forAll QC.arbitrary $ \(ds :: Money.DecimalConf,
+                                 aprox :: Money.Approximation,
+                                 r :: Rational) ->
+        let dec = MoneyI.rationalToDecimal ds aprox r
+            Just r' = MoneyI.rationalFromDecimal ds dec
+        in 1 > abs (abs r - abs r')
   ]
 
 testDense
@@ -489,42 +486,35 @@ testDense pc =
         T.unpack (Money.denseCurrency x) === symbolVal pc
 
   , QC.testProperty "denseToDecimal: Same as rationalToDecimal" $
-      let gen = (,) <$> genDecimalSeps <*> QC.arbitrary
-      in QC.forAll gen $ \( (yst :: Maybe Char, sd :: Char)
-                          , (dns :: Money.Dense currency, plus :: Bool,
-                             digs :: Word8, aprox :: Money.Approximation) ) ->
-            let ydnsd1 = Money.denseToDecimal aprox plus yst sd digs 1 dns
-                ydnsd100 = Money.denseToDecimal aprox plus yst sd digs 100 dns
-                yrd1 = MoneyI.rationalToDecimal aprox plus yst sd digs (toRational dns)
-                yrd100 = MoneyI.rationalToDecimal aprox plus yst sd digs (toRational dns * 100)
-            in (ydnsd1 === yrd1) .&&. (ydnsd100 === yrd100)
+      QC.forAll QC.arbitrary $ \(ds :: Money.DecimalConf,
+                                 dns :: Money.Dense currency,
+                                 aprox :: Money.Approximation) ->
+         let Just ds_s100 = Money.decimalConfScaleSet
+                              (Money.decimalConfScale ds * 100) ds
+             ydnsd1 = Money.denseToDecimal ds aprox dns
+             ydnsd100 = Money.denseToDecimal ds_s100 aprox dns
+             yrd1 = MoneyI.rationalToDecimal ds aprox (toRational dns)
+             yrd100 = MoneyI.rationalToDecimal ds aprox (toRational dns * 100)
+         in (ydnsd1 === yrd1) .&&. (ydnsd100 === yrd100)
 
   , QC.testProperty "denseFromDecimal: Same as rationalFromDecimal" $
-      QC.forAll genDecimal $ \(dec :: T.Text, yts :: Maybe Char, ds :: Char) ->
-         let Just r = MoneyI.rationalFromDecimal yts ds dec
-             Just dns = Money.denseFromDecimal yts ds 1 dec
+      QC.forAll QC.arbitrary $ \(Decimal ds dec) ->
+         let Just r = MoneyI.rationalFromDecimal ds dec
+             Just dns = Money.denseFromDecimal ds dec
          in r === toRational (dns :: Money.Dense currency)
-
-  , QC.testProperty "denseFromDecimal: Same as rationalFromDecimal" $
-      QC.forAll genDecimal $ \(dec :: T.Text, yts :: Maybe Char, ds :: Char) ->
-         let Just r = MoneyI.rationalFromDecimal yts ds dec
-             Just dns = Money.denseFromDecimal yts ds 1 dec
-         in r === toRational (dns :: Money.Dense currency)
-
 
   , Tasty.localOption (QC.QuickCheckTests 1000) $
     QC.testProperty "denseToDecimal/denseFromDiscrete: Lossy roundtrip" $
       -- We check that the roundtrip results in a close amount with a fractional
       -- difference of up to one.
-      let gen = (,) <$> genDecimalSeps <*> QC.arbitrary
-      in QC.forAll gen $ \( (yst :: Maybe Char, sd :: Char)
-                          , (sc0 :: Rational, plus :: Bool,
-                             digs :: Word8, aprox :: Money.Approximation,
-                             dns :: Money.Dense currency) ) ->
-           let sc = abs sc0 + 1 -- smaller scales can't reliably be parsed back
-               Just dec = Money.denseToDecimal aprox plus yst sd digs sc dns
-               Just dns' = Money.denseFromDecimal yst sd sc dec
-           in Money.dense' 1 > abs (abs dns - abs dns')
+      QC.forAll QC.arbitrary $ \(ds :: Money.DecimalConf,
+                                 sc0 :: Rational,
+                                 aprox :: Money.Approximation,
+                                 dns :: Money.Dense currency) ->
+        let sc = abs sc0 + 1  -- scales less than 1 can't reliably roundtrip.
+            dec = Money.denseToDecimal ds aprox dns
+            Just dns' = Money.denseFromDecimal ds dec
+        in Money.dense' 1 > abs (abs dns - abs dns')
 
   , HU.testCase "AdditiveGroup: zeroV" $
       (AG.zeroV :: Money.Dense currency) @?= Money.dense' (0%1)
@@ -633,16 +623,14 @@ testDiscrete pc pu =
   , QC.testProperty "discreteToDecimal/discreteFromDecimal: Same as denseToDecimal/denseFromDecimal" $
       -- We check that the roundtrip results in a close amount with a fractional
       -- difference of up to one.
-      let gen = (,) <$> genDecimalSeps <*> QC.arbitrary
-      in QC.forAll gen $ \( (yst :: Maybe Char, sd :: Char)
-                          , (sc0 :: Rational, plus :: Bool,
-                             digs :: Word8, aprox :: Money.Approximation,
-                             dis :: Money.Discrete currency unit) ) ->
-           let sc = abs sc0 + 1  -- scale can't be less than 1
-               dns = Money.denseFromDiscrete dis
-               ydec = Money.discreteToDecimal aprox plus yst sd digs sc dis
-               ydec' = Money.denseToDecimal aprox plus yst sd digs sc dns
-           in ydec === ydec'
+      QC.forAll QC.arbitrary $ \(ds :: Money.DecimalConf,
+                                 sc0 :: Rational,
+                                 aprox :: Money.Approximation,
+                                 dis :: Money.Discrete currency unit) ->
+        let sc = abs sc0 + 1  -- scales less than 1 can't reliably roundtrip.
+            dns = Money.denseFromDiscrete dis
+        in Money.discreteToDecimal ds aprox dis
+             === Money.denseToDecimal ds aprox dns
 
   , HU.testCase "AdditiveGroup: zeroV" $
       (AG.zeroV :: Money.Discrete currency unit) @?= Money.discrete 0
@@ -751,19 +739,17 @@ testExchangeRate ps pd =
              (show x, dr) === (show x', Money.toSomeExchangeRate x')
 
   , QC.testProperty "exchangeRateToDecimal: Same as rationalToDecimal" $
-      let gen = (,) <$> genDecimalSeps <*> QC.arbitrary
-      in QC.forAll gen $ \( (yst :: Maybe Char, sd :: Char)
-                          , (xr :: Money.ExchangeRate src dst, digs :: Word8,
-                             aprox :: Money.Approximation ) ) ->
-           let xrd = Money.exchangeRateToDecimal aprox yst sd digs xr
-               rd = MoneyI.rationalToDecimal aprox False yst sd digs
-                       (Money.exchangeRateToRational xr)
-           in xrd === rd
+      QC.forAll QC.arbitrary $ \(ds :: Money.DecimalConf,
+                                 xr :: Money.ExchangeRate src dst,
+                                 aprox :: Money.Approximation) ->
+        Money.exchangeRateToDecimal ds aprox xr
+          === MoneyI.rationalToDecimal ds aprox
+                (Money.exchangeRateToRational xr)
 
   , QC.testProperty "exchangeRateFromDecimal: Same as rationalFromDecimal" $
-      QC.forAll genDecimal $ \(dec :: T.Text, yts :: Maybe Char, ds :: Char) ->
-         let Just r = MoneyI.rationalFromDecimal yts ds dec
-             yxr = Money.exchangeRateFromDecimal yts ds dec
+      QC.forAll QC.arbitrary $ \(Decimal ds dec) ->
+         let Just r = MoneyI.rationalFromDecimal ds dec
+             yxr = Money.exchangeRateFromDecimal ds dec
                       :: Maybe (Money.ExchangeRate src dst)
          in (r > 0) ==> (Just r === fmap Money.exchangeRateToRational yxr)
 
@@ -793,52 +779,55 @@ testDiscreteFromDecimal :: Tasty.TestTree
 testDiscreteFromDecimal =
   Tasty.testGroup "discreteFromDecimal"
   [ HU.testCase "Too large" $ do
-      Money.discreteFromDecimal Nothing '.' 1 "0.053"
+      Money.discreteFromDecimal ds_dd_2 "0.053"
         @?= (Nothing :: Maybe (Money.Discrete "USD" "cent"))
-      Money.discreteFromDecimal (Just ',') '.' 1 "0.253"
+      Money.discreteFromDecimal ds_tc_dd_2 "0.253"
         @?= (Nothing :: Maybe (Money.Discrete "USD" "cent"))
 
   , HU.testCase "USD cent, small, zero" $ do
       let dis = 0 :: Money.Discrete "USD" "cent"
-          f = Money.discreteFromDecimal
-      f Nothing '.' 1 "0" @?= Just dis
-      f Nothing '.' 1 "+0" @?= Just dis
-      f Nothing '.' 1 "-0" @?= Just dis
-      f (Just ',') '.' 1 "0" @?= Just dis
-      f (Just ',') '.' 1 "+0" @?= Just dis
-      f (Just ',') '.' 1 "-0" @?= Just dis
+      Money.discreteFromDecimal ds_dd_2       "0" @?= Just dis
+      Money.discreteFromDecimal ds_dd_2      "+0" @?= Just dis
+      Money.discreteFromDecimal ds_dd_2      "-0" @?= Just dis
+      Money.discreteFromDecimal ds_p_dd_2     "0" @?= Just dis
+      Money.discreteFromDecimal ds_p_dd_2    "+0" @?= Just dis
+      Money.discreteFromDecimal ds_p_dd_2    "-0" @?= Just dis
 
   , HU.testCase "USD cent, small, positive" $ do
       let dis = 25 :: Money.Discrete "USD" "cent"
-          f = Money.discreteFromDecimal
-      f Nothing '.' 1 "0.25" @?= Just dis
-      f Nothing '.' 1 "+0.25" @?= Just dis
-      f (Just ',') '.' 1 "0.25" @?= Just dis
-      f (Just ',') '.' 1 "+0.25" @?= Just dis
+      Money.discreteFromDecimal ds_dd_2      "0.25"  @?= Just dis
+      Money.discreteFromDecimal ds_dd_2      "+0.25" @?= Just dis
+      Money.discreteFromDecimal ds_tc_dd_2   "0.25"  @?= Just dis
+      Money.discreteFromDecimal ds_tc_dd_2   "+0.25" @?= Just dis
+      Money.discreteFromDecimal ds_p_dd_2    "0.25"  @?= Just dis
+      Money.discreteFromDecimal ds_p_dd_2    "+0.25" @?= Just dis
+      Money.discreteFromDecimal ds_p_tc_dd_2 "0.25"  @?= Just dis
+      Money.discreteFromDecimal ds_p_tc_dd_2 "+0.25" @?= Just dis
 
   , HU.testCase "USD cent, small, negative" $ do
       let dis = -25 :: Money.Discrete "USD" "cent"
-          f = Money.discreteFromDecimal
-      f Nothing '.' 1 "-0.25" @?= Just dis
-      f Nothing '.' 1 "-0.25" @?= Just dis
-      f (Just ',') '.' 1 "-0.25" @?= Just dis
-      f (Just ',') '.' 1 "-0.25" @?= Just dis
+      Money.discreteFromDecimal ds_dd_2      "-0.25" @?= Just dis
+      Money.discreteFromDecimal ds_p_dd_2    "-0.25" @?= Just dis
+      Money.discreteFromDecimal ds_tc_dd_2   "-0.25" @?= Just dis
+      Money.discreteFromDecimal ds_p_tc_dd_2 "-0.25" @?= Just dis
 
   , HU.testCase "USD cent, big, positive" $ do
       let dis = 102300456789 :: Money.Discrete "USD" "cent"
-          f = Money.discreteFromDecimal
-      f Nothing '.' 1 "1023004567.89" @?= Just dis
-      f Nothing '.' 1 "+1023004567.89" @?= Just dis
-      f (Just ',') '.' 1 "1,023,004,567.89" @?= Just dis
-      f (Just ',') '.' 1 "+1,023,004,567.89" @?= Just dis
+      Money.discreteFromDecimal ds_dd_2      "+1023004567.89"    @?= Just dis
+      Money.discreteFromDecimal ds_dd_2      "1023004567.89"     @?= Just dis
+      Money.discreteFromDecimal ds_p_dd_2    "+1023004567.89"    @?= Just dis
+      Money.discreteFromDecimal ds_p_dd_2    "1023004567.89"     @?= Just dis
+      Money.discreteFromDecimal ds_p_tc_dd_2 "+1,023,004,567.89" @?= Just dis
+      Money.discreteFromDecimal ds_p_tc_dd_2 "1,023,004,567.89"  @?= Just dis
+      Money.discreteFromDecimal ds_tc_dd_2   "+1,023,004,567.89" @?= Just dis
+      Money.discreteFromDecimal ds_tc_dd_2   "1,023,004,567.89"  @?= Just dis
 
   , HU.testCase "USD cent, big, negative" $ do
       let dis = -102300456789 :: Money.Discrete "USD" "cent"
-          f = Money.discreteFromDecimal
-      f Nothing '.' 1 "-1023004567.89" @?= Just dis
-      f Nothing '.' 1 "-1023004567.89" @?= Just dis
-      f (Just ',') '.' 1 "-1,023,004,567.89" @?= Just dis
-      f (Just ',') '.' 1 "-1,023,004,567.89" @?= Just dis
+      Money.discreteFromDecimal ds_dd_2      "-1023004567.89" @?= Just dis
+      Money.discreteFromDecimal ds_p_dd_2    "-1023004567.89" @?= Just dis
+      Money.discreteFromDecimal ds_tc_dd_2   "-1,023,004,567.89" @?= Just dis
+      Money.discreteFromDecimal ds_p_tc_dd_2 "-1,023,004,567.89" @?= Just dis
   ]
 
 testRounding
@@ -870,6 +859,40 @@ testRounding _ _ =
     h f = \x -> (Money.denseFromDiscrete x) === case f (Money.denseFromDiscrete x) of
       (y, 0) -> Money.denseFromDiscrete y
       (_, _) -> error "testRounding.h: unexpected"
+
+
+-- | Decimal dot, 2 decimals
+ds_dd_2 :: Money.DecimalConf
+ds_dd_2 = Money.defaultDecimalConf
+
+-- | Leading plus, decimal dot, 2 decimals
+ds_p_dd_2 :: Money.DecimalConf
+ds_p_dd_2 = Money.decimalConfLeadingPlusSet True ds_dd_2
+
+-- | Thousands comma, decimal dot, 2 decimals
+ds_tc_dd_2 :: Money.DecimalConf
+ds_tc_dd_2 = Money.decimalConfSeparatorsSet Money.separatorsDotComma ds_dd_2
+
+-- | Leading plus, thousands comma, decimal dot, 2 decimals
+ds_p_tc_dd_2 :: Money.DecimalConf
+ds_p_tc_dd_2 = Money.decimalConfLeadingPlusSet True ds_tc_dd_2
+
+-- | Decimal dot, 0 decimals
+ds_dd_0 :: Money.DecimalConf
+ds_dd_0 = Money.decimalConfDigitsSet 0 ds_dd_2
+
+-- | Leading plus, decimal dot, 0 decimals
+ds_p_dd_0 :: Money.DecimalConf
+ds_p_dd_0 = Money.decimalConfDigitsSet 0 ds_p_dd_2
+
+-- | Thousands comma, decimal dot, 0 decimals
+ds_tc_dd_0 :: Money.DecimalConf
+ds_tc_dd_0 = Money.decimalConfDigitsSet 0 ds_tc_dd_2
+
+-- | Leading plus, thousands comma, decimal dot, 0 decimals
+ds_p_tc_dd_0 :: Money.DecimalConf
+ds_p_tc_dd_0 = Money.decimalConfDigitsSet 0 ds_p_tc_dd_2
+
 
 --------------------------------------------------------------------------------
 -- Raw parsing "golden tests"
