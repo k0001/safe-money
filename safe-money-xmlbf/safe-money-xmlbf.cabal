@@ -1,5 +1,5 @@
 name: safe-money-xmlbf
-version: 0.1
+version: 0.1.1
 license: BSD3
 license-file: LICENSE
 copyright: Copyright (c) Renzo Carbonara 2016-2018
@@ -32,7 +32,7 @@ library
   ghc-options: -Wall -O2
   build-depends:
     base (>=4.8 && <5.0),
-    safe-money,
+    safe-money >=0.8,
     text,
     xmlbf
   exposed-modules:

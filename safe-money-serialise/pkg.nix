@@ -3,7 +3,7 @@
 }:
 mkDerivation {
   pname = "safe-money-serialise";
-  version = "0.1";
+  version = "0.1.1";
   src = ./.;
   libraryHaskellDepends = [ base bytestring safe-money serialise ];
   testHaskellDepends = [

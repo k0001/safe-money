@@ -58,10 +58,8 @@ testCurrencies =
 testCurrencyUnits :: Tasty.TestTree
 testCurrencyUnits =
   Tasty.testGroup "Currency units"
-  [ testDiscrete (Proxy :: Proxy "BTC") (Proxy :: Proxy "BTC")
-  , testDiscrete (Proxy :: Proxy "BTC") (Proxy :: Proxy "satoshi")
+  [ testDiscrete (Proxy :: Proxy "BTC") (Proxy :: Proxy "satoshi")
   , testDiscrete (Proxy :: Proxy "BTC") (Proxy :: Proxy "bitcoin")
-  , testDiscrete (Proxy :: Proxy "USD") (Proxy :: Proxy "USD")
   , testDiscrete (Proxy :: Proxy "USD") (Proxy :: Proxy "cent")
   , testDiscrete (Proxy :: Proxy "USD") (Proxy :: Proxy "dollar")
   , testDiscrete (Proxy :: Proxy "VUV") (Proxy :: Proxy "vatu")
@@ -123,7 +121,7 @@ testExchange =
 
 testDiscrete
   :: forall (currency :: Symbol) (unit :: Symbol)
-  .  ( Money.GoodScale (Money.Scale currency unit)
+  .  ( Money.GoodScale (Money.UnitScale currency unit)
      , KnownSymbol currency
      , KnownSymbol unit )
   => Proxy currency
@@ -149,9 +147,10 @@ testDiscrete pc pu =
       QC.forAll QC.arbitrary $ \(x :: Money.Discrete currency unit) ->
         let sx = Money.toSomeDiscrete x
             c = T.unpack (Money.someDiscreteCurrency sx)
-            r = Money.someDiscreteScale sx
+            rs = Money.scaleToRational (Money.someDiscreteScale sx)
             a = Money.someDiscreteAmount sx
-            bs = Ae.encode ("Discrete" :: String, c, numerator r, denominator r, a)
+            bs = Ae.encode ("Discrete" :: String, c, numerator rs,
+                            denominator rs, a)
         in (Just  x === Ae.decode bs) .&&.
            (Just sx === Ae.decode bs)
   ]

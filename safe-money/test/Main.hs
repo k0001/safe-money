@@ -17,6 +17,7 @@ import qualified Data.Binary as Binary
 import qualified Data.ByteString as B
 import qualified Data.ByteString.Lazy as BL
 import qualified Data.Char as Char
+import Data.Constraint (Dict(Dict))
 import Data.Maybe (catMaybes, fromJust, fromMaybe, isJust, isNothing)
 import Data.Proxy (Proxy(Proxy))
 import Data.Ratio ((%), numerator, denominator)
@@ -92,10 +93,8 @@ testCurrencies =
 testCurrencyUnits :: Tasty.TestTree
 testCurrencyUnits =
   Tasty.testGroup "Currency units"
-  [ testDiscrete (Proxy :: Proxy "BTC") (Proxy :: Proxy "BTC")
-  , testDiscrete (Proxy :: Proxy "BTC") (Proxy :: Proxy "satoshi")
+  [ testDiscrete (Proxy :: Proxy "BTC") (Proxy :: Proxy "satoshi")
   , testDiscrete (Proxy :: Proxy "BTC") (Proxy :: Proxy "bitcoin")
-  , testDiscrete (Proxy :: Proxy "USD") (Proxy :: Proxy "USD")
   , testDiscrete (Proxy :: Proxy "USD") (Proxy :: Proxy "cent")
   , testDiscrete (Proxy :: Proxy "USD") (Proxy :: Proxy "dollar")
   , testDiscrete (Proxy :: Proxy "VUV") (Proxy :: Proxy "vatu")
@@ -560,11 +559,16 @@ testRationalFromDecimal =
     QC.testProperty "Lossy roundtrip" $
       -- We check that the roundtrip results in a close amount with a fractional
       -- difference of up to one.
-      QC.forAll QC.arbitrary $ \(ds :: Money.DecimalConf,
+      QC.forAll QC.arbitrary $ \(ds0 :: Money.DecimalConf,
                                  aprox :: Money.Approximation,
                                  r :: Rational) ->
-        let dec = MoneyI.rationalToDecimal ds aprox r
-            Just r' = MoneyI.rationalFromDecimal ds dec
+        let Just sr = Money.scaleFromRational
+                    $ (+ 1) -- scales less than 1 can't reliably roundtrip.
+                    $ Money.scaleToRational
+                    $ Money.decimalConf_scale ds0
+            ds1 = ds0 { Money.decimalConf_scale = sr }
+            dec = MoneyI.rationalToDecimal ds1 aprox r
+            Just r' = MoneyI.rationalFromDecimal ds1 dec
         in 1 > abs (abs r - abs r')
   ]
 
@@ -611,8 +615,9 @@ testDense pc =
       QC.forAll QC.arbitrary $ \(ds :: Money.DecimalConf,
                                  dns :: Money.Dense currency,
                                  aprox :: Money.Approximation) ->
-         let Just ds_s100 = Money.decimalConfScaleSet
-                              (Money.decimalConfScale ds * 100) ds
+         let Just s100 = Money.scaleFromRational
+                    (Money.scaleToRational (Money.decimalConf_scale ds) * 100)
+             ds_s100 = ds { Money.decimalConf_scale = s100 }
              ydnsd1 = Money.denseToDecimal ds aprox dns
              ydnsd100 = Money.denseToDecimal ds_s100 aprox dns
              yrd1 = MoneyI.rationalToDecimal ds aprox (toRational dns)
@@ -629,13 +634,16 @@ testDense pc =
     QC.testProperty "denseToDecimal/denseFromDiscrete: Lossy roundtrip" $
       -- We check that the roundtrip results in a close amount with a fractional
       -- difference of up to one.
-      QC.forAll QC.arbitrary $ \(ds :: Money.DecimalConf,
-                                 sc0 :: Rational,
+      QC.forAll QC.arbitrary $ \(ds0 :: Money.DecimalConf,
                                  aprox :: Money.Approximation,
                                  dns :: Money.Dense currency) ->
-        let sc = abs sc0 + 1  -- scales less than 1 can't reliably roundtrip.
-            dec = Money.denseToDecimal ds aprox dns
-            Just dns' = Money.denseFromDecimal ds dec
+        let Just sr = Money.scaleFromRational
+                    $ (+ 1) -- scales less than 1 can't reliably roundtrip.
+                    $ Money.scaleToRational
+                    $ Money.decimalConf_scale ds0
+            ds1 = ds0 { Money.decimalConf_scale = sr }
+            dec = Money.denseToDecimal ds1 aprox dns
+            Just dns' = Money.denseFromDecimal ds1 dec
         in Money.dense' 1 > abs (abs dns - abs dns')
 
   , HU.testCase "AdditiveGroup: zeroV" $
@@ -699,7 +707,7 @@ testExchange =
 
 testDiscrete
   :: forall (currency :: Symbol) (unit :: Symbol)
-  .  ( Money.GoodScale (Money.Scale currency unit)
+  .  ( Money.GoodScale (Money.UnitScale currency unit)
      , KnownSymbol currency
      , KnownSymbol unit )
   => Proxy currency
@@ -727,7 +735,7 @@ testDiscrete pc pu =
       QC.forAll QC.arbitrary $ \(dr :: Money.SomeDiscrete) ->
         ((T.unpack (Money.someDiscreteCurrency dr) /= symbolVal pc) &&
          (Money.someDiscreteScale dr /=
-             Money.scale (Proxy :: Proxy (Money.Scale currency unit)))
+             Money.scale (Proxy :: Proxy (Money.UnitScale currency unit)))
         ) ==> isNothing (Money.fromSomeDiscrete dr
                           :: Maybe (Money.Discrete currency unit))
   , QC.testProperty "withSomeDiscrete" $
@@ -954,7 +962,7 @@ testDiscreteFromDecimal =
 
 testRounding
   :: forall (currency :: Symbol) (unit :: Symbol)
-  .  (Money.GoodScale (Money.Scale currency unit), KnownSymbol currency)
+  .  (Money.GoodScale (Money.UnitScale currency unit), KnownSymbol currency)
   => Proxy currency
   -> Proxy unit
   -> Tasty.TestTree
@@ -972,12 +980,12 @@ testRounding _ _ =
     , QC.testProperty "half-even no reminder " $ QC.forAll QC.arbitrary (h (Money.discreteFromDense Money.HalfEven))
     ]
   where
-    g :: (Money.Dense currency -> (Money.Discrete' currency (Money.Scale currency unit), Money.Dense currency))
+    g :: (Money.Dense currency -> (Money.Discrete' currency (Money.UnitScale currency unit), Money.Dense currency))
       -> Money.Dense currency
       -> QC.Property
     g f = \x -> x === case f x of (y, z) -> Money.denseFromDiscrete y + z
 
-    h :: (Money.Dense currency -> (Money.Discrete' currency (Money.Scale currency unit), Money.Dense currency))
+    h :: (Money.Dense currency -> (Money.Discrete' currency (Money.UnitScale currency unit), Money.Dense currency))
       -> Money.Discrete currency unit
       -> QC.Property
     h f = \x -> (Money.denseFromDiscrete x) === case f (Money.denseFromDiscrete x) of
@@ -1029,31 +1037,31 @@ ds_dd_2 = Money.defaultDecimalConf
 
 -- | Leading plus, decimal dot, 2 decimals
 ds_p_dd_2 :: Money.DecimalConf
-ds_p_dd_2 = Money.decimalConfLeadingPlusSet True ds_dd_2
+ds_p_dd_2 = ds_dd_2 { Money.decimalConf_leadingPlus = True }
 
 -- | Thousands comma, decimal dot, 2 decimals
 ds_tc_dd_2 :: Money.DecimalConf
-ds_tc_dd_2 = Money.decimalConfSeparatorsSet Money.separatorsDotComma ds_dd_2
+ds_tc_dd_2 = ds_dd_2 { Money.decimalConf_separators = Money.separatorsDotComma }
 
 -- | Leading plus, thousands comma, decimal dot, 2 decimals
 ds_p_tc_dd_2 :: Money.DecimalConf
-ds_p_tc_dd_2 = Money.decimalConfLeadingPlusSet True ds_tc_dd_2
+ds_p_tc_dd_2 = ds_tc_dd_2 { Money.decimalConf_leadingPlus = True }
 
 -- | Decimal dot, 0 decimals
 ds_dd_0 :: Money.DecimalConf
-ds_dd_0 = Money.decimalConfDigitsSet 0 ds_dd_2
+ds_dd_0 = ds_dd_2 { Money.decimalConf_digits = 0 }
 
 -- | Leading plus, decimal dot, 0 decimals
 ds_p_dd_0 :: Money.DecimalConf
-ds_p_dd_0 = Money.decimalConfDigitsSet 0 ds_p_dd_2
+ds_p_dd_0 = ds_p_dd_2 { Money.decimalConf_digits = 0 }
 
 -- | Thousands comma, decimal dot, 0 decimals
 ds_tc_dd_0 :: Money.DecimalConf
-ds_tc_dd_0 = Money.decimalConfDigitsSet 0 ds_tc_dd_2
+ds_tc_dd_0 = ds_tc_dd_2 { Money.decimalConf_digits = 0 }
 
 -- | Leading plus, thousands comma, decimal dot, 0 decimals
 ds_p_tc_dd_0 :: Money.DecimalConf
-ds_p_tc_dd_0 = Money.decimalConfDigitsSet 0 ds_p_tc_dd_2
+ds_p_tc_dd_0 = ds_p_tc_dd_2 { Money.decimalConf_digits = 0 }
 
 
 --------------------------------------------------------------------------------
@@ -1098,6 +1106,16 @@ rawDis0_binary :: BL.ByteString
 rawDis0_binary = "\NUL\NUL\NUL\NUL\NUL\NUL\NUL\ETXUSD\NUL\NUL\NUL\NULd\NUL\NUL\NUL\NUL\SOH\NUL\NUL\NUL\NUL\EOT"
 rawXr0_binary :: BL.ByteString
 rawXr0_binary = "\NUL\NUL\NUL\NUL\NUL\NUL\NUL\ETXUSD\NUL\NUL\NUL\NUL\NUL\NUL\NUL\ETXBTC\NUL\NUL\NUL\NUL\ETX\NUL\NUL\NUL\NUL\STX"
+
+--------------------------------------------------------------------------------
+
+-- Just checking that this compiles.
+_testCurrencyScale
+  :: Dict (Money.CurrencyScale "USD" ~ Money.UnitScale "USD" "cent",
+           Money.CurrencyScale "BTC" ~ Money.UnitScale "BTC" "satoshi",
+           Money.CurrencyScale "VUV" ~ Money.UnitScale "VUV" "vatu",
+           Money.CurrencyScale "XAU" ~ Money.ErrScaleNonCanonical "XAU")
+_testCurrencyScale = Dict
 
 --------------------------------------------------------------------------------
 -- Misc

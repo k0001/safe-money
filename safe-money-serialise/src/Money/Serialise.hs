@@ -42,6 +42,17 @@ instance
   decode = maybe (fail "ExchangeRate") pure
              =<< fmap Money.fromSomeExchangeRate Ser.decode
 
+instance Ser.Serialise Money.Scale where
+  encode = \s ->
+    let r = Money.scaleToRational s
+    in Ser.encode (numerator r) <>
+       Ser.encode (denominator r)
+  decode = maybe (fail "Scale") pure =<< do
+    n :: Integer <- Ser.decode
+    d :: Integer <- Ser.decode
+    when (d == 0) (fail "denominator is zero")
+    pure (MoneyI.scaleFromRational (n % d))
+
 -- | Compatible with 'Money.Dense'.
 instance Ser.Serialise Money.SomeDense where
   encode = \sd ->
@@ -59,18 +70,14 @@ instance Ser.Serialise Money.SomeDense where
 -- | Compatible with 'Money.Discrete'.
 instance Ser.Serialise Money.SomeDiscrete where
   encode = \sd ->
-    let r = Money.someDiscreteScale sd
-    in Ser.encode (MoneyI.someDiscreteCurrency' sd) <>
-       Ser.encode (numerator r) <>
-       Ser.encode (denominator r) <>
-       Ser.encode (Money.someDiscreteAmount sd)
-  decode = maybe (fail "SomeDiscrete") pure =<< do
+    Ser.encode (MoneyI.someDiscreteCurrency' sd) <>
+    Ser.encode (Money.someDiscreteScale sd) <>
+    Ser.encode (Money.someDiscreteAmount sd)
+  decode = do
     c :: String <- Ser.decode
-    n :: Integer <- Ser.decode
-    d :: Integer <- Ser.decode
-    when (d == 0) (fail "denominator is zero")
+    s :: Money.Scale <- Ser.decode
     a :: Integer <- Ser.decode
-    pure (MoneyI.mkSomeDiscrete' c (n % d) a)
+    pure (MoneyI.mkSomeDiscrete' c s a)
 
 -- | Compatible with 'Money.ExchangeRate'.
 instance Ser.Serialise Money.SomeExchangeRate where

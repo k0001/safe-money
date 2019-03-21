@@ -96,9 +96,9 @@ instance
 -- string was dropped from the rendered 'Ae.Array').
 instance Ae.ToJSON Money.SomeDiscrete where
   toJSON = \sd ->
-    let r = Money.someDiscreteScale sd
+    let rs = Money.scaleToRational (Money.someDiscreteScale sd)
     in Ae.toJSON (MoneyI.someDiscreteCurrency' sd,
-                  numerator r, denominator r,
+                  numerator rs, denominator rs,
                   Money.someDiscreteAmount sd)
 
 -- | Compatible with 'Money.Discrete''
@@ -112,7 +112,9 @@ instance Ae.FromJSON Money.SomeDiscrete where
        ("Discrete" :: T.Text, c, n, d, a) <- Ae.parseJSON v
        pure (c, n, d, a)
     when (d == 0) (fail "denominator is zero")
-    maybe empty pure (MoneyI.mkSomeDiscrete' c (n % d) a)
+    maybe empty pure (MoneyI.mkSomeDiscrete' c
+                        <$> Money.scaleFromRational (n % d)
+                        <*> pure a)
 
 -- | Compatible with 'Money.SomeExchangeRate'
 --

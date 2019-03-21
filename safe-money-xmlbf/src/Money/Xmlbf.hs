@@ -78,7 +78,7 @@ instance
 -- | Compatible with 'Money.Discrete''
 instance Xmlbf.ToXml Money.SomeDiscrete where
   toXml = \sd ->
-    let r = Money.someDiscreteScale sd
+    let r = Money.scaleToRational (Money.someDiscreteScale sd)
         as = [ ("c", Money.someDiscreteCurrency sd)
              , ("n", T.pack (show (numerator r)))
              , ("d", T.pack (show (denominator r)))
@@ -93,7 +93,8 @@ instance Xmlbf.FromXml Money.SomeDiscrete where
     d <- Xmlbf.pRead =<< Xmlbf.pAttr "d"
     when (d == 0) (fail "denominator is zero")
     a <- Xmlbf.pRead =<< Xmlbf.pAttr "a"
-    maybe empty pure (Money.mkSomeDiscrete c (n % d) a)
+    maybe empty pure (Money.mkSomeDiscrete c <$> Money.scaleFromRational (n % d)
+                                             <*> pure a)
 
 -- | Compatible with 'Money..SomeExchangeRate'
 --

@@ -3,7 +3,7 @@
 }:
 mkDerivation {
   pname = "safe-money-cereal";
-  version = "0.1";
+  version = "0.1.1";
   src = ./.;
   libraryHaskellDepends = [ base cereal safe-money ];
   testHaskellDepends = [

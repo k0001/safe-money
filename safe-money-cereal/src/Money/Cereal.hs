@@ -56,23 +56,31 @@ instance Cereal.Serialize Money.SomeDense where
     when (d == 0) (fail "denominator is zero")
     pure (MoneyI.mkSomeDense' c (n % d))
 
+instance Cereal.Serialize Money.Scale where
+  put = \s -> do
+    let r = Money.scaleToRational s
+    Cereal.put (numerator r)
+    Cereal.put (denominator r)
+  get = maybe empty pure =<< do
+    -- We go through String for backwards compatibility.
+    n :: Integer <- Cereal.get
+    d :: Integer <- Cereal.get
+    when (d == 0) (fail "denominator is zero")
+    pure (Money.scaleFromRational (n % d))
+
 -- | Compatible with 'Money.Discrete'.
 instance Cereal.Serialize Money.SomeDiscrete where
   put = \sd -> do
     -- We go through String for backwards compatibility.
     Cereal.put (MoneyI.someDiscreteCurrency' sd)
-    let r = Money.someDiscreteScale sd
-    Cereal.put (numerator r)
-    Cereal.put (denominator r)
+    Cereal.put (Money.someDiscreteScale sd)
     Cereal.put (Money.someDiscreteAmount sd)
-  get = maybe empty pure =<< do
+  get = do
     -- We go through String for backwards compatibility.
     c :: String <- Cereal.get
-    n :: Integer <- Cereal.get
-    d :: Integer <- Cereal.get
-    when (d == 0) (fail "denominator is zero")
+    s :: Money.Scale <- Cereal.get
     a :: Integer <- Cereal.get
-    pure (MoneyI.mkSomeDiscrete' c (n % d) a)
+    pure (MoneyI.mkSomeDiscrete' c s a)
 
 -- | Compatible with 'Money.ExchangeRate'.
 instance Cereal.Serialize Money.SomeExchangeRate where

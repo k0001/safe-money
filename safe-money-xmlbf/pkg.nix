@@ -3,7 +3,7 @@
 }:
 mkDerivation {
   pname = "safe-money-xmlbf";
-  version = "0.1";
+  version = "0.1.1";
   src = ./.;
   libraryHaskellDepends = [ base safe-money text xmlbf ];
   testHaskellDepends = [

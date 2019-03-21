@@ -50,22 +50,30 @@ instance
   poke = Store.poke . Money.toSomeDiscrete
   peek = maybe (fail "peek") pure =<< fmap Money.fromSomeDiscrete Store.peek
 
+instance Store.Store Money.Scale where
+  poke = \s -> do
+    let r = Money.scaleToRational s
+    Store.poke (numerator r)
+    Store.poke (denominator r)
+  peek = maybe (fail "peek") pure =<< do
+    n :: Integer <- Store.peek
+    d :: Integer <- Store.peek
+    when (d == 0) (fail "denominator is zero")
+    pure (Money.scaleFromRational (n % d))
+
+
 -- | Compatible with 'Money.Discrete''.
 instance Store.Store Money.SomeDiscrete where
   poke = \sd -> do
     Store.poke (MoneyI.someDiscreteCurrency' sd)
-    let r = Money.someDiscreteScale sd
-    Store.poke (numerator r)
-    Store.poke (denominator r)
+    Store.poke (Money.someDiscreteScale sd)
     Store.poke (Money.someDiscreteAmount sd)
-  peek = maybe (fail "peek") pure =<< do
+  peek = do
     -- We go through String for backwards compatibility.
     c :: String <- Store.peek
-    n :: Integer <- Store.peek
-    d :: Integer <- Store.peek
-    when (d == 0) (fail "denominator is zero")
+    s :: Money.Scale <- Store.peek
     a :: Integer <- Store.peek
-    pure (MoneyI.mkSomeDiscrete' c (n % d) a)
+    pure (MoneyI.mkSomeDiscrete' c s a)
 
 -- | Compatible with 'Money.SomeExchangeRate'.
 instance

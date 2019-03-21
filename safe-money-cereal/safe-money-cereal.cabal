@@ -1,5 +1,5 @@
 name: safe-money-cereal
-version: 0.1
+version: 0.1.1
 license: BSD3
 license-file: LICENSE
 copyright: Copyright (c) Renzo Carbonara 2016-2018
@@ -33,7 +33,7 @@ library
   build-depends:
     base (>=4.8 && <5.0),
     cereal,
-    safe-money
+    safe-money >=0.8
   exposed-modules:
     Money.Cereal
 

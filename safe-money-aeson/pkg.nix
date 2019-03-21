@@ -3,7 +3,7 @@
 }:
 mkDerivation {
   pname = "safe-money-aeson";
-  version = "0.1";
+  version = "0.1.1";
   src = ./.;
   libraryHaskellDepends = [ aeson base safe-money text ];
   testHaskellDepends = [

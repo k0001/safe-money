@@ -7,10 +7,25 @@
   directly, rather than a `Maybe Text`. In turn, `Separators` has been
   introduced for configuring decimal and thousands separators. See issue #30.
 
+* _COMPILER ASSISTED BREAKING CHANGE_. The `Scale` type family was renamed to
+  `UnitScale`.
+
+* _COMPILER ASSISTED BREAKING CHANGE_. Previous instances of the `Scale` type
+  family where the `currency` and the `unit` were the same (e.g., `Scale "USD"
+  "USD"`), intended to convey a canonical scale for the currency, are now
+  written as `CurrencyScale currency` (e.g., `CurrencyScale "USD"`).
+
+* _COMPILER ASSISTED BREAKING CHANGE_. A new datatype called `Scale` has been
+  introduced. This datatype replaces term-level uses of `Rational` to convey the
+  scale of a discrete monetary amount. The rationale for this, beyond improved
+  type errors, is that checking for the scale's validity can be done at a single
+  place (namely, the new `scaleFromRational`), rather than everywhere a
+  term-level scale was expected as input. See issue #43.
+
 * Added new approximation method `HalfEven`, also known as “Bankers rounding”.
   See issue #42.
 
-* New currency: VES (Bolívar Soberano). See issue #33.
+* New currencies: VES (see issue #33), UYW.
 
 
 # Version 0.7.1

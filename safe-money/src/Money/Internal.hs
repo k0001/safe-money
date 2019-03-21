@@ -43,9 +43,13 @@ module Money.Internal
  , discreteToDecimal
    -- * Currency scales
  , Scale
+ , scaleFromRational
+ , scaleToRational
+ , scale
+ , UnitScale
+ , CurrencyScale
  , GoodScale
  , ErrScaleNonCanonical
- , scale
    -- * Currency exchange
  , ExchangeRate
  , exchangeRate
@@ -92,16 +96,8 @@ module Money.Internal
  , Approximation(Round, Floor, Ceiling, Truncate, HalfEven)
  , approximate
  -- ** Decimal config
- , DecimalConf
+ , DecimalConf(..)
  , defaultDecimalConf
- , decimalConfSeparators
- , decimalConfSeparatorsSet
- , decimalConfLeadingPlus
- , decimalConfLeadingPlusSet
- , decimalConfDigits
- , decimalConfDigitsSet
- , decimalConfScale
- , decimalConfScaleSet
  -- *** Separators
  , Separators
  , mkSeparators
@@ -328,8 +324,8 @@ denseCurrency' = symbolVal
 --
 -- For example, if you want to represent @GBP 21.05@, where the smallest
 -- represetable unit for a GBP (United Kingdom Pound) is the /penny/, and 100
--- /pennies/ equal 1 GBP (i.e., @'Scale' \"GBP\" ~ '(100, 1)@), then you can
--- use:
+-- /pennies/ equal 1 GBP (i.e., @'UnitScale' \"GBP\" \"penny\" ~ '(100, 1)@), then
+-- you can use:
 --
 -- @
 -- 'discrete' 2105 :: 'Discrete' \"GBP\" \"penny\"
@@ -337,7 +333,7 @@ denseCurrency' = symbolVal
 --
 -- Because @2015 / 100 == 20.15@.
 type Discrete (currency :: Symbol) (unit :: Symbol)
-  = Discrete' currency (Scale currency unit)
+  = Discrete' currency (UnitScale currency unit)
 
 -- | 'Discrete'' represents a discrete monetary value for a @currency@ expresed
 -- as amount of @scale@, which is a rational number expressed as @(numerator,
@@ -401,24 +397,24 @@ instance forall currency scale.
   ( KnownSymbol currency, GoodScale scale
   ) => Show (Discrete' currency scale) where
   showsPrec n = \d0@(Discrete i0) ->
-    let c = symbolVal (Proxy :: Proxy currency)
-        s = scale d0
+    let c = symbolVal (Proxy :: Proxy currency) :: String
+        rs = scaleToRational (scale d0) :: Rational
     in showParen (n > 10) $
          showString "Discrete " .  showsPrec 0 c . showChar ' ' .
-         showsPrec 0 (numerator s) . showChar '%' .
-         showsPrec 0 (denominator s) . showChar ' ' .
+         showsPrec 0 (numerator rs) . showChar '%' .
+         showsPrec 0 (denominator rs) . showChar ' ' .
          showsPrec 0 i0
 
 instance forall currency scale.
   ( KnownSymbol currency, GoodScale scale
   ) => Read (Discrete' currency scale) where
   readPrec = Read.parens $ do
-    let c = symbolVal (Proxy :: Proxy currency)
-        s = scale (Proxy :: Proxy scale)
+    let c = symbolVal (Proxy :: Proxy currency) :: String
+        rs = scaleToRational (scale (Proxy :: Proxy scale)) :: Rational
     _ <- ReadPrec.lift (ReadP.string (concat
            [ "Discrete ", show c, " "
-           , show (numerator s), "%"
-           , show (denominator s), " "
+           , show (numerator rs), "%"
+           , show (denominator rs), " "
            ]))
     fmap Discrete Read.readPrec
 
@@ -456,7 +452,8 @@ denseFromDiscrete
   :: GoodScale scale
   => Discrete' currency scale
   -> Dense currency -- ^
-denseFromDiscrete = \c@(Discrete i) -> Dense (fromInteger i / scale c)
+denseFromDiscrete = \c@(Discrete i) ->
+  Dense (fromInteger i / scaleToRational (scale c))
 {-# INLINE denseFromDiscrete #-}
 
 -- | 'Discrete' currency identifier.
@@ -540,7 +537,7 @@ discreteFromDense
   -> (Discrete' currency scale, Dense currency)
 discreteFromDense a = \c0 ->
   let !r0 = toRational c0 :: Rational
-      !r1 = scale (Proxy :: Proxy scale)
+      !r1 = scaleToRational (scale (Proxy :: Proxy scale)) :: Rational
       !i2 = approximate a (r0 * r1) :: Integer
       !r2 = fromInteger i2 / r1 :: Rational
       !d2 = Discrete i2
@@ -550,41 +547,51 @@ discreteFromDense a = \c0 ->
 
 --------------------------------------------------------------------------------
 
--- | @'Scale' currency unit@ is an rational number (expressed as @'(numerator,
+-- | A 'Scale' is a positive, non-zero rational number.
+--
+-- See 'UnitScale' for a description.
+newtype Scale = Scale Rational
+  deriving (Eq, Ord, Show, GHC.Generic)
+
+-- | Construct a 'Scale' from a positive, non-zero rational number.
+scaleFromRational :: Rational -> Maybe Scale
+{-# INLINE scaleFromRational #-}
+scaleFromRational r = do
+  guard (denominator r /= 0 && r > 0)
+  Just (Scale (abs (numerator r) % abs (denominator r)))
+
+-- | Obtain the 'Rational' representation of a 'Scale'.
+scaleToRational :: Scale -> Rational
+{-# INLINE scaleToRational #-}
+scaleToRational (Scale r) = r
+
+-- | @'UnitScale' currency unit@ is an rational number (expressed as @'(numerator,
 -- denominator)@) indicating how many pieces of @unit@ fit in @currency@.
 --
 -- @currency@ is usually a ISO-4217 currency code, but not necessarily.
 --
--- The 'Scale' will determine how to convert a 'Dense' value into a
+-- The resulting 'Scale' will determine how to convert a 'Dense' value into a
 -- 'Discrete' value and vice-versa.
 --
 -- For example, there are 100 USD cents in 1 USD, so the scale for this
 -- relationship is:
 --
 -- @
--- type instance 'Scale' \"USD\" \"cent\" = '(100, 1)
+-- type instance 'UnitScale' \"USD\" \"cent\" = '(100, 1)
 -- @
 --
 -- As another example, there is 1 dollar in USD, so the scale for this
 -- relationship is:
 --
 -- @
--- type instance 'Scale' \"USD\" \"dollar\" = '(1, 1)
+-- type instance 'UnitScale' \"USD\" \"dollar\" = '(1, 1)
 -- @
 --
 -- When using 'Discrete' values to represent money, it will be impossible to
 -- represent an amount of @currency@ smaller than @unit@. So, if you decide to
--- use @Scale \"USD\" \"dollar\"@ as your scale, you will not be able to
+-- use @UnitScale \"USD\" \"dollar\"@ as your scale, you will not be able to
 -- represent values such as USD 3.50 or USD 21.87 becacuse they are not exact
 -- multiples of a dollar.
---
--- If there exists a canonical smallest @unit@ that can fully represent the
--- currency in all its denominations, then an instance @'Scale' currency
--- currency@ exists.
---
--- @
--- type instance 'Scale' \"USD\" \"USD\" = 'Scale' \"USD\" \"cent\"
--- @
 --
 -- For some monetary values, such as precious metals, there is no smallest
 -- representable unit, since you can repeatedly split the precious metal many
@@ -597,7 +604,7 @@ discreteFromDense a = \c0 ->
 -- /troy ounce/ equals 480000 /milligrains/.
 --
 -- @
--- type instance 'Scale' \"XAU\" \"milligrain\" = '(480000, 1)
+-- type instance 'UnitScale' \"XAU\" \"milligrain\" = '(480000, 1)
 -- @
 --
 -- You can use other units such as /milligrams/ for measuring XAU, for example.
@@ -606,12 +613,27 @@ discreteFromDense a = \c0 ->
 -- express it.
 --
 -- @
--- type instance 'Scale' \"XAU\" \"milligram\" = '(31103477, 1000)
+-- type instance 'UnitScale' \"XAU\" \"milligram\" = '(31103477, 1000)
 -- @
 --
--- If you try to obtain the 'Scale' of a @currency@ without an obvious smallest
+-- If you try to obtain the 'UnitScale' of a @currency@ without an obvious smallest
 -- representable @unit@, like XAU, you will get a compile error.
-type family Scale (currency :: Symbol) (unit :: Symbol) :: (Nat, Nat)
+type family UnitScale (currency :: Symbol) (unit :: Symbol) :: (Nat, Nat)
+
+-- | If there exists a canonical smallest 'Scale' that can fully represent the
+-- @currency@ in all its denominations, then @'CurrencyScale' currency@ will
+-- return such 'Scale'. For example, @'CurrencyScale' \"USD\"@ evaluates to
+-- @'UnitScale' \"USD\" \"cent\"@.
+--
+-- @
+-- type instance 'CurrencyScale' \"USD\" = 'UnitScale' \"USD\" \"cent\"
+-- @
+--
+-- If the @currency@ doesn't have a canonical smallest 'Scale', then
+-- @'CurrencyScale' currency@ shall be left undefined or fail to compile with a
+-- 'GHC.TypeError'. For example @'CurrencyScale' \"XAU\"@ fails with
+-- @'ErrScaleNonCanonical' \"XAU\"@.
+type family CurrencyScale (currency :: Symbol) :: (Nat, Nat)
 
 -- | A friendly 'GHC.TypeError' to use for a @currency@ that doesn't have a
 -- canonical small unit.
@@ -621,7 +643,7 @@ type family ErrScaleNonCanonical (currency :: Symbol) :: k where
       'GHC.Text " is not a currency with a canonical smallest unit," 'GHC.:$$:
       'GHC.Text "be explicit about the currency unit you want to use." )
 
--- | Constraints to a scale (like the one returned by @'Scale' currency unit@)
+-- | Constraints to a scale (like the one returned by @'UnitScale' currency unit@)
 -- expected to always be satisfied. In particular, the scale is always
 -- guaranteed to be a positive rational number ('GHC.Real.infinity' and
 -- 'GHC.Real.notANumber' are forbidden by 'GoodScale').
@@ -649,22 +671,28 @@ mkGoodScale =
 
 -- | Term-level representation of a currrency @scale@.
 --
--- For example, the 'Scale' for @\"USD\"@ in @\"cent\"@s is @100/1@.
+-- For example, the 'Scale' for @\"USD\"@ in @\"cent\"@s is @100/1@. We can
+-- obtain a term-level representation for it using any of the following:
 --
 -- @
--- > 'scale' ('Proxy' :: 'Proxy' ('Scale' \"USD\" \"cent\"))
--- 100 '%' 1
+-- > 'scale' ('Proxy' :: 'Proxy' ('UnitScale' \"USD\" \"cent\"))
+-- 'Scale' (100 '%' 1)
+-- @
+--
+-- @
+-- > 'scale' ('Proxy' :: 'CurrencyScale' \"USD\")
+-- 'Scale' (100 '%' 1)
 -- @
 --
 -- @
 -- > 'scale' (x :: 'Discrete' \"USD\" \"cent\")
--- 100 '%' 1
+-- 'Scale' (100 '%' 1)
 -- @
 --
 -- The returned 'Rational' is statically guaranteed to be a positive number.
-scale :: forall proxy scale. GoodScale scale => proxy scale -> Rational -- ^
-scale = \_ -> natVal (Proxy :: Proxy (Fst scale)) %
-              natVal (Proxy :: Proxy (Snd scale))
+scale :: forall proxy scale. GoodScale scale => proxy scale -> Scale -- ^
+scale = \_ -> Scale (natVal (Proxy :: Proxy (Fst scale)) %
+                     natVal (Proxy :: Proxy (Snd scale)))
 {-# INLINE scale #-}
 
 --------------------------------------------------------------------------------
@@ -844,7 +872,7 @@ someDenseAmount = _someDenseAmount
 -- operation on the monetary value.
 mkSomeDense
   :: T.Text   -- ^ Currency. ('someDenseCurrency')
-  -> Rational -- ^ Scale. ('someDenseAmount')
+  -> Rational -- ^ Amount. ('someDenseAmount')
   -> Maybe SomeDense
 {-# INLINE mkSomeDense #-}
 mkSomeDense = \c r -> mkSomeDense' (T.unpack c) r
@@ -915,7 +943,7 @@ data SomeDiscrete = SomeDiscrete
     -- us to derive serialization instances maintaining backwards compatiblity
     -- with pre-0.6 versions of this library, when 'String' was the prefered
     -- string type, and not 'T.Text'.
-  , _someDiscreteScale    :: !Rational -- ^ Positive, non-zero.
+  , _someDiscreteScale    :: !Scale
   , _someDiscreteAmount   :: !Integer  -- ^ Amount of unit.
   } deriving (Eq, Show, GHC.Generic)
 
@@ -935,7 +963,7 @@ someDiscreteCurrency' = _someDiscreteCurrency
 {-# INLINE someDiscreteCurrency' #-}
 
 -- | Positive, non-zero.
-someDiscreteScale :: SomeDiscrete -> Rational
+someDiscreteScale :: SomeDiscrete -> Scale
 someDiscreteScale = _someDiscreteScale
 {-# INLINE someDiscreteScale #-}
 
@@ -947,23 +975,20 @@ someDiscreteAmount = _someDiscreteAmount
 -- | Internal. Build a 'SomeDiscrete' from raw values.
 --
 -- This function is intended for deserialization purposes. You need to convert
--- this 'SomeDiscrete' value to a 'Discrete' vallue in order to do any arithmetic
--- operation on the monetary value.
+-- this 'SomeDiscrete' value to a 'Discrete' vallue in order to do any
+-- arithmetic operation on the monetary value.
 mkSomeDiscrete
   :: T.Text   -- ^ Currency name. ('someDiscreteCurrency')
-  -> Rational -- ^ Scale. Positive, non-zero. ('someDiscreteScale')
+  -> Scale    -- ^ Scale. Positive, non-zero. ('someDiscreteScale')
   -> Integer  -- ^ Amount of unit. ('someDiscreteAmount')
-  -> Maybe SomeDiscrete
+  -> SomeDiscrete
 {-# INLINE mkSomeDiscrete #-}
-mkSomeDiscrete = \c r a -> mkSomeDiscrete' (T.unpack c) r a
+mkSomeDiscrete = \c s a -> mkSomeDiscrete' (T.unpack c) s a
 
 -- | Like 'mkSomeDiscrete' but takes 'String' rather than 'T.Text'.
-mkSomeDiscrete' :: String -> Rational -> Integer -> Maybe SomeDiscrete
+mkSomeDiscrete' :: String -> Scale -> Integer -> SomeDiscrete
 {-# INLINABLE mkSomeDiscrete' #-}
-mkSomeDiscrete' = \c r a ->
-  if (denominator r /= 0) && (r > 0)
-  then Just (SomeDiscrete c r a)
-  else Nothing
+mkSomeDiscrete' = SomeDiscrete
 
 -- | Convert a 'Discrete' to a 'SomeDiscrete' for ease of serialization.
 toSomeDiscrete
@@ -974,7 +999,7 @@ toSomeDiscrete = \(Discrete i0 :: Discrete' currency scale) ->
   let c = symbolVal (Proxy :: Proxy currency)
       n = natVal (Proxy :: Proxy (Fst scale))
       d = natVal (Proxy :: Proxy (Snd scale))
-  in SomeDiscrete c (n % d) i0
+  in SomeDiscrete c (Scale (n % d)) i0
 {-# INLINABLE toSomeDiscrete #-}
 
 -- | Attempt to convert a 'SomeDiscrete' to a 'Discrete', provided you know the
@@ -1010,19 +1035,20 @@ withSomeDiscrete
            -> r )
   -> r  -- ^
 withSomeDiscrete dr = \f ->
-  case someSymbolVal (_someDiscreteCurrency dr) of
-    SomeSymbol (Proxy :: Proxy currency) ->
-      case someNatVal (numerator (someDiscreteScale dr)) of
-        Nothing -> error "withSomeDiscrete: impossible: numerator < 0"
-        Just (SomeNat (Proxy :: Proxy num)) ->
-          case someNatVal (denominator (someDiscreteScale dr)) of
-            Nothing -> error "withSomeDiscrete: impossible: denominator < 0"
-            Just (SomeNat (Proxy :: Proxy den)) ->
-              case mkGoodScale of
-                Nothing -> error "withSomeDiscrete: impossible: mkGoodScale"
-                Just (Dict :: Dict (GoodScale '(num, den))) ->
-                  f (Discrete (someDiscreteAmount dr)
-                       :: Discrete' currency '(num, den))
+  let rscale :: Rational = scaleToRational (someDiscreteScale dr)
+  in case someSymbolVal (_someDiscreteCurrency dr) of
+       SomeSymbol (Proxy :: Proxy currency) ->
+         case someNatVal (numerator rscale) of
+           Nothing -> error "withSomeDiscrete: impossible: numerator < 0"
+           Just (SomeNat (Proxy :: Proxy num)) ->
+             case someNatVal (denominator rscale) of
+               Nothing -> error "withSomeDiscrete: impossible: denominator < 0"
+               Just (SomeNat (Proxy :: Proxy den)) ->
+                 case mkGoodScale of
+                   Nothing -> error "withSomeDiscrete: impossible: mkGoodScale"
+                   Just (Dict :: Dict (GoodScale '(num, den))) ->
+                     f (Discrete (someDiscreteAmount dr)
+                          :: Discrete' currency '(num, den))
 {-# INLINABLE withSomeDiscrete #-}
 
 --------------------------------------------------------------------------------
@@ -1207,6 +1233,7 @@ instance GoodScale scale => Hashable (Discrete' currency scale)
 instance Hashable SomeDiscrete
 instance Hashable (ExchangeRate src dst)
 instance Hashable SomeExchangeRate
+instance Hashable Scale
 
 --------------------------------------------------------------------------------
 -- Extra instances: deepseq
@@ -1217,6 +1244,7 @@ instance GoodScale scale => NFData (Discrete' currency scale)
 instance NFData SomeDiscrete
 instance NFData (ExchangeRate src dst)
 instance NFData SomeExchangeRate
+instance NFData Scale
 
 --------------------------------------------------------------------------------
 -- Extra instances: binary
@@ -1253,21 +1281,29 @@ instance Binary.Binary SomeDense where
     when (d == 0) (fail "denominator is zero")
     pure (mkSomeDense' c (n % d))
 
--- | Compatible with 'Discrete'.
-instance Binary.Binary SomeDiscrete where
-  put = \(SomeDiscrete c r a) ->
-    -- We go through String for backwards compatibility.
-    Binary.put c <>
-    Binary.put (numerator r) <>
-    Binary.put (denominator r) <>
-    Binary.put a
+instance Binary.Binary Scale where
+  put = \s ->
+    let r = scaleToRational s
+    in Binary.put (numerator r) <>
+       Binary.put (denominator r)
   get = maybe empty pure =<< do
-    c :: String <- Binary.get
     n :: Integer <- Binary.get
     d :: Integer <- Binary.get
     when (d == 0) (fail "denominator is zero")
+    pure (scaleFromRational (n % d))
+
+-- | Compatible with 'Discrete'.
+instance Binary.Binary SomeDiscrete where
+  put = \(SomeDiscrete c s a) ->
+    -- We go through String for backwards compatibility.
+    Binary.put c <>
+    Binary.put s <>
+    Binary.put a
+  get = do
+    c :: String <- Binary.get
+    s :: Scale <- Binary.get
     a :: Integer <- Binary.get
-    pure (mkSomeDiscrete' c (n % d) a)
+    pure (mkSomeDiscrete' c s a)
 
 -- | Compatible with 'ExchangeRate'.
 instance Binary.Binary SomeExchangeRate where
@@ -1323,7 +1359,7 @@ denseToDecimal ds a = \(Dense r0) -> do
 --
 -- In particular, the @scale@ in @'Discrete'' currency scale@ has no influence
 -- over the scale in which the decimal number is rendered. Change the scale
--- with 'decimalConfScaleSet' in order to modify that behavior.
+-- with 'decimalConf_scale' in order to modify that behavior.
 --
 -- Please refer to 'denseToDecimal' for further documentation.
 discreteToDecimal
@@ -1460,74 +1496,40 @@ separatorsDotSpace = Separators '.' (Just '\32')
 
 -- | Config to use when rendering or parsing decimal numbers.
 --
--- Construct with 'defaultDecimalConf', modify with 'decimalConfSeparatorsSet',
--- 'decimalConfLeadingPlusSet', 'decimalConfDigitsSet' and
--- 'decimalConfScaleSet'.
+-- See 'defaultDecimalConf'.
 data DecimalConf = DecimalConf
   { decimalConf_separators :: !Separators
+  -- ^ Decimal and thousands separators to use when rendering the decimal number.
+  -- Construct one with 'mkSeparators', or pick a ready made one like
+  -- 'separatorsDot' or 'separatorsDotNarrownbsp'.
   , decimalConf_leadingPlus :: !Bool
+  -- ^ Whether to render a leading @\'+\'@ sign in case the amount is positive.
   , decimalConf_digits :: !Word8
-  , decimalConf_scale :: !Rational
+  -- ^ Number of decimal numbers to render, if any.
+  , decimalConf_scale :: !Scale
+  -- ^ Scale used to when rendering the decimal number. This is useful if, for
+  -- example, you want to render a “number of cents” rather than a “number of
+  -- dollars” as the whole part of the decimal number when rendering a USD
+  -- amount. It's particularly useful when rendering currencies such as XAU,
+  -- where one might prefer to render amounts as a number of grams, rather than
+  -- as a number of troy-ounces.
+  --
+  -- /Set this to @1@ if you don't care./
+  --
+  -- For example, when rendering render @'dense'' (123 '%' 100) :: 'Dense'
+  -- \"USD\"@ as a decimal number with two decimal places, a scale of @1@
+  -- (analogous to  @'UnitScale' \"USD\" \"dollar\"@) would render @1@ as the
+  -- integer part and @23@ as the fractional part, whereas a scale of @100@
+  -- (analogous @'UnitScale' \"USD\" \"cent\"@) would render @123@ as the integer
+  -- part and @00@ as the fractional part.
+  --
+  -- You can easily obtain the scale for a particular currency and unit
+  -- combination using the 'scale' function.
+  --
+  -- __Important:__ Generally, you will want this number to be @1@ or larger.
+  -- This is because scales in the range @(0, 1)@ can be particularly lossy unless
+  -- the number of decimal digits is sufficiently large.
   } deriving (Eq, Show)
-
--- | See 'decimalConfSeparators'.
-decimalConfSeparators :: DecimalConf -> Separators
-decimalConfSeparators = decimalConf_separators
-
--- | Decimal and thousands separators to use when rendering the decimal number.
--- Construct one with 'mkSeparators', or pick a ready made one like
--- 'separatorsDot' or 'separatorsDotNarrownbsp'.
-decimalConfSeparatorsSet :: Separators -> DecimalConf -> DecimalConf
-decimalConfSeparatorsSet s dc = dc { decimalConf_separators = s }
-
--- | See 'decimalConfLeadingPlusSet'.
-decimalConfLeadingPlus :: DecimalConf -> Bool
-decimalConfLeadingPlus = decimalConf_leadingPlus
-
--- | Whether to render a leading @\'+\'@ sign in case the amount is positive.
-decimalConfLeadingPlusSet :: Bool -> DecimalConf -> DecimalConf
-decimalConfLeadingPlusSet b dc = dc { decimalConf_leadingPlus = b }
-
--- | See 'decimalConfDigitsSet'.
-decimalConfDigits :: DecimalConf -> Word8
-decimalConfDigits = decimalConf_digits
-
--- | Number of decimal numbers to render, if any.
-decimalConfDigitsSet :: Word8 -> DecimalConf -> DecimalConf
-decimalConfDigitsSet w dc = dc { decimalConf_digits = w }
-
--- | See 'decimalConfScaleSet'.
-decimalConfScale :: DecimalConf -> Rational
-decimalConfScale = decimalConf_scale
-
--- | Scale used to when rendering the decimal number. This is useful if, for
--- example, you want to render a “number of cents” rather than a “number of
--- dollars” as the whole part of the decimal number when rendering a USD
--- amount. It's particularly useful when rendering currencies such as XAU,
--- where one might prefer to render amounts as a number of grams, rather than
--- as a number of troy-ounces.
---
--- /Set this to @1@ if you don't care./
---
--- This function returns 'Nothing' if a non-positive scale is given.
---
--- For example, when rendering render @'dense'' (123 '%' 100) :: 'Dense'
--- \"USD\"@ as a decimal number with two decimal places, a scale of @1@
--- (analogous to  @'Scale' \"USD\" \"dollar\"@) would render @1@ as the
--- integer part and @23@ as the fractional part, whereas a scale of @100@
--- (analogous @'Scale' \"USD\" \"cent\"@) would render @123@ as the integer
--- part and @00@ as the fractional part.
---
--- You can easily obtain the scale for a particular currency and unit
--- combination using the 'scale' function.
---
--- __Important:__ Generally, you will want this number to be @1@ or larger.
--- This is because scales in the range @(0, 1)@ can be particularly lossy unless
--- the number of decimal digits is sufficiently large.
-decimalConfScaleSet :: Rational -> DecimalConf -> Maybe DecimalConf
-decimalConfScaleSet r dc = do
-  guard (r > 0)
-  pure (dc { decimalConf_scale = r })
 
 -- | Default 'DecimalConf'.
 --
@@ -1547,7 +1549,7 @@ defaultDecimalConf = DecimalConf
   { decimalConf_separators = separatorsDot
   , decimalConf_leadingPlus = False
   , decimalConf_digits = 2
-  , decimalConf_scale = 1
+  , decimalConf_scale = Scale 1
   }
 
 --------------------------------------------------------------------------------
@@ -1567,7 +1569,7 @@ rationalToDecimal
 {-# INLINABLE rationalToDecimal #-}
 rationalToDecimal (DecimalConf (Separators ds yts) plus fdigs0 scal) a = \r0 -> do
   -- this string-fu is not particularly efficient.
-  let start = r0 * scal * (10 ^ fdigs0) :: Rational
+  let start = r0 * scaleToRational scal * (10 ^ fdigs0) :: Rational
       parts = approximate a start :: Integer
       ipart = fromInteger (abs parts) `div` (10 ^ fdigs0) :: Natural
       ftext | ipart == 0 = show (abs parts) :: String
@@ -1622,8 +1624,7 @@ denseFromDecimal
   -> Maybe (Dense currency)
 denseFromDecimal ds t = do
   r <- rationalFromDecimal ds t
-  pure (Dense $! r) -- TODO this scale thing ok?
-  -- pure (Dense $! r / decimalConf_scale ds) -- TODO this scale thing ok?
+  pure (Dense $! r)
 
 -- | Parses a decimal representation of a 'Discrete'.
 --
@@ -1709,7 +1710,7 @@ rationalFromDecimalP ds = do
    let r = sig $ case yfpart of
          Nothing -> fromInteger (read ipart)
          Just fpart -> read (ipart <> fpart) % (10 ^ length fpart)
-   pure $! r / decimalConf_scale ds
+   pure $! r / scaleToRational (decimalConf_scale ds)
 
 --------------------------------------------------------------------------------
 -- QuickCheck Arbitrary instances
@@ -1721,12 +1722,9 @@ instance
   shrink = fmap fromInteger . QC.shrink . toInteger
 
 instance QC.Arbitrary SomeDiscrete where
-  arbitrary = do
-    let md = mkSomeDiscrete
-               <$> fmap T.pack QC.arbitrary
-               <*> QC.arbitrary
-               <*> QC.arbitrary
-    fromJust <$> QC.suchThat md isJust
+  arbitrary = mkSomeDiscrete <$> fmap T.pack QC.arbitrary
+                             <*> QC.arbitrary
+                             <*> QC.arbitrary
   shrink = \x -> withSomeDiscrete x (map toSomeDiscrete . QC.shrink)
 
 instance QC.Arbitrary (Dense currency) where
@@ -1760,6 +1758,13 @@ instance QC.Arbitrary SomeExchangeRate where
 instance QC.Arbitrary Approximation where
   arbitrary = QC.oneof [ pure Round, pure Floor, pure Ceiling, pure Truncate ]
 
+instance QC.Arbitrary Scale where
+  arbitrary = do
+    n <- QC.arbitrary
+    d <- QC.arbitrary
+    let r = (abs n + 1) % (abs d + 1)
+    pure (Scale r)
+
 instance QC.Arbitrary Separators where
   arbitrary = do
     let msep = QC.suchThat QC.arbitrary $ \c ->
@@ -1771,9 +1776,5 @@ instance QC.Arbitrary Separators where
     pure out
 
 instance QC.Arbitrary DecimalConf where
-  arbitrary = DecimalConf
-    <$> QC.arbitrary
-    <*> QC.arbitrary
-    <*> QC.arbitrary
-    <*> fmap (\x -> abs x + 1) QC.arbitrary
-
+  arbitrary = DecimalConf <$> QC.arbitrary <*> QC.arbitrary
+                          <*> QC.arbitrary <*> QC.arbitrary

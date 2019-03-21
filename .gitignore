@@ -7,4 +7,4 @@ cabal.project.local
 result
 .ghc.environment.*
 tags
-
+*~
