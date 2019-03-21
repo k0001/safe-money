@@ -99,7 +99,7 @@ module Money
  , I.someExchangeRateDstCurrency
  , I.someExchangeRateRate
  -- * Miscellaneous
- , I.Approximation(Round, Floor, Ceiling, Truncate)
+ , I.Approximation(..)
  -- ** Decimal config
  , I.DecimalConf
  , I.defaultDecimalConf

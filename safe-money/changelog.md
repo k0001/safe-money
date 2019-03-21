@@ -7,6 +7,9 @@
   directly, rather than a `Maybe Text`. In turn, `Separators` has been
   introduced for configuring decimal and thousands separators. See issue #30.
 
+* Added new approximation method `HalfEven`, also known as “Bankers rounding”.
+  See issue #42.
+
 * New currency: VES (Bolívar Soberano). See issue #33.
 
 

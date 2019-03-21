@@ -36,7 +36,6 @@ import qualified Test.Tasty.QuickCheck as QC
 
 import qualified Money
 import qualified Money.Internal as MoneyI
-  (rationalFromDecimal, rationalToDecimal)
 
 --------------------------------------------------------------------------------
 
@@ -71,6 +70,7 @@ tests :: Tasty.TestTree
 tests =
   Tasty.testGroup "root"
   [ testCurrencies
+  , testHalfEvenRounding
   , testCurrencyUnits
   , testExchange
   , testRationalToDecimal
@@ -195,6 +195,29 @@ testRationalToDecimal =
          , "0"       --  6
          , "0"       --  7
          ]
+  , HU.testCase "Round: r5" $ do
+       render Money.Round r5 @?=
+         [ "0.50"   --  0
+         , "0.50"   --  1
+         , "+0.50"  --  2
+         , "+0.50"  --  3
+         , "0"      --  4
+         , "0"      --  5
+         , "0"      --  6
+         , "0"      --  7
+         ]
+  , HU.testCase "Round: negate r5" $ do
+       render Money.Round (negate r5) @?=
+         [ "-0.50"   --  0
+         , "-0.50"   --  1
+         , "-0.50"   --  2
+         , "-0.50"   --  3
+         , "0"       --  4
+         , "0"       --  5
+         , "0"       --  6
+         , "0"       --  7
+         ]
+
   , HU.testCase "Floor: r1" $ do
        render Money.Floor r1 @?=
          [ "1023004567.89"        --  0
@@ -278,6 +301,28 @@ testRationalToDecimal =
          , "-0.01"   --  1
          , "-0.01"   --  2
          , "-0.01"   --  3
+         , "-1"      --  4
+         , "-1"      --  5
+         , "-1"      --  6
+         , "-1"      --  7
+         ]
+  , HU.testCase "Floor: r5" $ do
+       render Money.Floor r5 @?=
+         [ "0.50"   --  0
+         , "0.50"   --  1
+         , "+0.50"   --  2
+         , "+0.50"   --  3
+         , "0"      --  4
+         , "0"      --  5
+         , "0"      --  6
+         , "0"      --  7
+         ]
+  , HU.testCase "Floor: negate r5" $ do
+       render Money.Floor (negate r5) @?=
+         [ "-0.50"   --  0
+         , "-0.50"   --  1
+         , "-0.50"   --  2
+         , "-0.50"   --  3
          , "-1"      --  4
          , "-1"      --  5
          , "-1"      --  6
@@ -372,6 +417,28 @@ testRationalToDecimal =
          , "0"      --  6
          , "0"      --  7
          ]
+  , HU.testCase "Ceiling: r5" $ do
+       render Money.Ceiling r5 @?=
+         [ "0.50"   --  0
+         , "0.50"   --  1
+         , "+0.50"  --  2
+         , "+0.50"  --  3
+         , "1"      --  4
+         , "1"      --  5
+         , "+1"     --  6
+         , "+1"     --  7
+         ]
+  , HU.testCase "Ceiling: negate r5" $ do
+       render Money.Ceiling (negate r5) @?=
+         [ "-0.50"   --  0
+         , "-0.50"   --  1
+         , "-0.50"   --  2
+         , "-0.50"   --  3
+         , "0"      --  4
+         , "0"      --  5
+         , "0"      --  6
+         , "0"      --  7
+         ]
 
   , HU.testCase "Truncate: r1" $ do
       render Money.Truncate r1 @?= render Money.Floor r1
@@ -396,19 +463,74 @@ testRationalToDecimal =
 
   , HU.testCase "Truncate: negate r4" $ do
       render Money.Truncate (negate r4) @?= render Money.Ceiling (negate r4)
+
+  , HU.testCase "Truncate: r5" $ do
+      render Money.Truncate r5 @?= render Money.Floor r5
+
+  , HU.testCase "Truncate: negate r5" $ do
+      render Money.Truncate (negate r5) @?= render Money.Ceiling (negate r5)
+
+  , HU.testCase "HalfEven: r1" $ do
+      render Money.HalfEven r1 @?= render Money.Round r1
+
+  , HU.testCase "HalfEven: negate r1" $ do
+      render Money.HalfEven (negate r1) @?= render Money.Round (negate r1)
+
+  , HU.testCase "HalfEven: r2" $ do
+      render Money.HalfEven r2 @?= render Money.Round r2
+
+  , HU.testCase "HalfEven: negate r2" $ do
+      render Money.HalfEven (negate r2) @?= render Money.Round (negate r2)
+
+  , HU.testCase "HalfEven: r3" $ do
+      render Money.HalfEven r3 @?= render Money.Round r3
+
+  , HU.testCase "HalfEven: negate r3" $ do
+      render Money.HalfEven (negate r3) @?= render Money.Round (negate r3)
+
+  , HU.testCase "HalfEven: r4" $ do
+      render Money.HalfEven r4 @?= render Money.Round r4
+
+  , HU.testCase "HalfEven: negate r4" $ do
+      render Money.HalfEven (negate r4) @?= render Money.Round (negate r4)
+
+  , HU.testCase "HalfEven: r5" $ do
+       render Money.HalfEven r5 @?=
+         [ "0.50"   --  0
+         , "0.50"   --  1
+         , "+0.50"  --  2
+         , "+0.50"  --  3
+         , "0"      --  4
+         , "0"      --  5
+         , "0"      --  6
+         , "0"      --  7
+         ]
+  , HU.testCase "HalfEven: negate r5" $ do
+       render Money.HalfEven (negate r5) @?=
+         [ "-0.50"   --  0
+         , "-0.50"   --  1
+         , "-0.50"   --  2
+         , "-0.50"   --  3
+         , "0"      --  4
+         , "0"      --  5
+         , "0"      --  6
+         , "0"      --  7
+         ]
+
   ]
   where
     r1 :: Rational = 1023004567895 % 1000
     r2 :: Rational = 123 % 100
     r3 :: Rational = 345 % 1000
     r4 :: Rational = 7 % 1000
+    r5 :: Rational = 1 % 2
 
     render :: Money.Approximation -> Rational -> [T.Text]
     render a r =
-      [ MoneyI.rationalToDecimal ds_dd_2 a r           -- 0
-      , MoneyI.rationalToDecimal ds_tc_dd_2 a r        -- 1
-      , MoneyI.rationalToDecimal ds_p_dd_2 a r         -- 2
-      , MoneyI.rationalToDecimal ds_p_tc_dd_2 a r      -- 3
+      [ MoneyI.rationalToDecimal ds_dd_2 a r        -- 0
+      , MoneyI.rationalToDecimal ds_tc_dd_2 a r     -- 1
+      , MoneyI.rationalToDecimal ds_p_dd_2 a r      -- 2
+      , MoneyI.rationalToDecimal ds_p_tc_dd_2 a r   -- 3
       , MoneyI.rationalToDecimal ds_dd_0 a r        -- 4
       , MoneyI.rationalToDecimal ds_tc_dd_0 a r     -- 5
       , MoneyI.rationalToDecimal ds_p_dd_0 a r      -- 6
@@ -842,10 +964,12 @@ testRounding _ _ =
     , QC.testProperty "ceiling"  $ QC.forAll QC.arbitrary (g (Money.discreteFromDense Money.Ceiling))
     , QC.testProperty "round"    $ QC.forAll QC.arbitrary (g (Money.discreteFromDense Money.Round))
     , QC.testProperty "truncate" $ QC.forAll QC.arbitrary (g (Money.discreteFromDense Money.Truncate))
+    , QC.testProperty "half-even" $ QC.forAll QC.arbitrary (g (Money.discreteFromDense Money.HalfEven))
     , QC.testProperty "floor no reminder"    $ QC.forAll QC.arbitrary (h (Money.discreteFromDense Money.Floor))
     , QC.testProperty "ceiling no reminder"  $ QC.forAll QC.arbitrary (h (Money.discreteFromDense Money.Ceiling))
     , QC.testProperty "round no reminder"    $ QC.forAll QC.arbitrary (h (Money.discreteFromDense Money.Round))
     , QC.testProperty "truncate no reminder" $ QC.forAll QC.arbitrary (h (Money.discreteFromDense Money.Truncate))
+    , QC.testProperty "half-even no reminder " $ QC.forAll QC.arbitrary (h (Money.discreteFromDense Money.HalfEven))
     ]
   where
     g :: (Money.Dense currency -> (Money.Discrete' currency (Money.Scale currency unit), Money.Dense currency))
@@ -859,6 +983,44 @@ testRounding _ _ =
     h f = \x -> (Money.denseFromDiscrete x) === case f (Money.denseFromDiscrete x) of
       (y, 0) -> Money.denseFromDiscrete y
       (_, _) -> error "testRounding.h: unexpected"
+
+testHalfEvenRounding :: Tasty.TestTree
+testHalfEvenRounding =
+    Tasty.testGroup "HalfEven rounding"
+    [ HU.testCase "-2.8" $ -3 @=? f (-3152519739159347 % 1125899906842624)
+
+    , HU.testCase "-2.5" $ -2 @=? f (-5 % 2)
+    , HU.testCase "-2.2" $ -2 @=? f (-2476979795053773 % 1125899906842624)
+    , HU.testCase "-2"   $ -2 @=? f (-2 % 1)
+    , HU.testCase "-1.8" $ -2 @=? f (-8106479329266893 % 4503599627370496)
+    , HU.testCase "-1.5" $ -2 @=? f (-3 % 2)
+
+    , HU.testCase "-1.2" $ -1 @=? f (-5404319552844595 % 4503599627370496)
+    , HU.testCase "-1"   $ -1 @=? f (-1 % 1)
+    , HU.testCase "-0.8" $ -1 @=? f (-3602879701896397 % 4503599627370496)
+
+    , HU.testCase "-0.5" $  0 @=? f (-1 % 2)
+    , HU.testCase "-0.2" $  0 @=? f (-3602879701896397 % 18014398509481984)
+    , HU.testCase  "0"   $  0 @=? f (0 % 1)
+    , HU.testCase  "0.2" $  0 @=? f (3602879701896397 % 18014398509481984)
+    , HU.testCase  "0.5" $  0 @=? f (1 % 2)
+
+    , HU.testCase  "0.8" $  1 @=? f (3602879701896397 % 4503599627370496)
+    , HU.testCase  "1"   $  1 @=? f (1 % 1)
+    , HU.testCase  "1.2" $  1 @=? f (5404319552844595 % 4503599627370496)
+
+    , HU.testCase  "1.5" $  2 @=? f (3 % 2)
+    , HU.testCase  "1.8" $  2 @=? f (8106479329266893 % 4503599627370496)
+    , HU.testCase  "2"   $  2 @=? f (2 % 1)
+    , HU.testCase  "2.2" $  2 @=? f (2476979795053773 % 1125899906842624)
+    , HU.testCase  "2.5" $  2 @=? f (5 % 2)
+
+    , HU.testCase  "2.8" $  3 @=? f (3152519739159347 % 1125899906842624)
+    ]
+  where
+    f :: Rational -> Integer
+    f = MoneyI.approximate MoneyI.HalfEven
+
 
 
 -- | Decimal dot, 2 decimals

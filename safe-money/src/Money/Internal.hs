@@ -89,7 +89,8 @@ module Money.Internal
  , rationalToDecimal
  , rationalFromDecimal
  -- * Miscellaneous
- , Approximation(Round, Floor, Ceiling, Truncate)
+ , Approximation(Round, Floor, Ceiling, Truncate, HalfEven)
+ , approximate
  -- ** Decimal config
  , DecimalConf
  , defaultDecimalConf
@@ -491,8 +492,10 @@ data Approximation
   -- ^ Approximate @x@ to the nearest integer greater than or equal to @x@.
   | Truncate
   -- ^ Approximate @x@ to the nearest integer betwen @0@ and @x@, inclusive.
+  | HalfEven
+  -- ^ Approximate @x@ to the nearest even integer, when equidistant from the
+  -- nearest two integers. This is also known as “Bankers Rounding”.
   deriving (Eq, Ord, Show, Read, GHC.Generic)
-
 
 approximate :: Approximation -> Rational -> Integer
 {-# INLINE approximate #-}
@@ -501,6 +504,19 @@ approximate = \case
   Floor -> floor
   Ceiling -> ceiling
   Truncate -> truncate
+  HalfEven -> halfEven
+
+-- | Approximate to the nearest even integer, when equidistant from the nearest
+-- two integers. This is also known as “Bankers Rounding”.
+halfEven :: Rational -> Integer
+{-# INLINABLE halfEven #-}
+halfEven = \r ->                          --    1.5    -1.5
+  let tr  :: Integer  = truncate r        --    1.0    -1.0
+      rr  :: Rational = toRational tr - r --   -0.5     0.5
+  in if | abs rr /= 1%2 -> round r
+        | even tr -> tr
+        | otherwise -> tr + signum tr
+
 
 -- | Approximate a 'Dense' value @x@ to the nearest value fully representable a
 -- given @scale@.
