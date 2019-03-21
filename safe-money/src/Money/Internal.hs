@@ -547,9 +547,11 @@ discreteFromDense a = \c0 ->
 
 --------------------------------------------------------------------------------
 
--- | A 'Scale' is a positive, non-zero rational number.
+-- | This is the term-level representation of the “scale” we represent as
+-- @('Nat', 'Nat')@ elsewhere in the type system (e.g., in 'GoodScale' or
+-- 'UnitScale').
 --
--- See 'UnitScale' for a description.
+-- See 'UnitScale' for a detailed description.
 newtype Scale = Scale Rational
   deriving (Eq, Ord, Show, GHC.Generic)
 
@@ -570,8 +572,9 @@ scaleToRational (Scale r) = r
 --
 -- @currency@ is usually a ISO-4217 currency code, but not necessarily.
 --
--- The resulting 'Scale' will determine how to convert a 'Dense' value into a
--- 'Discrete' value and vice-versa.
+-- The resulting @('Nat', 'Nat')@, which is the type-level representation for
+-- what at the term-level we call 'Scale', will determine how to convert a
+-- 'Dense' value into a 'Discrete' value and vice-versa.
 --
 -- For example, there are 100 USD cents in 1 USD, so the scale for this
 -- relationship is:
