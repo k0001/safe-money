@@ -1,6 +1,8 @@
 # Version 0.8.1
 
-* Fix decimal rendering of some small cent values (e.g., `0.02`). See #45
+* Fix decimal rendering of some small cent values (e.g., `0.02`). See issue #45.
+
+* Fixed `xxxToDecimal` docs. See issue #45.
 
 
 # Version 0.8

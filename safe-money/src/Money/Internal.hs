@@ -1376,8 +1376,6 @@ discreteToDecimal
   -> Discrete' currency scale
   -- ^ The monetary amount to render.
   -> T.Text
-  -- ^ Returns 'Nothing' is the given separators are not acceptable (i.e., they
-  -- are digits, or they are equal).
 {-# INLINABLE discreteToDecimal #-}
 discreteToDecimal ds a = \dns ->
   denseToDecimal ds a (denseFromDiscrete dns)
@@ -1398,8 +1396,6 @@ exchangeRateToDecimal
   -> ExchangeRate src dst
   -- ^ The 'ExchangeRate' to render.
   -> T.Text
-  -- ^ Returns 'Nothing' if the given separators are not acceptable (i.e., they
-  -- are digits, or they are equal).
 {-# INLINABLE exchangeRateToDecimal #-}
 exchangeRateToDecimal ds a = \(ExchangeRate r0) ->
   rationalToDecimal ds a r0
@@ -1415,7 +1411,7 @@ data Separators = Separators Char (Maybe Char)
 
 -- | Construct 'Separators' to use with in 'DecimalConf'.
 --
--- The separatorsA can't be an ASCII digit nor control character, and they must
+-- The separators can't be an ASCII digit nor control character, and they must
 -- be different from each other.
 mkSeparators
   :: Char
@@ -1568,8 +1564,6 @@ rationalToDecimal
   -> Rational
   -- ^ The dense monetary amount to render.
   -> T.Text
-  -- ^ Returns 'Nothing' if the given separators are not acceptable (i.e., they
-  -- are digits, or they are equal).
 {-# INLINABLE rationalToDecimal #-}
 rationalToDecimal (DecimalConf (Separators ds yts) plus fdigs sc) a = \r0 -> do
   -- This string-fu is not particularly efficient. TODO: Make fast.
