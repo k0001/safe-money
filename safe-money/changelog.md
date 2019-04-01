@@ -4,6 +4,8 @@
 
 * Fixed `xxxToDecimal` docs. See issue #45.
 
+* Add `someXxxToDecimal`. See issue #44.
+
 
 # Version 0.8
 

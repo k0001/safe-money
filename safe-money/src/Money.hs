@@ -84,6 +84,7 @@ module Money
  , I.mkSomeDense
  , I.fromSomeDense
  , I.withSomeDense
+ , I.someDenseToDecimal
  , I.someDenseCurrency
  , I.someDenseAmount
  , I.SomeDiscrete
@@ -91,6 +92,7 @@ module Money
  , I.mkSomeDiscrete
  , I.fromSomeDiscrete
  , I.withSomeDiscrete
+ , I.someDiscreteToDecimal
  , I.someDiscreteCurrency
  , I.someDiscreteScale
  , I.someDiscreteAmount
@@ -99,6 +101,7 @@ module Money
  , I.mkSomeExchangeRate
  , I.fromSomeExchangeRate
  , I.withSomeExchangeRate
+ , I.someExchangeRateToDecimal
  , I.someExchangeRateSrcCurrency
  , I.someExchangeRateDstCurrency
  , I.someExchangeRateRate

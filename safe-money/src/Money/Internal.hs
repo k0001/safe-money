@@ -65,6 +65,7 @@ module Money.Internal
  , mkSomeDense'
  , fromSomeDense
  , withSomeDense
+ , someDenseToDecimal
  , someDenseCurrency
  , someDenseCurrency'
  , someDenseAmount
@@ -74,6 +75,7 @@ module Money.Internal
  , mkSomeDiscrete'
  , fromSomeDiscrete
  , withSomeDiscrete
+ , someDiscreteToDecimal
  , someDiscreteCurrency
  , someDiscreteCurrency'
  , someDiscreteScale
@@ -84,6 +86,7 @@ module Money.Internal
  , mkSomeExchangeRate'
  , fromSomeExchangeRate
  , withSomeExchangeRate
+ , someExchangeRateToDecimal
  , someExchangeRateSrcCurrency
  , someExchangeRateSrcCurrency'
  , someExchangeRateDstCurrency
@@ -532,7 +535,7 @@ discreteFromDense
   :: forall currency scale
   .  GoodScale scale
   => Approximation
-  -- ^ Approximation to use if necesary in order to fit the 'Dense' amount in
+  -- ^ Approximation to use if necessary in order to fit the 'Dense' amount in
   -- the requested @scale@.
   -> Dense currency
   -> (Discrete' currency scale, Dense currency)
@@ -1336,20 +1339,27 @@ instance Binary.Binary SomeExchangeRate where
 -- \"1234.56\"
 -- @
 denseToDecimal
-  :: DecimalConf
-  -- ^ Config to use for rendering the decimal number.
+  :: DecimalConf -- ^ Config to use for rendering the decimal number.
   -> Approximation
-  -- ^ Approximation to use if necesary in order to fit the 'Dense' amount in
+  -- ^ Approximation to use if necessary in order to fit the 'Dense' amount in
   -- as many decimal numbers as requested.
-  -> Dense currency
-  -- ^ The dense monetary amount to render.
+  -> Dense currency -- ^ The monetary amount to render.
   -> T.Text
-  -- ^ Returns 'Nothing' is the given separators are not acceptable (i.e., they
-  -- are digits, or they are equal).
 {-# INLINABLE denseToDecimal #-}
-denseToDecimal ds a = \(Dense r0) -> do
-  rationalToDecimal ds a r0
+denseToDecimal dc a = \(Dense r0) ->
+  rationalToDecimal dc a r0
 
+-- | Like 'denseToDecimal', but takes a 'SomeDense' as input.
+someDenseToDecimal
+  :: DecimalConf -- ^ Config to use for rendering the decimal number.
+  -> Approximation
+  -- ^ Approximation to use if necessary in order to fit the 'SomeDense' amount
+  -- in as many decimal numbers as requested.
+  -> SomeDense -- ^ The monetary amount to render.
+  -> T.Text
+{-# INLINABLE someDenseToDecimal #-}
+someDenseToDecimal dc a = \sd ->
+  withSomeDense sd (denseToDecimal dc a)
 
 -- | Render a 'Discrete'' monetary amount as a decimal number in a potentially
 -- lossy manner.
@@ -1368,17 +1378,28 @@ denseToDecimal ds a = \(Dense r0) -> do
 -- Please refer to 'denseToDecimal' for further documentation.
 discreteToDecimal
   :: GoodScale scale
-  => DecimalConf
-  -- ^ Config to use for rendering the decimal number.
+  => DecimalConf -- ^ Config to use for rendering the decimal number.
   -> Approximation
-  -- ^ Approximation to use if necesary in order to fit the 'Discrete' amount in
-  -- as many decimal numbers as requested.
+  -- ^ Approximation to use if necessary in order to fit the 'Discrete' amount
+  -- in as many decimal numbers as requested.
   -> Discrete' currency scale
   -- ^ The monetary amount to render.
   -> T.Text
 {-# INLINABLE discreteToDecimal #-}
-discreteToDecimal ds a = \dns ->
-  denseToDecimal ds a (denseFromDiscrete dns)
+discreteToDecimal dc a = \dns ->
+  denseToDecimal dc a (denseFromDiscrete dns)
+
+-- | Like 'discreteToDecimal', but takes a 'SomeDiscrete' as input.
+someDiscreteToDecimal
+  :: DecimalConf -- ^ Config to use for rendering the decimal number.
+  -> Approximation
+  -- ^ Approximation to use if necessary in order to fit the 'SomeDiscrete'
+  -- amount in as many decimal numbers as requested.
+  -> SomeDiscrete -- ^ The monetary amount to render.
+  -> T.Text
+{-# INLINABLE someDiscreteToDecimal #-}
+someDiscreteToDecimal dc a = \sd ->
+  withSomeDiscrete sd (discreteToDecimal dc a)
 
 -- | Render a 'ExchangeRate' as a decimal number in a potentially lossy manner.
 --
@@ -1388,17 +1409,27 @@ discreteToDecimal ds a = \dns ->
 -- Just \"1,234.56\"
 -- @
 exchangeRateToDecimal
-  :: DecimalConf
-  -- ^ Config to use for rendering the decimal number.
+  :: DecimalConf -- ^ Config to use for rendering the decimal number.
   -> Approximation
-  -- ^ Approximation to use if necesary in order to fit the 'Dense' amount in
-  -- as many decimal numbers as requested.
-  -> ExchangeRate src dst
-  -- ^ The 'ExchangeRate' to render.
+  -- ^ Approximation to use if necessary in order to fit the 'ExchangeRate'
+  -- amount in as many decimal numbers as requested.
+  -> ExchangeRate src dst -- ^ The 'ExchangeRate' to render.
   -> T.Text
 {-# INLINABLE exchangeRateToDecimal #-}
-exchangeRateToDecimal ds a = \(ExchangeRate r0) ->
-  rationalToDecimal ds a r0
+exchangeRateToDecimal dc a = \(ExchangeRate r0) ->
+  rationalToDecimal dc a r0
+
+-- | Like 'exchangeRateToDecimal', but takes a 'SomeExchangeRate' as input.
+someExchangeRateToDecimal
+  :: DecimalConf -- ^ Config to use for rendering the decimal number.
+  -> Approximation
+  -- ^ Approximation to use if necessary in order to fit the 'SomeExchangeRate'
+  -- amount in as many decimal numbers as requested.
+  -> SomeExchangeRate -- ^ The 'SomeExchangeRate' to render.
+  -> T.Text
+{-# INLINABLE someExchangeRateToDecimal #-}
+someExchangeRateToDecimal dc a = \ser ->
+  withSomeExchangeRate ser (exchangeRateToDecimal dc a)
 
 --------------------------------------------------------------------------------
 
@@ -1559,7 +1590,7 @@ rationalToDecimal
   :: DecimalConf
   -- ^ Config to use for rendering the decimal number.
   -> Approximation
-  -- ^ Approximation to use if necesary in order to fit the 'Dense' amount in
+  -- ^ Approximation to use if necessary in order to fit the 'Dense' amount in
   -- as many decimal numbers as requested.
   -> Rational
   -- ^ The dense monetary amount to render.
