@@ -1,3 +1,8 @@
+# Version 0.8.1
+
+* Fix decimal rendering of some small cent values (e.g., `0.02`). See #45
+
+
 # Version 0.8
 
 * _COMPILER ASSISTED BREAKING CHANGE_. Introduced `DecimalConf`, which all

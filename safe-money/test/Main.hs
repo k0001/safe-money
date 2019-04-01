@@ -100,6 +100,33 @@ testCurrencyUnits =
   , testDiscrete (Proxy :: Proxy "VUV") (Proxy :: Proxy "vatu")
   , testDiscrete (Proxy :: Proxy "XAU") (Proxy :: Proxy "gram")
   , testDiscrete (Proxy :: Proxy "XAU") (Proxy :: Proxy "grain")
+  , testDiscreteBase10 (Proxy :: Proxy "BTC") (Proxy :: Proxy "satoshi")
+  , testDiscreteBase10 (Proxy :: Proxy "BTC") (Proxy :: Proxy "bitcoin")
+  , testDiscreteBase10 (Proxy :: Proxy "USD") (Proxy :: Proxy "cent")
+  , testDiscreteBase10 (Proxy :: Proxy "USD") (Proxy :: Proxy "dollar")
+  , testDiscreteBase10 (Proxy :: Proxy "VUV") (Proxy :: Proxy "vatu")
+  ]
+
+testDiscreteBase10
+  :: forall (currency :: Symbol) (unit :: Symbol)
+  .  ( Money.GoodScale (Money.UnitScale currency unit)
+     , KnownSymbol currency
+     , KnownSymbol unit )
+  => Proxy currency
+  -> Proxy unit
+  ->  Tasty.TestTree
+testDiscreteBase10 _ _=
+  Tasty.testGroup "Discrete (scale base 10)"
+  [ Tasty.localOption (QC.QuickCheckTests 5000) $
+    QC.testProperty "discreteToDecimal/discreteFromDecimal: roundtrip" $
+      QC.forAll QC.arbitrary $ \(dis0 :: Money.Discrete currency unit) ->
+        let fdigs = ceiling (logBase 10 (fromRational
+                      (Money.scaleToRational (Money.scale dis0))))
+        in (fdigs <= fromIntegral (maxBound :: Word8))
+           ==> let dc = Money.defaultDecimalConf
+                        { Money.decimalConf_digits = fromIntegral fdigs }
+                   dec = Money.discreteToDecimal dc Money.Round dis0
+               in Just dis0 === Money.discreteFromDecimal dc dec
   ]
 
 
@@ -216,6 +243,28 @@ testRationalToDecimal =
          , "0"       --  6
          , "0"       --  7
          ]
+  , HU.testCase "Round: r6" $ do
+       render Money.Round r6 @?=
+         [ "0.02"   --  0
+         , "0.02"   --  1
+         , "+0.02"  --  2
+         , "+0.02"  --  3
+         , "0"      --  4
+         , "0"      --  5
+         , "0"      --  6
+         , "0"      --  7
+         ]
+  , HU.testCase "Round: negate r6" $ do
+       render Money.Round (negate r6) @?=
+         [ "-0.02"   --  0
+         , "-0.02"   --  1
+         , "-0.02"   --  2
+         , "-0.02"   --  3
+         , "0"       --  4
+         , "0"       --  5
+         , "0"       --  6
+         , "0"       --  7
+         ]
 
   , HU.testCase "Floor: r1" $ do
        render Money.Floor r1 @?=
@@ -322,6 +371,28 @@ testRationalToDecimal =
          , "-0.50"   --  1
          , "-0.50"   --  2
          , "-0.50"   --  3
+         , "-1"      --  4
+         , "-1"      --  5
+         , "-1"      --  6
+         , "-1"      --  7
+         ]
+  , HU.testCase "Floor: r6" $ do
+       render Money.Floor r6 @?=
+         [ "0.02"   --  0
+         , "0.02"   --  1
+         , "+0.02"  --  2
+         , "+0.02"  --  3
+         , "0"      --  4
+         , "0"      --  5
+         , "0"      --  6
+         , "0"      --  7
+         ]
+  , HU.testCase "Floor: negate r6" $ do
+       render Money.Floor (negate r6) @?=
+         [ "-0.02"   --  0
+         , "-0.02"   --  1
+         , "-0.02"   --  2
+         , "-0.02"   --  3
          , "-1"      --  4
          , "-1"      --  5
          , "-1"      --  6
@@ -438,6 +509,28 @@ testRationalToDecimal =
          , "0"      --  6
          , "0"      --  7
          ]
+  , HU.testCase "Ceiling: r6" $ do
+       render Money.Ceiling r6 @?=
+         [ "0.02"   --  0
+         , "0.02"   --  1
+         , "+0.02"  --  2
+         , "+0.02"  --  3
+         , "1"      --  4
+         , "1"      --  5
+         , "+1"     --  6
+         , "+1"     --  7
+         ]
+  , HU.testCase "Ceiling: negate r6" $ do
+       render Money.Ceiling (negate r6) @?=
+         [ "-0.02"   --  0
+         , "-0.02"   --  1
+         , "-0.02"   --  2
+         , "-0.02"   --  3
+         , "0"      --  4
+         , "0"      --  5
+         , "0"      --  6
+         , "0"      --  7
+         ]
 
   , HU.testCase "Truncate: r1" $ do
       render Money.Truncate r1 @?= render Money.Floor r1
@@ -468,6 +561,12 @@ testRationalToDecimal =
 
   , HU.testCase "Truncate: negate r5" $ do
       render Money.Truncate (negate r5) @?= render Money.Ceiling (negate r5)
+
+  , HU.testCase "Truncate: r6" $ do
+      render Money.Truncate r6 @?= render Money.Floor r6
+
+  , HU.testCase "Truncate: negate r6" $ do
+      render Money.Truncate (negate r6) @?= render Money.Ceiling (negate r6)
 
   , HU.testCase "HalfEven: r1" $ do
       render Money.HalfEven r1 @?= render Money.Round r1
@@ -516,6 +615,12 @@ testRationalToDecimal =
          , "0"      --  7
          ]
 
+  , HU.testCase "HalfEven: r6" $ do
+      render Money.HalfEven r6 @?= render Money.Round r6
+
+  , HU.testCase "HalfEven: negate r6" $ do
+      render Money.HalfEven (negate r6) @?= render Money.Round (negate r6)
+
   ]
   where
     r1 :: Rational = 1023004567895 % 1000
@@ -523,6 +628,7 @@ testRationalToDecimal =
     r3 :: Rational = 345 % 1000
     r4 :: Rational = 7 % 1000
     r5 :: Rational = 1 % 2
+    r6 :: Rational = 2 % 100
 
     render :: Money.Approximation -> Rational -> [T.Text]
     render a r =
@@ -569,7 +675,7 @@ testRationalFromDecimal =
             ds1 = ds0 { Money.decimalConf_scale = sr }
             dec = MoneyI.rationalToDecimal ds1 aprox r
             Just r' = MoneyI.rationalFromDecimal ds1 dec
-        in 1 > abs (abs r - abs r')
+        in (1 / Money.scaleToRational sr) > abs (abs r - abs r')
   ]
 
 testDense
@@ -630,7 +736,7 @@ testDense pc =
              Just dns = Money.denseFromDecimal ds dec
          in r === toRational (dns :: Money.Dense currency)
 
-  , Tasty.localOption (QC.QuickCheckTests 1000) $
+  , Tasty.localOption (QC.QuickCheckTests 5000) $
     QC.testProperty "denseToDecimal/denseFromDiscrete: Lossy roundtrip" $
       -- We check that the roundtrip results in a close amount with a fractional
       -- difference of up to one.

@@ -145,6 +145,7 @@ import Prelude hiding ((.), id)
 import qualified Test.QuickCheck as QC
 import qualified Text.ParserCombinators.ReadPrec as ReadPrec
 import qualified Text.ParserCombinators.ReadP as ReadP
+import Text.Printf (printf)
 import qualified Text.Read as Read
 import Unsafe.Coerce (unsafeCoerce)
 
@@ -1570,23 +1571,21 @@ rationalToDecimal
   -- ^ Returns 'Nothing' if the given separators are not acceptable (i.e., they
   -- are digits, or they are equal).
 {-# INLINABLE rationalToDecimal #-}
-rationalToDecimal (DecimalConf (Separators ds yts) plus fdigs0 scal) a = \r0 -> do
-  -- this string-fu is not particularly efficient.
-  let start = r0 * scaleToRational scal * (10 ^ fdigs0) :: Rational
+rationalToDecimal (DecimalConf (Separators ds yts) plus fdigs sc) a = \r0 -> do
+  -- This string-fu is not particularly efficient. TODO: Make fast.
+  let start = r0 * scaleToRational sc * (10 ^ fdigs) :: Rational
       parts = approximate a start :: Integer
-      ipart = fromInteger (abs parts) `div` (10 ^ fdigs0) :: Natural
-      ftext | ipart == 0 = show (abs parts) :: String
-            | otherwise = drop (length (show ipart)) (show (abs parts))
+      ipart = fromInteger (abs parts) `div` (10 ^ fdigs) :: Natural
+      ftext | ipart == 0 = printf ("%0." <> show fdigs <> "d") (abs parts)
+            | otherwise = drop (length (show ipart)) (show (abs parts)) :: String
       itext = maybe (show ipart) (renderThousands ipart) yts :: String
-      fpad0 = List.replicate (fromIntegral fdigs0 - length ftext) '0' :: String
+      fpadr = List.replicate (fromIntegral fdigs - length ftext) '0' :: String
   T.pack $ mconcat
     [ if | parts < 0 -> "-"
          | plus && parts > 0 -> "+"
          | otherwise -> ""
     , itext
-    , if | fdigs0 > 0 -> ds : if start < 1
-                                   then fpad0 <> ftext
-                                   else ftext <> fpad0
+    , if | fdigs > 0 -> ds : ftext <> fpadr
          | otherwise -> ""
     ]
 

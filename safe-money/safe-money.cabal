@@ -1,8 +1,8 @@
 name: safe-money
-version: 0.8
+version: 0.8.1
 license: BSD3
 license-file: LICENSE
-copyright: Copyright (c) Renzo Carbonara 2016-2018
+copyright: Copyright (c) Renzo Carbonara 2016-2019
 author: Renzo Carbonara
 maintainer: renλren!zone
 stability: Experimental
