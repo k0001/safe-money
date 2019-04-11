@@ -195,12 +195,12 @@ Just rawXr0 = Money.exchangeRate (3%2)
 
 rawDns0_xmlbf :: [Xmlbf.Node]
 rawDns0_xmlbf = -- "<money-dense n=\"26\" d=\"1\" c=\"USD\"/>"
-  [ Xmlbf.element' "money-dense" (fromList [("n","26"), ("d","1"), ("c","USD")]) [] ]
+  [ either error id $ Xmlbf.element' "money-dense" (fromList [("n","26"), ("d","1"), ("c","USD")]) [] ]
 rawDis0_xmlbf :: [Xmlbf.Node]
 rawDis0_xmlbf = -- "<money-discrete n=\"100\" a=\"4\" d=\"1\" c=\"USD\"/>"
-  [ Xmlbf.element' "money-discrete" (fromList [("n","100"), ("d","1"), ("c","USD"), ("a","4")]) [] ]
+  [ either error id $ Xmlbf.element' "money-discrete" (fromList [("n","100"), ("d","1"), ("c","USD"), ("a","4")]) [] ]
 rawXr0_xmlbf :: [Xmlbf.Node]
 rawXr0_xmlbf = -- "<exchange-rate dst=\"BTC\" n=\"3\" d=\"2\" src=\"USD\"/>"
-  [ Xmlbf.element' "exchange-rate" (fromList [("n","3"), ("d","2"), ("src","USD"), ("dst","BTC")]) [] ]
+  [ either error id $ Xmlbf.element' "exchange-rate" (fromList [("n","3"), ("d","2"), ("src","USD"), ("dst","BTC")]) [] ]
 
 
