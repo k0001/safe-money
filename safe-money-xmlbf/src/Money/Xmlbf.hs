@@ -22,6 +22,13 @@ import GHC.Exts (fromList)
 import GHC.TypeLits (KnownSymbol)
 import qualified Money
 import qualified Xmlbf
+import qualified Data.Text.Read as TR
+
+pRead :: Integral a => TR.Reader a -> T.Text -> Xmlbf.Parser a
+pRead parser txt = case parser txt of
+  Left err -> fail err
+  Right ( n, "" ) -> return n
+  Right _ -> fail "Parser did not match fully."
 
 --------------------------------------------------------------------------------
 
@@ -46,14 +53,14 @@ instance Xmlbf.ToXml Money.SomeDense where
         as = [ (T.pack "c", Money.someDenseCurrency sd)
              , (T.pack "n", T.pack (show (numerator r)))
              , (T.pack "d", T.pack (show (denominator r))) ]
-    in [ Xmlbf.element' (T.pack "money-dense") (fromList as) [] ]
+    in [ either error id $ Xmlbf.element' (T.pack "money-dense") (fromList as) [] ]
 
 -- | Compatible with 'Money.Dense'.
 instance Xmlbf.FromXml Money.SomeDense where
   fromXml = Xmlbf.pElement (T.pack "money-dense") $ do
     c <- Xmlbf.pAttr "c"
-    n <- Xmlbf.pRead =<< Xmlbf.pAttr "n"
-    d <- Xmlbf.pRead =<< Xmlbf.pAttr "d"
+    n <- pRead (TR.signed TR.decimal) =<< Xmlbf.pAttr "n"
+    d <- pRead TR.decimal =<< Xmlbf.pAttr "d"
     when (d == 0) (fail "denominator is zero")
     maybe empty pure (Money.mkSomeDense c (n % d))
 
@@ -83,16 +90,16 @@ instance Xmlbf.ToXml Money.SomeDiscrete where
              , ("n", T.pack (show (numerator r)))
              , ("d", T.pack (show (denominator r)))
              , ("a", T.pack (show (Money.someDiscreteAmount sd))) ]
-    in [ Xmlbf.element' (T.pack "money-discrete") (fromList as) [] ]
+    in [ either error id $ Xmlbf.element' (T.pack "money-discrete") (fromList as) [] ]
 
 -- | Compatible with 'Money.Discrete''
 instance Xmlbf.FromXml Money.SomeDiscrete where
   fromXml = Xmlbf.pElement (T.pack "money-discrete") $ do
     c <- Xmlbf.pAttr "c"
-    n <- Xmlbf.pRead =<< Xmlbf.pAttr "n"
-    d <- Xmlbf.pRead =<< Xmlbf.pAttr "d"
+    n <- pRead TR.decimal =<< Xmlbf.pAttr "n"
+    d <- pRead TR.decimal =<< Xmlbf.pAttr "d"
     when (d == 0) (fail "denominator is zero")
-    a <- Xmlbf.pRead =<< Xmlbf.pAttr "a"
+    a <- pRead (TR.signed TR.decimal) =<< Xmlbf.pAttr "a"
     maybe empty pure (Money.mkSomeDiscrete c <$> Money.scaleFromRational (n % d)
                                              <*> pure a)
 
@@ -123,15 +130,15 @@ instance Xmlbf.ToXml Money.SomeExchangeRate where
              , ("dst", Money.someExchangeRateDstCurrency ser)
              , ("n", T.pack (show (numerator r)))
              , ("d", T.pack (show (denominator r))) ]
-    in [ Xmlbf.element' (T.pack "exchange-rate") (fromList as) [] ]
+    in [ either error id $ Xmlbf.element' (T.pack "exchange-rate") (fromList as) [] ]
 
 -- | Compatible with 'Money.ExchangeRate'
 instance Xmlbf.FromXml Money.SomeExchangeRate where
   fromXml = Xmlbf.pElement (T.pack "exchange-rate") $ do
     src <- Xmlbf.pAttr "src"
     dst <- Xmlbf.pAttr "dst"
-    n <- Xmlbf.pRead =<< Xmlbf.pAttr "n"
-    d <- Xmlbf.pRead =<< Xmlbf.pAttr "d"
+    n <- pRead TR.decimal =<< Xmlbf.pAttr "n"
+    d <- pRead TR.decimal =<< Xmlbf.pAttr "d"
     when (d == 0) (fail "denominator is zero")
     maybe empty pure (Money.mkSomeExchangeRate src dst (n % d))
 
