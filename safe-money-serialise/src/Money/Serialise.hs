@@ -19,6 +19,7 @@ import Data.Ratio ((%), numerator, denominator)
 import GHC.TypeLits (KnownSymbol)
 import qualified Money
 import qualified Money.Internal as MoneyI
+import Data.Monoid ((<>))
 
 --------------------------------------------------------------------------------
 -- | Compatible with 'Money.SomeDense'.
