@@ -3,7 +3,7 @@
 self: super:
 {
   _here = {
-    ghc841 = super.haskell.packages.ghc841.override {
+    ghc843 = super.haskell.packages.ghc843.override {
       packageSetConfig = import ./hs-overlay.nix { pkgs = self; };
     };
   };
