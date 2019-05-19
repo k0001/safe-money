@@ -1,3 +1,8 @@
+# Version 0.1.2
+
+* Require `xmlbf>=0.5`.
+
+
 # Version 0.1.1
 
 * Require `safe-money>=0.8`.
