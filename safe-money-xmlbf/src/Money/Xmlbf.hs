@@ -25,10 +25,11 @@ import qualified Xmlbf
 import qualified Data.Text.Read as TR
 
 pRead :: Integral a => TR.Reader a -> T.Text -> Xmlbf.Parser a
-pRead parser txt = case parser txt of
+{-# INLINE pRead #-}
+pRead rdr txt = case rdr txt of
+  Right (a, "") -> pure a
+  Right _ -> fail "Money.Xmblbf.pRead: did not match fully."
   Left err -> fail err
-  Right ( n, "" ) -> return n
-  Right _ -> fail "Parser did not match fully."
 
 --------------------------------------------------------------------------------
 
@@ -53,7 +54,7 @@ instance Xmlbf.ToXml Money.SomeDense where
         as = [ (T.pack "c", Money.someDenseCurrency sd)
              , (T.pack "n", T.pack (show (numerator r)))
              , (T.pack "d", T.pack (show (denominator r))) ]
-    in [ either error id $ Xmlbf.element' (T.pack "money-dense") (fromList as) [] ]
+    in [ either error id (Xmlbf.element' "money-dense" (fromList as) []) ]
 
 -- | Compatible with 'Money.Dense'.
 instance Xmlbf.FromXml Money.SomeDense where
@@ -90,7 +91,7 @@ instance Xmlbf.ToXml Money.SomeDiscrete where
              , ("n", T.pack (show (numerator r)))
              , ("d", T.pack (show (denominator r)))
              , ("a", T.pack (show (Money.someDiscreteAmount sd))) ]
-    in [ either error id $ Xmlbf.element' (T.pack "money-discrete") (fromList as) [] ]
+    in [ either error id (Xmlbf.element' "money-discrete" (fromList as) []) ]
 
 -- | Compatible with 'Money.Discrete''
 instance Xmlbf.FromXml Money.SomeDiscrete where
@@ -130,7 +131,7 @@ instance Xmlbf.ToXml Money.SomeExchangeRate where
              , ("dst", Money.someExchangeRateDstCurrency ser)
              , ("n", T.pack (show (numerator r)))
              , ("d", T.pack (show (denominator r))) ]
-    in [ either error id $ Xmlbf.element' (T.pack "exchange-rate") (fromList as) [] ]
+    in [ either error id (Xmlbf.element' "exchange-rate" (fromList as) []) ]
 
 -- | Compatible with 'Money.ExchangeRate'
 instance Xmlbf.FromXml Money.SomeExchangeRate where
