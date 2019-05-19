@@ -171,14 +171,20 @@ testRawSerializations =
     [ Tasty.testGroup "decode"
       [ HU.testCase "Dense" $ do
           Right rawDns0 @=? Xmlbf.runParser Xmlbf.fromXml rawDns0_xmlbf
+      , HU.testCase "Dense (negative)" $ do
+          Right rawDns1 @=? Xmlbf.runParser Xmlbf.fromXml rawDns1_xmlbf
       , HU.testCase "Discrete" $ do
           Right rawDis0 @=? Xmlbf.runParser Xmlbf.fromXml rawDis0_xmlbf
+      , HU.testCase "Discrete (negative)" $ do
+          Right rawDis1 @=? Xmlbf.runParser Xmlbf.fromXml rawDis1_xmlbf
       , HU.testCase "ExchangeRate" $ do
           Right rawXr0 @=? Xmlbf.runParser Xmlbf.fromXml rawXr0_xmlbf
       ]
     , Tasty.testGroup "encode"
       [ HU.testCase "Dense" $ rawDns0_xmlbf @=? Xmlbf.toXml rawDns0
+      , HU.testCase "Dense (negative)" $ rawDns1_xmlbf @=? Xmlbf.toXml rawDns1
       , HU.testCase "Discrete" $ rawDis0_xmlbf @=? Xmlbf.toXml rawDis0
+      , HU.testCase "Discrete (negative)" $ rawDis1_xmlbf @=? Xmlbf.toXml rawDis1
       , HU.testCase "ExchangeRate" $ rawXr0_xmlbf @=? Xmlbf.toXml rawXr0
       ]
     ]
@@ -187,8 +193,15 @@ testRawSerializations =
 rawDns0 :: Money.Dense "USD"
 rawDns0 = Money.dense' (26%1)
 
+rawDns1 :: Money.Dense "USD"
+rawDns1 = Money.dense' (negate 26 % 1)
+
 rawDis0 :: Money.Discrete "USD" "cent"
 rawDis0 = Money.discrete 4
+
+rawDis1 :: Money.Discrete "USD" "cent"
+rawDis1 = Money.discrete (negate 4)
+
 
 rawXr0 :: Money.ExchangeRate "USD" "BTC"
 Just rawXr0 = Money.exchangeRate (3%2)
@@ -196,9 +209,20 @@ Just rawXr0 = Money.exchangeRate (3%2)
 rawDns0_xmlbf :: [Xmlbf.Node]
 rawDns0_xmlbf = -- "<money-dense n=\"26\" d=\"1\" c=\"USD\"/>"
   [ either error id $ Xmlbf.element' "money-dense" (fromList [("n","26"), ("d","1"), ("c","USD")]) [] ]
+
+rawDns1_xmlbf :: [Xmlbf.Node]
+rawDns1_xmlbf = -- "<money-dense n=\"-26\" d=\"1\" c=\"USD\"/>"
+  [ either error id $ Xmlbf.element' "money-dense" (fromList [("n","-26"), ("d","1"), ("c","USD")]) [] ]
+
 rawDis0_xmlbf :: [Xmlbf.Node]
 rawDis0_xmlbf = -- "<money-discrete n=\"100\" a=\"4\" d=\"1\" c=\"USD\"/>"
   [ either error id $ Xmlbf.element' "money-discrete" (fromList [("n","100"), ("d","1"), ("c","USD"), ("a","4")]) [] ]
+
+rawDis1_xmlbf :: [Xmlbf.Node]
+rawDis1_xmlbf = -- "<money-discrete n=\"100\" a=\"-4\" d=\"1\" c=\"USD\"/>"
+  [ either error id $ Xmlbf.element' "money-discrete" (fromList [("n","100"), ("d","1"), ("c","USD"), ("a","-4")]) [] ]
+
+
 rawXr0_xmlbf :: [Xmlbf.Node]
 rawXr0_xmlbf = -- "<exchange-rate dst=\"BTC\" n=\"3\" d=\"2\" src=\"USD\"/>"
   [ either error id $ Xmlbf.element' "exchange-rate" (fromList [("n","3"), ("d","2"), ("src","USD"), ("dst","BTC")]) [] ]
