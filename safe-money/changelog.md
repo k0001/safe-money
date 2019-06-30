@@ -6,6 +6,8 @@
 
 * Add `someXxxToDecimal`. See issue #44.
 
+* Fix `MDL` scale. See issue #50.
+
 
 # Version 0.8
 

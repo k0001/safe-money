@@ -484,7 +484,7 @@ type instance I.UnitScale "MAD" "dirham" = '(1, 1)
 type instance I.UnitScale "MAD" "centime" = '(100, 1)
 -- | Moldovan leu
 type instance I.CurrencyScale "MDL" = I.UnitScale "MDL" "ban"
-type instance I.UnitScale "MDL" "leu" = '(100, 1)
+type instance I.UnitScale "MDL" "leu" = '(1, 1)
 type instance I.UnitScale "MDL" "ban" = '(100, 1)
 -- | Malagasy ariary
 type instance I.CurrencyScale "MGA" = I.UnitScale "MGA" "iraimbilanja"
