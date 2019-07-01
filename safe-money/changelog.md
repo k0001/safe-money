@@ -1,3 +1,14 @@
+# Version 0.9
+
+* _BREAKING CHANGE, POSSIBLY REQUIRING HUMAN INTERVENTION_. Changed
+  `UnitScale "BSD" "cent"` from `(1, 1)` to `(100, 1)`, changed
+  `UnitScale "HTG" "centime"` from `(1, 1)` to `(100, 1)`, changed
+  `UnitScale "MDL" "leu"` from `(100, 1)` to `(1, 1)`, and changed
+  `UnitScale "SBD" "dollar"` from `(100, 1)` to `(1, 1)`.  The scales in
+  question were wrong before. If you relied on these specific scales,
+  for example, for serializing and storing amounts in a database, you
+  will need to rescale your amounts.
+
 # Version 0.8.1
 
 * Fix decimal rendering of some small cent values (e.g., `0.02`). See issue #45.
@@ -5,8 +16,6 @@
 * Fixed `xxxToDecimal` docs. See issue #45.
 
 * Add `someXxxToDecimal`. See issue #44.
-
-* Fix `MDL` scale. See issue #50.
 
 
 # Version 0.8

@@ -217,7 +217,7 @@ type instance I.UnitScale "BRL" "centavo" = '(100, 1)
 -- | Bahamian dollar
 type instance I.CurrencyScale "BSD" = I.UnitScale "BSD" "cent"
 type instance I.UnitScale "BSD" "dollar" = '(1, 1)
-type instance I.UnitScale "BSD" "cent" = '(1, 1)
+type instance I.UnitScale "BSD" "cent" = '(100, 1)
 -- | Bhutanese ngultrum
 type instance I.CurrencyScale "BTN" = I.UnitScale "BTN" "chetrum"
 type instance I.UnitScale "BTN" "ngultrum" = '(1, 1)
@@ -377,7 +377,7 @@ type instance I.UnitScale "HRK" "lipa" = '(100, 1)
 -- | Haitian gourde
 type instance I.CurrencyScale "HTG" = I.UnitScale "HTG" "centime"
 type instance I.UnitScale "HTG" "gourde" = '(1, 1)
-type instance I.UnitScale "HTG" "centime" = '(1, 1)
+type instance I.UnitScale "HTG" "centime" = '(100, 1)
 -- | Hungarian forint
 type instance I.CurrencyScale "HUF" = I.UnitScale "HUF" "filler"
 type instance I.UnitScale "HUF" "forint" = '(1, 1)
@@ -618,7 +618,7 @@ type instance I.UnitScale "SAR" "riyal" = '(1, 1)
 type instance I.UnitScale "SAR" "halala" = '(100, 1)
 -- | Solomon Islands dollar
 type instance I.CurrencyScale "SBD" = I.UnitScale "SBD" "cent"
-type instance I.UnitScale "SBD" "dollar" = '(100, 1)
+type instance I.UnitScale "SBD" "dollar" = '(1, 1)
 type instance I.UnitScale "SBD" "cent" = '(100, 1)
 -- | Seychellois rupee
 type instance I.CurrencyScale "SCR" = I.UnitScale "SCR" "cent"
