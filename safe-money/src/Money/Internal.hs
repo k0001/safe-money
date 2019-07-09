@@ -163,7 +163,7 @@ import Unsafe.Coerce (unsafeCoerce)
 -- of @USD 3.41@ is @USD 1.705@, which is not an amount that can't be
 -- represented as a number of USD cents (the smallest unit that can
 -- represent USD amounts). Nevertheless, if you do manage to represent @USD
--- 1.709@ somehow, and you eventually multiply @USD 1.705@ by @4@ for
+-- 1.705@ somehow, and you eventually multiply @USD 1.705@ by @4@ for
 -- example, then you end up with @USD 6.82@, which is again a value
 -- representable as USD cents. In other words, 'Dense' monetary values
 -- allow us to perform precise calculations deferring the conversion to a
