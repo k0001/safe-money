@@ -96,7 +96,7 @@ module Money.Internal
  , rationalToDecimal
  , rationalFromDecimal
  -- * Miscellaneous
- , Approximation(Round, Floor, Ceiling, Truncate, HalfEven)
+ , Approximation(Round, Floor, Ceiling, Truncate, HalfEven, HalfAwayFromZero)
  , approximate
  -- ** Decimal config
  , DecimalConf(..)
@@ -496,6 +496,10 @@ data Approximation
   | HalfEven
   -- ^ Approximate @x@ to the nearest even integer, when equidistant from the
   -- nearest two integers. This is also known as “Bankers Rounding”.
+  | HalfAwayFromZero
+  -- ^ Approximate @x@ to the nearest integer, or to the nearest integer away
+  -- from zero if @x@ is equidistant between to integers. This is known
+  -- as “kaufmännisches Runden” in German speaking countries.
   deriving (Eq, Ord, Show, Read, GHC.Generic)
 
 approximate :: Approximation -> Rational -> Integer
@@ -506,6 +510,7 @@ approximate = \case
   Ceiling -> ceiling
   Truncate -> truncate
   HalfEven -> halfEven
+  HalfAwayFromZero -> halfAwayFromZero
 
 -- | Approximate to the nearest even integer, when equidistant from the nearest
 -- two integers. This is also known as “Bankers Rounding”.
@@ -518,6 +523,19 @@ halfEven = \r ->                          --    1.5    -1.5
         | even tr -> tr
         | otherwise -> tr + signum tr
 
+-- | Approximate @x@ to the nearest integer, or to the nearest integer away
+-- from zero if @x@ is equidistant between to integers. This is known
+-- as “kaufmännisches Runden” in German speaking countries.
+
+halfAwayFromZero :: Rational -> Integer
+{-# INLINABLE halfAwayFromZero #-}
+halfAwayFromZero = \r ->                   --    1.5    -1.5
+  let s   :: Integer  = truncate (signum r)
+      ar  :: Rational = abs r              --    1.5     1.5
+      tr  :: Integer  = truncate ar        --    1.0     1.0
+      rr  :: Rational = ar - toRational tr --    0.5     0.5
+  in if | rr < 1%2  -> s * tr
+        | otherwise -> s * (tr + 1)
 
 -- | Approximate a 'Dense' value @x@ to the nearest value fully representable a
 -- given @scale@.

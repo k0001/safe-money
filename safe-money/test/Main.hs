@@ -72,6 +72,7 @@ tests =
   Tasty.testGroup "root"
   [ testCurrencies
   , testHalfEvenRounding
+  , testHalfAwayFromZeroRounding
   , testCurrencyUnits
   , testExchange
   , testRationalToDecimal
@@ -1135,6 +1136,42 @@ testHalfEvenRounding =
     f :: Rational -> Integer
     f = MoneyI.approximate MoneyI.HalfEven
 
+testHalfAwayFromZeroRounding :: Tasty.TestTree
+testHalfAwayFromZeroRounding =
+    Tasty.testGroup "HalfAwayFromZero rounding"
+    [ HU.testCase "-2.8" $ -3 @=? f (-3152519739159347 % 1125899906842624)
+
+    , HU.testCase "-2.5" $ -3 @=? f (-5 % 2)
+    , HU.testCase "-2.2" $ -2 @=? f (-2476979795053773 % 1125899906842624)
+    , HU.testCase "-2"   $ -2 @=? f (-2 % 1)
+    , HU.testCase "-1.8" $ -2 @=? f (-8106479329266893 % 4503599627370496)
+    , HU.testCase "-1.5" $ -2 @=? f (-3 % 2)
+
+    , HU.testCase "-1.2" $ -1 @=? f (-5404319552844595 % 4503599627370496)
+    , HU.testCase "-1"   $ -1 @=? f (-1 % 1)
+    , HU.testCase "-0.8" $ -1 @=? f (-3602879701896397 % 4503599627370496)
+
+    , HU.testCase "-0.5" $  -1 @=? f (-1 % 2)
+    , HU.testCase "-0.2" $  0 @=? f (-3602879701896397 % 18014398509481984)
+    , HU.testCase  "0"   $  0 @=? f (0 % 1)
+    , HU.testCase  "0.2" $  0 @=? f (3602879701896397 % 18014398509481984)
+    , HU.testCase  "0.5" $  1 @=? f (1 % 2)
+
+    , HU.testCase  "0.8" $  1 @=? f (3602879701896397 % 4503599627370496)
+    , HU.testCase  "1"   $  1 @=? f (1 % 1)
+    , HU.testCase  "1.2" $  1 @=? f (5404319552844595 % 4503599627370496)
+
+    , HU.testCase  "1.5" $  2 @=? f (3 % 2)
+    , HU.testCase  "1.8" $  2 @=? f (8106479329266893 % 4503599627370496)
+    , HU.testCase  "2"   $  2 @=? f (2 % 1)
+    , HU.testCase  "2.2" $  2 @=? f (2476979795053773 % 1125899906842624)
+    , HU.testCase  "2.5" $  3 @=? f (5 % 2)
+
+    , HU.testCase  "2.8" $  3 @=? f (3152519739159347 % 1125899906842624)
+    ]
+  where
+    f :: Rational -> Integer
+    f = MoneyI.approximate MoneyI.HalfAwayFromZero
 
 
 -- | Decimal dot, 2 decimals
