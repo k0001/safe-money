@@ -1,3 +1,8 @@
+# Version 0.9.1
+
+* Add approximation method `HalfAwayFromZero`, also known as “kaufmännisches Runden”
+  in German speaking countries.
+
 # Version 0.9
 
 * _BREAKING CHANGE, POSSIBLY REQUIRING HUMAN INTERVENTION_. Changed
