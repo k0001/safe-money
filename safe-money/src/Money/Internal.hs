@@ -21,7 +21,7 @@
 {-# OPTIONS_GHC -Wno-redundant-constraints #-}
 
 -- | This is an internal module. You may use stuff exported from here, but we
--- can't garantee their stability.
+-- can't guarantee their stability.
 module Money.Internal
  ( -- * Dense monetary values
    Dense
