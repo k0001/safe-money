@@ -479,7 +479,7 @@ discreteCurrency'
   .  (KnownSymbol currency, GoodScale scale)
   => Discrete' currency scale
   -> String -- ^
-discreteCurrency' = \_ -> symbolVal (Proxy @ currency)
+discreteCurrency' = \_ -> symbolVal (Proxy @currency)
 {-# INLINE discreteCurrency' #-}
 
 -- | Method for approximating a fractional number to an integer number.
@@ -913,7 +913,7 @@ mkSomeDense' = \c r ->
 -- | Convert a 'Dense' to a 'SomeDense' for ease of serialization.
 toSomeDense :: KnownSymbol currency => Dense currency -> SomeDense
 toSomeDense = \(Dense r0 :: Dense currency) ->
-  SomeDense (symbolVal (Proxy @ currency)) r0
+  SomeDense (symbolVal (Proxy @currency)) r0
 {-# INLINE toSomeDense #-}
 
 -- | Attempt to convert a 'SomeDense' to a 'Dense', provided you know the target
@@ -1035,8 +1035,8 @@ fromSomeDiscrete
   => SomeDiscrete
   -> Maybe (Discrete' currency scale)  -- ^
 fromSomeDiscrete = \dr ->
-   if (_someDiscreteCurrency dr == symbolVal (Proxy @ currency)) &&
-      (someDiscreteScale dr == scale (Proxy @ scale))
+   if (_someDiscreteCurrency dr == symbolVal (Proxy @currency)) &&
+      (someDiscreteScale dr == scale (Proxy @scale))
    then Just (Discrete (someDiscreteAmount dr))
    else Nothing
 {-# INLINABLE fromSomeDiscrete #-}
@@ -1178,8 +1178,8 @@ fromSomeExchangeRate
   => SomeExchangeRate
   -> Maybe (ExchangeRate src dst)  -- ^
 fromSomeExchangeRate = \x ->
-   if (_someExchangeRateSrcCurrency x == symbolVal (Proxy @ src)) &&
-      (_someExchangeRateDstCurrency x == symbolVal (Proxy @ dst))
+   if (_someExchangeRateSrcCurrency x == symbolVal (Proxy @src)) &&
+      (_someExchangeRateDstCurrency x == symbolVal (Proxy @dst))
    then Just (ExchangeRate (someExchangeRateRate x))
    else Nothing
 {-# INLINABLE fromSomeExchangeRate #-}
