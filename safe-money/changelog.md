@@ -2,6 +2,8 @@
 
 * Add approximation method `HalfAwayFromZero`, also known as “kaufmännisches Runden”
   in German speaking countries.
+  
+* Fix compilation with GHC 9.
 
 # Version 0.9
 
