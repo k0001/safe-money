@@ -335,7 +335,7 @@ denseCurrency' = symbolVal
 -- 'discrete' 2105 :: 'Discrete' \"GBP\" \"penny\"
 -- @
 --
--- Because @2015 / 100 == 20.15@.
+-- Because @2105 / 100 == 21.05@.
 type Discrete (currency :: Symbol) (unit :: Symbol)
   = Discrete' currency (UnitScale currency unit)
 
