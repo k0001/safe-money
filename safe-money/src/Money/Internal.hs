@@ -997,7 +997,7 @@ someDiscreteAmount :: SomeDiscrete -> Integer
 someDiscreteAmount = _someDiscreteAmount
 {-# INLINE someDiscreteAmount #-}
 
--- | Internal. Build a 'SomeDiscrete' from raw values.
+-- | Build a 'SomeDiscrete' from raw values.
 --
 -- This function is intended for deserialization purposes. You need to convert
 -- this 'SomeDiscrete' value to a 'Discrete' vallue in order to do any
@@ -1137,7 +1137,7 @@ someExchangeRateRate :: SomeExchangeRate -> Rational
 someExchangeRateRate = _someExchangeRateRate
 {-# INLINE someExchangeRateRate #-}
 
--- | Internal. Build a 'SomeExchangeRate' from raw values.
+-- | Build a 'SomeExchangeRate' from raw values.
 --
 -- This function is intended for deserialization purposes. You need to convert
 -- this 'SomeExchangeRate' value to a 'ExchangeRate' value in order to do any
