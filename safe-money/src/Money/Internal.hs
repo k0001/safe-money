@@ -53,6 +53,7 @@ module Money.Internal
    -- * Currency exchange
  , ExchangeRate
  , exchangeRate
+ , exchangeRate'
  , exchange
  , exchangeRateFromDecimal
  , exchangeRateToDecimal
@@ -814,6 +815,34 @@ exchangeRate = \r ->
   then Just (ExchangeRate r)
   else Nothing
 {-# INLINE exchangeRate #-}
+
+-- | Unsafely build an 'ExchageRate' monetary value from a 'Rational' value.
+-- Contrary to 'exchangeRate', this function *crashes* if the given 'Rational'
+-- a value has zero as a denominator or when it is negative, with the former
+-- case being something very unlikely to happen unless the given 'Rational'
+-- was itself unsafely constructed. Other than that, 'exchangeRate' and
+-- 'exchangeRate'' behave the same.
+--
+-- Prefer to use 'exchangeRate' when dealing with 'Rational' inputs from
+-- untrusted sources.
+--
+-- @
+-- 'denominator' x /= 0 && x > 0
+--   ⇒ 'exchangeRate' x == 'Just' ('exchangeRate'' x)
+-- @
+--
+-- @
+-- 'denominator' x == 0 || x <= 0
+--   ⇒ 'undefined' == 'exchangeRate'' x
+-- @
+exchangeRate' :: Rational -> ExchangeRate src dst
+exchangeRate' = \r ->
+  if denominator r /= 0 && r > 0
+  then ExchangeRate r
+  else if denominator r == 0
+       then error "exchangeRate': malformed Rational given (denominator is zero)."
+       else error "exchangeRate': malformed Rational given (is negative)."
+{-# INLINABLE exchangeRate' #-}
 
 -- | Reciprocal 'ExchangeRate'.
 --
