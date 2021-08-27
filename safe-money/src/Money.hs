@@ -73,6 +73,7 @@ module Money
    -- * Currency exchange
  , I.ExchangeRate
  , I.exchangeRate
+ , I.exchangeRate'
  , I.exchange
  , I.exchangeRateRecip
  , I.exchangeRateFromDecimal
