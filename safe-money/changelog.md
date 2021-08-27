@@ -1,9 +1,11 @@
 # Version 0.9.1
 
 * Add approximation method `HalfAwayFromZero`, also known as “kaufmännisches Runden”
-  in German speaking countries.
+  in German speaking countries. See issue #55.
   
-* Fix compilation with GHC 9.
+* Fix compilation with GHC 9. See issue #59.
+
+* Added `exchangeRate'`. See issue #61.
 
 # Version 0.9
 
