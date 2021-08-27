@@ -11,6 +11,7 @@ self: super: {
 
    _shell = self.shellFor {
      withHoogle = false; # hoogle dependencies don't compile
+     buildInputs = [ self.cabal-install ];
      packages = p: [
        p.safe-money
        p.safe-money-aeson
